@@ -1045,11 +1045,11 @@ body,
 }
 
 .title-bar-tabs .ant-tabs-tab {
-    padding: 4px 12px;
-    margin: 0;
+    padding: 4px 24px !important;
+    margin: 0 !important;
     height: 32px;
     line-height: 32px;
-    font-size: 12px;
+    font-size: 12px !important;
 }
 
 .title-bar-tabs .ant-tabs-tab .anticon {
