@@ -16,6 +16,7 @@ interface ProjectTree {
     id: string;
     name: string;
     type: string;
+    method?: string;
     children?: ProjectTree[];
     path?: string;
 }
@@ -119,7 +120,7 @@ function App() {
 
         if (tree.type === 'request') {
             const matchKeyword = !keyword || tree.name.toLowerCase().includes(keyword.toLowerCase());
-            const matchMethod = method === 'ALL' || (tree as any).method === method;
+            const matchMethod = method === 'ALL' || tree.method === method;
             if (matchKeyword && matchMethod) return tree;
             return null;
         }
@@ -152,7 +153,7 @@ function App() {
                     className="api-method-tag"
                     style={{ backgroundColor: getMethodColor((api as any).method || 'GET') + '20', color: getMethodColor((api as any).method || 'GET') }}
                 >
-                    {((api as any).method || 'GET').substring(0, 3).toUpperCase()}
+                    {((api as any).method || 'GET').substring(0, 7).toUpperCase()}
                 </span>
                 <span className="api-name">{api.name.replace('.curl', '')}</span>
                 {hoveredItem === api.path && (
@@ -398,7 +399,7 @@ function App() {
 
         const parentPath = selectedFolder || currentProject.path;
         try {
-            await CreateRequest(currentProject.id, parentPath, newRequestName, '# curl 命令\ncurl ');
+            await CreateRequest(currentProject.id, parentPath, newRequestName, 'curl ');
             message.success('请求创建成功');
             setCreateRequestModal(false);
             setNewRequestName('');
@@ -422,7 +423,6 @@ function App() {
 
     const handleTreeItemClick = async (treeNode: ProjectTree) => {
         if (treeNode.type === 'request' && treeNode.path) {
-            setLoading(true);
             try {
                 const request = await GetRequest(treeNode.path);
                 setCurrentRequest(request);
@@ -446,8 +446,6 @@ function App() {
             } catch (error: any) {
                 console.error('Failed to load request:', error);
                 message.error('加载请求失败');
-            } finally {
-                setLoading(false);
             }
         }
     };
@@ -629,6 +627,13 @@ function App() {
             setRequestContent(curlCommand);
             message.success('请求已保存');
             setStatus('请求已保存');
+
+            // 刷新项目树以更新接口列表中的方法显示
+            const currentProject = projectTabs.find(t => t.id === activeTab)?.project;
+            if (currentProject) {
+                const tree = await GetProjectTree(currentProject.id);
+                setProjectTrees(prev => ({ ...prev, [currentProject.id]: tree }));
+            }
         } catch (error: any) {
             message.error(`保存失败: ${error?.message || error}`);
         }

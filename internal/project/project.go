@@ -32,6 +32,7 @@ type ProjectTree struct {
 	ID       string         `json:"id"`
 	Name     string         `json:"name"`
 	Type     string         `json:"type"`
+	Method   string         `json:"method,omitempty"`
 	Children []*ProjectTree `json:"children,omitempty"`
 	Path     string         `json:"path,omitempty"`
 }
@@ -145,6 +146,12 @@ func (pm *ProjectManager) buildTree(dir string, node *ProjectTree) error {
 			if filepath.Ext(entry.Name()) == ".curl" {
 				requestName := strings.TrimSuffix(entry.Name(), ".curl")
 				metaPath := filepath.Join(dir, requestName+".meta")
+				method := "GET"
+
+				if content, err := os.ReadFile(filepath.Join(dir, entry.Name())); err == nil {
+					method = extractMethod(string(content))
+				}
+
 				if metaData, err := os.ReadFile(metaPath); err == nil {
 					var meta map[string]string
 					if json.Unmarshal(metaData, &meta) == nil {
@@ -155,10 +162,11 @@ func (pm *ProjectManager) buildTree(dir string, node *ProjectTree) error {
 				}
 
 				child := &ProjectTree{
-					ID:   uuid.New().String(),
-					Name: requestName,
-					Type: "request",
-					Path: filepath.Join(dir, entry.Name()),
+					ID:     uuid.New().String(),
+					Name:   requestName,
+					Type:   "request",
+					Path:   filepath.Join(dir, entry.Name()),
+					Method: method,
 				}
 				node.Children = append(node.Children, child)
 			}
@@ -166,6 +174,41 @@ func (pm *ProjectManager) buildTree(dir string, node *ProjectTree) error {
 	}
 
 	return nil
+}
+
+func extractMethod(curlContent string) string {
+	lines := strings.Split(curlContent, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// 查找 curl 命令中的 -X 或 --request 参数
+		if strings.HasPrefix(line, "-X ") || strings.HasPrefix(line, "--request ") {
+			parts := strings.Fields(line)
+			if len(parts) >= 2 {
+				return strings.ToUpper(parts[1])
+			}
+		}
+
+		// 如果行以 curl 开头（可能包含内联参数）
+		if strings.HasPrefix(line, "curl ") {
+			// 直接在行中查找 -X 或 --request
+			if idx := strings.Index(line, "-X "); idx != -1 {
+				methodPart := strings.TrimSpace(line[idx+3:])
+				parts := strings.Fields(methodPart)
+				if len(parts) > 0 {
+					return strings.ToUpper(parts[0])
+				}
+			}
+			if idx := strings.Index(line, "--request "); idx != -1 {
+				methodPart := strings.TrimSpace(line[idx+10:])
+				parts := strings.Fields(methodPart)
+				if len(parts) > 0 {
+					return strings.ToUpper(parts[0])
+				}
+			}
+		}
+	}
+	return "GET"
 }
 
 func (pm *ProjectManager) CreateFolder(projectID, parentPath, name string) (*models.Folder, error) {
