@@ -998,3 +998,119 @@ body,
 .api-item:nth-child(10) {
     animation-delay: 0.5s;
 }
+
+.title-bar {
+    height: 40px;
+    background: var(--bg-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border-subtle);
+    --wails-draggable: drag;
+    user-select: none;
+}
+
+.title-bar-left {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    height: 100%;
+    overflow: hidden;
+}
+
+.title-bar-logo-img {
+    height: 24px;
+    width: auto;
+    margin: 0 12px;
+    --wails-draggable: no-drag;
+}
+
+.title-bar-tabs {
+    flex: 1;
+    overflow: hidden;
+}
+
+.title-bar-tabs .ant-tabs {
+    margin: 0;
+}
+
+.title-bar-tabs .ant-tabs-nav {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+}
+
+.title-bar-tabs .ant-tabs-nav::before {
+    display: none;
+}
+
+.title-bar-tabs .ant-tabs-tab {
+    padding: 4px 12px;
+    margin: 0;
+    height: 32px;
+    line-height: 32px;
+    font-size: 12px;
+}
+
+.title-bar-tabs .ant-tabs-tab .anticon {
+    margin-right: 4px;
+}
+
+.title-bar-tabs .ant-tabs-tab-remove {
+    margin-left: 4px;
+}
+
+.title-bar-tabs .ant-tabs-tab-remove .anticon {
+    margin: 0;
+}
+
+.title-bar-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.title-bar-controls {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    -webkit-app-region: no-drag;
+}
+
+.title-bar-button {
+    width: 46px;
+    height: 100%;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease;
+    color: var(--text-secondary);
+}
+
+.title-bar-button:hover {
+    background: var(--bg-hover);
+}
+
+.title-bar-button.close:hover {
+    background: #e81123;
+    color: white;
+}
+
+.title-bar-button:active {
+    background: var(--bg-active);
+}
+
+.title-bar-button.close:active {
+    background: #c42b1c;
+}
+
+.title-bar-button .anticon {
+    font-size: 14px;
+}
+
+.title-bar-button.maximize .anticon {
+    font-size: 12px;
+}

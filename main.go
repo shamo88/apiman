@@ -16,16 +16,17 @@ func main() {
 	app := NewApp()
 
 	err := wails.Run(&options.App{
-		Title:     "Apiman - API Management Tool",
-		Width:     1280,
-		Height:    800,
-		MinWidth:  800,
-		MinHeight: 600,
+		Title:            "Apiman - API Management Tool",
+		Width:            1280,
+		Height:           800,
+		MinWidth:         800,
+		MinHeight:        600,
+		Frameless:        true,
+		BackgroundColour: &options.RGBA{R: 255, G: 255, B: 255, A: 255},
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: &options.RGBA{R: 255, G: 255, B: 255, A: 255},
-		OnStartup:        app.startup,
+		OnStartup: app.startup,
 		Bind: []interface{}{
 			app,
 		},

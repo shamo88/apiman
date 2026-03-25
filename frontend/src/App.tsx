@@ -3,6 +3,7 @@ import { Button, Space, Modal, Input, message, Spin, Tree, Dropdown, Tabs, Card,
 import { PlusOutlined, ApiOutlined, ProjectOutlined, FolderOutlined, FileOutlined, CloseOutlined, HomeOutlined, DragOutlined, SearchOutlined, RightOutlined, DownOutlined, MoreOutlined } from '@ant-design/icons';
 import type { DataNode } from 'antd/es/tree';
 import './App.css';
+import { TitleBar } from './components/TitleBar';
 import { ListProjects, CreateProject, DeleteProject, GetProjectTree, CreateFolder, CreateRequest, GetRequest, DeleteRequest, DeleteFolder, ExecuteCurl, UpdateRequest } from '../wailsjs/go/main/App';
 
 interface Project {
@@ -732,31 +733,25 @@ function App() {
 
     return (
         <div className="app-container">
-            <div className="app-header">
-                <img src="/logo.png" alt="ApiMan" style={{ height: 32, marginRight: 12 }} />
-                <Tabs
-                    activeKey={activeTab}
-                    onChange={(key) => {
-                        setActiveTab(key);
-                        if (key === 'home') {
-                            setCurrentRequest(null);
-                            setRequestContent('');
-                            setResponse(null);
-                            setRequestTabs([]);
-                            setActiveRequestTab('');
-                        }
-                    }}
-                    type="editable-card"
-                    hideAdd
-                    onEdit={(targetKey, action) => {
-                        if (action === 'remove' && targetKey !== 'home') {
-                            handleCloseProjectTab(targetKey as string);
-                        }
-                    }}
-                    items={tabItems}
-                    style={{ flex: 1 }}
-                />
-            </div>
+            <TitleBar
+                activeTab={activeTab}
+                onTabChange={(key) => {
+                    setActiveTab(key);
+                    if (key === 'home') {
+                        setCurrentRequest(null);
+                        setRequestContent('');
+                        setResponse(null);
+                        setRequestTabs([]);
+                        setActiveRequestTab('');
+                    }
+                }}
+                onTabEdit={(targetKey, action) => {
+                    if (action === 'remove' && targetKey !== 'home') {
+                        handleCloseProjectTab(targetKey as string);
+                    }
+                }}
+                tabItems={tabItems}
+            />
 
             <div className="app-content">
                 {activeTab === 'home' ? (
