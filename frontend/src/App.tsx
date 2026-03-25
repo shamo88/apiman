@@ -383,10 +383,7 @@ function App() {
     return (
         <div className="app-container">
             <div className="app-header">
-                <span style={{ fontWeight: 500, fontSize: '16px' }}>API 管理工具</span>
-            </div>
-
-            <div className="app-content">
+                <span style={{ fontWeight: 500, fontSize: '16px', marginRight: 16 }}>API 管理工具</span>
                 <Tabs
                     activeKey={activeTab}
                     onChange={(key) => {
@@ -407,9 +404,11 @@ function App() {
                         }
                     }}
                     items={tabItems}
-                    style={{ marginBottom: 0 }}
+                    style={{ flex: 1 }}
                 />
+            </div>
 
+            <div className="app-content">
                 {activeTab === 'home' ? (
                     <div className="home-page">
                         <div className="home-header">
@@ -603,9 +602,6 @@ function App() {
                 />
             </Modal>
 
-            <div style={{ padding: '10px 20px', background: '#e6f7ff', borderTop: '1px solid #91d5ff', fontSize: 14 }}>
-                状态: {status}
-            </div>
         </div>
     );
 }

@@ -28,6 +28,38 @@ body,
     color: white;
 }
 
+.app-header .ant-tabs {
+    flex: 1;
+}
+
+.app-header .ant-tabs-nav {
+    margin: 0;
+}
+
+.app-header .ant-tabs-tab {
+    color: rgba(255, 255, 255, 0.65) !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.app-header .ant-tabs-tab:hover {
+    color: white !important;
+}
+
+.app-header .ant-tabs-tab-active {
+    color: #333 !important;
+    background: #e6e6e6 !important;
+    border-bottom: 2px solid #1890ff !important;
+}
+
+.app-header .ant-tabs-tab-remove {
+    color: #999 !important;
+}
+
+.app-header .ant-tabs-tab-remove:hover {
+    color: #666 !important;
+}
+
 .app-content {
     flex: 1;
     display: flex;
