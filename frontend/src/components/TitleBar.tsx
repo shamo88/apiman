@@ -163,9 +163,6 @@ export const TitleBar: React.FC<TitleBarProps> = ({
             >
                 <Row gutter={0} style={{ minHeight: 400 }}>
                     <Col span={6} style={{ borderRight: '1px solid #f0f0f0', paddingRight: 16 }}>
-                        <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 16, color: '#333' }}>
-                            通用设置
-                        </div>
                         {settingsMenuItems.map(item => (
                             <div
                                 key={item.key}
