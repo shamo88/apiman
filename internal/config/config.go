@@ -166,6 +166,16 @@ func (c *ConfigManager) SaveGlobalVariables(variables map[string]string) error {
 	return os.WriteFile(varFile, data, 0644)
 }
 
+type ProxyConfig struct {
+	Enabled    bool   `json:"enabled"`
+	HTTPHost   string `json:"httpHost,omitempty"`
+	HTTPPort   int    `json:"httpPort,omitempty"`
+	HTTPSHost  string `json:"httpsHost,omitempty"`
+	HTTPSPort  int    `json:"httpsPort,omitempty"`
+	SOCKS5Host string `json:"socks5Host,omitempty"`
+	SOCKS5Port int    `json:"socks5Port,omitempty"`
+}
+
 type AppConfig struct {
 	Proxy ProxyConfig `json:"proxy"`
 }
@@ -202,18 +212,4 @@ func (c *ConfigManager) SaveAppConfig(config *AppConfig) error {
 	}
 
 	return os.WriteFile(configFile, data, 0644)
-}
-
-type ProxyConfig struct {
-	Enabled    bool   `json:"enabled"`
-	HTTPHost   string `json:"httpHost,omitempty"`
-	HTTPPort   int    `json:"httpPort,omitempty"`
-	HTTPSHost  string `json:"httpsHost,omitempty"`
-	HTTPSPort  int    `json:"httpsPort,omitempty"`
-	SOCKS5Host string `json:"socks5Host,omitempty"`
-	SOCKS5Port int    `json:"socks5Port,omitempty"`
-}
-
-type AppConfig struct {
-	Proxy ProxyConfig `json:"proxy"`
 }

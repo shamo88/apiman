@@ -2,11 +2,12 @@ export namespace config {
 	
 	export class ProxyConfig {
 	    enabled: boolean;
-	    type: string;
-	    host: string;
-	    port: number;
-	    username?: string;
-	    password?: string;
+	    httpHost?: string;
+	    httpPort?: number;
+	    httpsHost?: string;
+	    httpsPort?: number;
+	    socks5Host?: string;
+	    socks5Port?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new ProxyConfig(source);
@@ -15,11 +16,12 @@ export namespace config {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.enabled = source["enabled"];
-	        this.type = source["type"];
-	        this.host = source["host"];
-	        this.port = source["port"];
-	        this.username = source["username"];
-	        this.password = source["password"];
+	        this.httpHost = source["httpHost"];
+	        this.httpPort = source["httpPort"];
+	        this.httpsHost = source["httpsHost"];
+	        this.httpsPort = source["httpsPort"];
+	        this.socks5Host = source["socks5Host"];
+	        this.socks5Port = source["socks5Port"];
 	    }
 	}
 	export class AppConfig {

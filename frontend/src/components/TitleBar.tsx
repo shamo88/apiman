@@ -14,11 +14,12 @@ interface TitleBarProps {
 
 interface ProxyConfig {
     enabled: boolean;
-    type: string;
-    host: string;
-    port: number;
-    username: string;
-    password: string;
+    httpHost: string;
+    httpPort: number;
+    httpsHost: string;
+    httpsPort: number;
+    socks5Host: string;
+    socks5Port: number;
 }
 
 interface AppConfig {
@@ -66,11 +67,12 @@ export const TitleBar: React.FC<TitleBarProps> = ({
             form.setFieldsValue({
                 proxy: {
                     enabled: config.proxy?.enabled || false,
-                    type: config.proxy?.type || 'http',
-                    host: config.proxy?.host || '',
-                    port: config.proxy?.port || 8080,
-                    username: config.proxy?.username || '',
-                    password: config.proxy?.password || '',
+                    httpHost: config.proxy?.httpHost || '',
+                    httpPort: config.proxy?.httpPort || undefined,
+                    httpsHost: config.proxy?.httpsHost || '',
+                    httpsPort: config.proxy?.httpsPort || undefined,
+                    socks5Host: config.proxy?.socks5Host || '',
+                    socks5Port: config.proxy?.socks5Port || undefined,
                 }
             });
             setSettingsVisible(true);
