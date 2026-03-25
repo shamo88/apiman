@@ -84,10 +84,13 @@ export const TitleBar: React.FC<TitleBarProps> = ({
     const handleSaveSettings = async () => {
         try {
             const values = await form.validateFields();
+            console.log('Saving config:', values);
             await SaveAppConfig(values);
+            console.log('Config saved successfully');
             setSettingsVisible(false);
         } catch (error) {
             console.error('Failed to save config:', error);
+            alert('保存失败: ' + (error as Error).message);
         }
     };
 
