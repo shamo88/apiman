@@ -1107,6 +1107,14 @@ body,
     background: #c42b1c;
 }
 
+.title-bar-button.settings {
+    width: 40px;
+}
+
+.title-bar-button.settings .anticon {
+    font-size: 14px;
+}
+
 .title-bar-button .anticon {
     font-size: 14px;
 }

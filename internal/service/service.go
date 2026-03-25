@@ -108,3 +108,11 @@ func (s *Service) ExtractVariables(text string) []string {
 func (s *Service) ReplaceVariables(text string, variables map[string]string) string {
 	return s.CurlExecutor.ReplaceVariables(text, variables)
 }
+
+func (s *Service) LoadAppConfig() (*config.AppConfig, error) {
+	return s.ConfigManager.LoadAppConfig()
+}
+
+func (s *Service) SaveAppConfig(cfg *config.AppConfig) error {
+	return s.ConfigManager.SaveAppConfig(cfg)
+}

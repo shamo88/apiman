@@ -165,3 +165,55 @@ func (c *ConfigManager) SaveGlobalVariables(variables map[string]string) error {
 
 	return os.WriteFile(varFile, data, 0644)
 }
+
+type AppConfig struct {
+	Proxy ProxyConfig `json:"proxy"`
+}
+
+func (c *ConfigManager) LoadAppConfig() (*AppConfig, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	configFile := filepath.Join(c.configDir, "config.json")
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &AppConfig{}, nil
+		}
+		return nil, err
+	}
+
+	var config AppConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return nil, err
+	}
+
+	return &config, nil
+}
+
+func (c *ConfigManager) SaveAppConfig(config *AppConfig) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	configFile := filepath.Join(c.configDir, "config.json")
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(configFile, data, 0644)
+}
+
+type ProxyConfig struct {
+	Enabled    bool   `json:"enabled"`
+	HTTPHost   string `json:"httpHost,omitempty"`
+	HTTPPort   int    `json:"httpPort,omitempty"`
+	HTTPSHost  string `json:"httpsHost,omitempty"`
+	HTTPSPort  int    `json:"httpsPort,omitempty"`
+	SOCKS5Host string `json:"socks5Host,omitempty"`
+	SOCKS5Port int    `json:"socks5Port,omitempty"`
+}
+
+type AppConfig struct {
+	Proxy ProxyConfig `json:"proxy"`
+}

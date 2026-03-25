@@ -1,6 +1,7 @@
 package main
 
 import (
+	"apiman/internal/config"
 	"apiman/internal/models"
 	"apiman/internal/project"
 	"apiman/internal/service"
@@ -104,4 +105,12 @@ func (a *App) ExtractVariables(text string) []string {
 
 func (a *App) ReplaceVariables(text string, variables map[string]string) string {
 	return a.service.ReplaceVariables(text, variables)
+}
+
+func (a *App) LoadAppConfig() (*config.AppConfig, error) {
+	return a.service.LoadAppConfig()
+}
+
+func (a *App) SaveAppConfig(config *config.AppConfig) error {
+	return a.service.SaveAppConfig(config)
 }

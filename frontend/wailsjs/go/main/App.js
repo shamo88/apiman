@@ -66,12 +66,20 @@ export function ListProjects() {
   return window['go']['main']['App']['ListProjects']();
 }
 
+export function LoadAppConfig() {
+  return window['go']['main']['App']['LoadAppConfig']();
+}
+
 export function LoadEnvironments() {
   return window['go']['main']['App']['LoadEnvironments']();
 }
 
 export function ReplaceVariables(arg1, arg2) {
   return window['go']['main']['App']['ReplaceVariables'](arg1, arg2);
+}
+
+export function SaveAppConfig(arg1) {
+  return window['go']['main']['App']['SaveAppConfig'](arg1);
 }
 
 export function SaveGlobalVariables(arg1) {
