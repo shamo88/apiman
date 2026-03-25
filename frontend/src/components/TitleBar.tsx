@@ -49,7 +49,6 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                     src="/logo.png"
                     alt="Apiman"
                     className="title-bar-logo-img"
-                    style={{ '--wails-draggable': 'no-drag' } as React.CSSProperties}
                 />
 
                 {tabItems && onTabChange && (
