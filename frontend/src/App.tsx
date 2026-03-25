@@ -191,25 +191,26 @@ function App() {
 
     const handleTreeItemClick = async (treeNode: ProjectTree) => {
         if (treeNode.type === 'request' && treeNode.path) {
-            const existingTab = requestTabs.find(t => t.path === treeNode.path);
-            if (existingTab) {
-                setActiveRequestTab(existingTab.id);
-            } else {
-                const newTab: RequestTab = {
-                    id: `request-${Date.now()}`,
-                    title: treeNode.name,
-                    path: treeNode.path,
-                };
-                setRequestTabs([...requestTabs, newTab]);
-                setActiveRequestTab(newTab.id);
-            }
-
             setLoading(true);
             try {
                 const request = await GetRequest(treeNode.path);
                 setCurrentRequest(request);
                 setRequestContent(request.content);
                 setResponse(null);
+
+                const existingTab = requestTabs.find(t => t.path === treeNode.path);
+                if (existingTab) {
+                    setActiveRequestTab(existingTab.id);
+                } else {
+                    const displayName = treeNode.name.replace('.curl', '');
+                    const newTab: RequestTab = {
+                        id: `request-${Date.now()}`,
+                        title: displayName,
+                        path: treeNode.path,
+                    };
+                    setRequestTabs([...requestTabs, newTab]);
+                    setActiveRequestTab(newTab.id);
+                }
             } catch (error: any) {
                 console.error('Failed to load request:', error);
                 message.error('加载请求失败');
@@ -383,7 +384,7 @@ function App() {
     return (
         <div className="app-container">
             <div className="app-header">
-                <span style={{ fontWeight: 500, fontSize: '16px', marginRight: 16 }}>API 管理工具</span>
+                <img src="/logo.png" alt="ApiMan" style={{ height: 32, marginRight: 12 }} />
                 <Tabs
                     activeKey={activeTab}
                     onChange={(key) => {
