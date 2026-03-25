@@ -437,73 +437,52 @@ body,
     flex: 1;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow: auto;
     padding: 24px;
 }
 
-.toolbar {
-    margin-bottom: 20px;
+.api-request-bar {
     display: flex;
     gap: 12px;
-}
-
-.toolbar .ant-btn-primary {
-    background: var(--accent-gradient) !important;
-    border: none !important;
-    padding: 8px 20px;
-    height: auto;
-    font-weight: 500;
-    border-radius: var(--radius-sm);
-    box-shadow: 0 2px 12px rgba(79, 70, 229, 0.2);
-    transition: all 0.3s ease;
-}
-
-.toolbar .ant-btn-primary:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 16px rgba(79, 70, 229, 0.3);
-}
-
-.toolbar .ant-btn:not(.ant-btn-primary) {
-    background: var(--bg-tertiary) !important;
-    border: 1px solid var(--border-subtle) !important;
-    color: var(--text-secondary) !important;
-    border-radius: var(--radius-sm);
-}
-
-.toolbar .ant-btn:not(.ant-btn-primary):hover {
-    background: var(--bg-hover) !important;
-    color: var(--text-primary) !important;
-    border-color: var(--border-accent) !important;
-}
-
-.request-editor {
-    flex: 1;
     margin-bottom: 20px;
-    min-height: 180px;
 }
 
-.request-editor .ant-input {
-    width: 100%;
-    height: 100%;
-    background: var(--bg-card) !important;
-    border: 1px solid var(--border-subtle) !important;
+.api-request-bar .ant-select {
+    width: 120px !important;
+}
+
+.api-config-section {
+    margin-bottom: 20px;
+}
+
+.api-config-section .ant-collapse {
+    border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
-    padding: 16px;
-    font-family: var(--font-mono);
-    font-size: 13px;
-    color: var(--text-primary);
-    resize: none;
-    line-height: 1.6;
+    background: var(--bg-card);
 }
 
-.request-editor .ant-input:focus,
-.request-editor .ant-input-focused {
-    border-color: var(--accent-primary) !important;
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1) !important;
+.api-config-section .ant-collapse-item {
+    border-bottom: 1px solid var(--border-subtle);
 }
 
-.request-editor .ant-input::placeholder {
-    color: var(--text-muted);
+.api-config-section .ant-collapse-header {
+    padding: 12px 16px !important;
+    font-weight: 500;
+}
+
+.kv-editor {
+    padding: 12px;
+}
+
+.kv-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: center;
+}
+
+.kv-row .ant-input {
+    flex: 1;
 }
 
 .response-panel {
@@ -514,7 +493,7 @@ body,
     background: var(--bg-card);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
-    min-height: 180px;
+    min-height: 200px;
     box-shadow: var(--shadow-card);
 }
 

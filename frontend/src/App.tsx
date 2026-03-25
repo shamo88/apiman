@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Button, Space, Modal, Input, message, Spin, Tree, Dropdown, Tabs, Card, Col, Row } from 'antd';
-import { PlusOutlined, ApiOutlined, ProjectOutlined, FolderOutlined, FileOutlined, CloseOutlined, HomeOutlined } from '@ant-design/icons';
+import { Button, Space, Modal, Input, message, Spin, Tree, Dropdown, Tabs, Card, Col, Row, Select, Collapse, Empty } from 'antd';
+import { PlusOutlined, ApiOutlined, ProjectOutlined, FolderOutlined, FileOutlined, CloseOutlined, HomeOutlined, DragOutlined } from '@ant-design/icons';
 import type { DataNode } from 'antd/es/tree';
 import './App.css';
-import { ListProjects, CreateProject, DeleteProject, GetProjectTree, CreateFolder, CreateRequest, GetRequest, DeleteRequest, DeleteFolder, ExecuteCurl } from '../wailsjs/go/main/App';
+import { ListProjects, CreateProject, DeleteProject, GetProjectTree, CreateFolder, CreateRequest, GetRequest, DeleteRequest, DeleteFolder, ExecuteCurl, UpdateRequest } from '../wailsjs/go/main/App';
 
 interface Project {
     id: string;
@@ -37,6 +37,15 @@ interface RequestTab {
     path: string;
 }
 
+interface ApiConfig {
+    name: string;
+    method: string;
+    url: string;
+    headers: { key: string; value: string; enabled: boolean }[];
+    params: { key: string; value: string; enabled: boolean }[];
+    body: string;
+}
+
 function App() {
     const [status, setStatus] = useState('初始化中...');
     const [projects, setProjects] = useState<Project[]>([]);
@@ -57,6 +66,16 @@ function App() {
     const [newFolderName, setNewFolderName] = useState('');
     const [createRequestModal, setCreateRequestModal] = useState(false);
     const [newRequestName, setNewRequestName] = useState('');
+    const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+    const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+    const [apiConfig, setApiConfig] = useState<ApiConfig>({
+        name: '',
+        method: 'GET',
+        url: '',
+        headers: [],
+        params: [],
+        body: ''
+    });
 
     useEffect(() => {
         loadProjects();
@@ -158,8 +177,9 @@ function App() {
             return;
         }
 
+        const parentPath = selectedFolder || currentProject.path;
         try {
-            await CreateFolder(currentProject.id, currentProject.path, newFolderName);
+            await CreateFolder(currentProject.id, parentPath, newFolderName);
             message.success('文件夹创建成功');
             setCreateFolderModal(false);
             setNewFolderName('');
@@ -170,6 +190,33 @@ function App() {
         }
     };
 
+    const findTreeNode = (tree: ProjectTree | null, key: string): ProjectTree | null => {
+        if (!tree) return null;
+        if ((tree.path || tree.id) === key) return tree;
+        if (tree.children) {
+            for (const child of tree.children) {
+                const found = findTreeNode(child, key);
+                if (found) return found;
+            }
+        }
+        return null;
+    };
+
+    const moveRequest = async (dragPath: string, targetFolderPath: string) => {
+        if (!currentProject) return;
+        try {
+            const request = await GetRequest(dragPath);
+            const fileName = dragPath.split(/[/\\]/).pop();
+            await CreateRequest(currentProject.id, targetFolderPath, request.name, request.content);
+            await DeleteRequest(dragPath);
+            const tree = await GetProjectTree(currentProject.id);
+            setProjectTrees(prev => ({ ...prev, [currentProject.id]: tree }));
+            message.success('接口移动成功');
+        } catch (error: any) {
+            message.error(`移动失败: ${error?.message || error}`);
+        }
+    };
+
     const handleCreateRequest = async () => {
         const currentProject = projectTabs.find(t => t.id === activeTab)?.project;
         if (!newRequestName.trim() || !currentProject) {
@@ -177,8 +224,9 @@ function App() {
             return;
         }
 
+        const parentPath = selectedFolder || currentProject.path;
         try {
-            await CreateRequest(currentProject.id, currentProject.path, newRequestName, '# curl 命令\ncurl ');
+            await CreateRequest(currentProject.id, parentPath, newRequestName, '# curl 命令\ncurl ');
             message.success('请求创建成功');
             setCreateRequestModal(false);
             setNewRequestName('');
@@ -195,6 +243,8 @@ function App() {
             try {
                 const request = await GetRequest(treeNode.path);
                 setCurrentRequest(request);
+                const parsedConfig = parseCurlToConfig(request.content, request.name);
+                setApiConfig(parsedConfig);
                 setRequestContent(request.content);
                 setResponse(null);
 
@@ -202,10 +252,9 @@ function App() {
                 if (existingTab) {
                     setActiveRequestTab(existingTab.id);
                 } else {
-                    const displayName = treeNode.name.replace('.curl', '');
                     const newTab: RequestTab = {
                         id: `request-${Date.now()}`,
-                        title: displayName,
+                        title: request.name || treeNode.name.replace('.curl', ''),
                         path: treeNode.path,
                     };
                     setRequestTabs([...requestTabs, newTab]);
@@ -218,6 +267,96 @@ function App() {
                 setLoading(false);
             }
         }
+    };
+
+    const parseCurlToConfig = (curlCommand: string, name: string): ApiConfig => {
+        const config: ApiConfig = {
+            name: name,
+            method: 'GET',
+            url: '',
+            headers: [],
+            params: [],
+            body: ''
+        };
+
+        const lines = curlCommand.split('\n');
+        let urlFound = false;
+
+        for (const line of lines) {
+            const trimmedLine = line.trim();
+            if (trimmedLine.startsWith('#')) continue;
+
+            const methodMatch = trimmedLine.match(/-X\s+(\w+)/i);
+            if (methodMatch) {
+                config.method = methodMatch[1].toUpperCase();
+            }
+
+            const headerMatch = trimmedLine.match(/-H\s+['"]([^'"]+)['"]/i);
+            if (headerMatch) {
+                const [key, ...valueParts] = headerMatch[1].split(':');
+                config.headers.push({
+                    key: key.trim(),
+                    value: valueParts.join(':').trim(),
+                    enabled: true
+                });
+            }
+
+            const dataMatch = trimmedLine.match(/-d\s+['"]([^'"]+)['"]/i);
+            if (dataMatch) {
+                config.body = dataMatch[1];
+            }
+
+            const urlMatch = trimmedLine.match(/['"]?(https?:\/\/[^\s'"]+)['"]?/i);
+            if (urlMatch && !urlFound) {
+                let url = urlMatch[1];
+                const paramMatch = url.match(/\?(.+)$/);
+                if (paramMatch) {
+                    url = url.replace(/\?.*$/, '');
+                    const paramPairs = paramMatch[1].split('&');
+                    for (const pair of paramPairs) {
+                        const [key, value] = pair.split('=');
+                        config.params.push({
+                            key: decodeURIComponent(key || ''),
+                            value: decodeURIComponent(value || ''),
+                            enabled: true
+                        });
+                    }
+                }
+                config.url = url;
+                urlFound = true;
+            }
+        }
+
+        return config;
+    };
+
+    const configToCurl = (config: ApiConfig): string => {
+        let curl = 'curl';
+
+        if (config.method !== 'GET') {
+            curl += ` -X ${config.method}`;
+        }
+
+        for (const header of config.headers) {
+            if (header.enabled && header.key) {
+                curl += ` -H "${header.key}: ${header.value}"`;
+            }
+        }
+
+        for (const param of config.params) {
+            if (param.enabled && param.key) {
+                const separator = config.url.includes('?') ? '&' : '?';
+                config.url += `${separator}${encodeURIComponent(param.key)}=${encodeURIComponent(param.value)}`;
+            }
+        }
+
+        if (config.body) {
+            curl += ` -d '${config.body}'`;
+        }
+
+        curl += ` "${config.url}"`;
+
+        return curl;
     };
 
     const handleCloseRequestTab = (tabId: string) => {
@@ -252,15 +391,16 @@ function App() {
     };
 
     const handleExecuteCurl = async () => {
-        if (!requestContent.trim()) {
-            message.warning('请输入 curl 命令');
+        const curlCommand = configToCurl(apiConfig);
+        if (!curlCommand || !apiConfig.url) {
+            message.warning('请输入 URL');
             return;
         }
 
         setExecuting(true);
         setResponse(null);
         try {
-            const result = await ExecuteCurl(requestContent);
+            const result = await ExecuteCurl(curlCommand);
             setResponse(result);
             setStatus(`请求完成 - ${result.status_code}`);
         } catch (error: any) {
@@ -275,9 +415,9 @@ function App() {
         if (!currentRequest?.path) return;
 
         try {
-            await import('../wailsjs/go/main/App').then(module => {
-                module.UpdateRequest(currentRequest!.path, requestContent);
-            });
+            const curlCommand = configToCurl(apiConfig);
+            await UpdateRequest(currentRequest.path, curlCommand);
+            setRequestContent(curlCommand);
             message.success('请求已保存');
             setStatus('请求已保存');
         } catch (error: any) {
@@ -355,6 +495,7 @@ function App() {
                     )}
                 </div>
             ),
+            isLeaf: tree.type === 'request',
             children: tree.children?.map(child => convertTreeToDataNode(child)),
         };
     };
@@ -475,7 +616,29 @@ function App() {
                                         treeData={currentTree.children?.map(child => convertTreeToDataNode(child))}
                                         showIcon={false}
                                         expandedKeys={expandedKeys}
+                                        selectedKeys={selectedKeys}
                                         onExpand={(keys) => setExpandedKeys(keys as string[])}
+                                        onSelect={(keys) => {
+                                            const selectedKey = keys[0] as string;
+                                            if (selectedKey) {
+                                                const node = findTreeNode(currentTree, selectedKey);
+                                                if (node && node.type === 'folder') {
+                                                    setSelectedFolder(node.path || currentProject?.path || '');
+                                                } else {
+                                                    setSelectedFolder(null);
+                                                }
+                                            }
+                                            setSelectedKeys(keys.map(k => k as string));
+                                        }}
+                                        draggable
+                                        onDrop={(info) => {
+                                            const dragKey = info.dragNode.key as string;
+                                            const dropKey = info.dropToGap ? (info.node.key as string) : (info.node.key as string);
+                                            const dropNode = findTreeNode(currentTree, dropKey);
+                                            if (dropNode && dropNode.type === 'folder') {
+                                                moveRequest(dragKey, dropNode.path || '');
+                                            }
+                                        }}
                                     />
                                 )}
                             </div>
@@ -508,21 +671,153 @@ function App() {
 
                             {currentRequest ? (
                                 <div className="request-panel">
-                                    <div className="toolbar">
-                                        <Button type="primary" icon={<ApiOutlined />} onClick={handleExecuteCurl} loading={executing}>
+                                    <div className="api-request-bar">
+                                        <Select
+                                            value={apiConfig.method}
+                                            onChange={(value) => setApiConfig({ ...apiConfig, method: value })}
+                                            style={{ width: 100 }}
+                                            options={[
+                                                { value: 'GET', label: 'GET' },
+                                                { value: 'POST', label: 'POST' },
+                                                { value: 'PUT', label: 'PUT' },
+                                                { value: 'DELETE', label: 'DELETE' },
+                                                { value: 'PATCH', label: 'PATCH' },
+                                            ]}
+                                        />
+                                        <Input
+                                            placeholder="输入请求 URL"
+                                            value={apiConfig.url}
+                                            onChange={(e) => setApiConfig({ ...apiConfig, url: e.target.value })}
+                                            style={{ flex: 1 }}
+                                        />
+                                        <Button type="primary" onClick={handleExecuteCurl} loading={executing}>
                                             发送
                                         </Button>
-                                        <Button icon={<PlusOutlined />} onClick={handleSaveRequest}>
+                                        <Button onClick={handleSaveRequest}>
                                             保存
                                         </Button>
                                     </div>
 
-                                    <div className="request-editor">
-                                        <Input.TextArea
-                                            value={requestContent}
-                                            onChange={(e) => setRequestContent(e.target.value)}
-                                            placeholder="输入 curl 命令，例如: curl https://api.example.com/users"
-                                            style={{ height: '100%', fontFamily: 'Monaco, Menlo, monospace', fontSize: 13 }}
+                                    <div className="api-config-section">
+                                        <Collapse
+                                            items={[
+                                                {
+                                                    key: 'params',
+                                                    label: 'Params',
+                                                    children: (
+                                                        <div className="kv-editor">
+                                                            {apiConfig.params.map((param, index) => (
+                                                                <div key={index} className="kv-row">
+                                                                    <Input
+                                                                        placeholder="Key"
+                                                                        value={param.key}
+                                                                        onChange={(e) => {
+                                                                            const newParams = [...apiConfig.params];
+                                                                            newParams[index].key = e.target.value;
+                                                                            setApiConfig({ ...apiConfig, params: newParams });
+                                                                        }}
+                                                                    />
+                                                                    <Input
+                                                                        placeholder="Value"
+                                                                        value={param.value}
+                                                                        onChange={(e) => {
+                                                                            const newParams = [...apiConfig.params];
+                                                                            newParams[index].value = e.target.value;
+                                                                            setApiConfig({ ...apiConfig, params: newParams });
+                                                                        }}
+                                                                    />
+                                                                    <Button
+                                                                        type="text"
+                                                                        danger
+                                                                        onClick={() => {
+                                                                            const newParams = apiConfig.params.filter((_, i) => i !== index);
+                                                                            setApiConfig({ ...apiConfig, params: newParams });
+                                                                        }}
+                                                                    >
+                                                                        ×
+                                                                    </Button>
+                                                                </div>
+                                                            ))}
+                                                            <Button
+                                                                type="link"
+                                                                icon={<PlusOutlined />}
+                                                                onClick={() => {
+                                                                    setApiConfig({
+                                                                        ...apiConfig,
+                                                                        params: [...apiConfig.params, { key: '', value: '', enabled: true }]
+                                                                    });
+                                                                }}
+                                                            >
+                                                                添加参数
+                                                            </Button>
+                                                        </div>
+                                                    ),
+                                                },
+                                                {
+                                                    key: 'headers',
+                                                    label: 'Headers',
+                                                    children: (
+                                                        <div className="kv-editor">
+                                                            {apiConfig.headers.map((header, index) => (
+                                                                <div key={index} className="kv-row">
+                                                                    <Input
+                                                                        placeholder="Key"
+                                                                        value={header.key}
+                                                                        onChange={(e) => {
+                                                                            const newHeaders = [...apiConfig.headers];
+                                                                            newHeaders[index].key = e.target.value;
+                                                                            setApiConfig({ ...apiConfig, headers: newHeaders });
+                                                                        }}
+                                                                    />
+                                                                    <Input
+                                                                        placeholder="Value"
+                                                                        value={header.value}
+                                                                        onChange={(e) => {
+                                                                            const newHeaders = [...apiConfig.headers];
+                                                                            newHeaders[index].value = e.target.value;
+                                                                            setApiConfig({ ...apiConfig, headers: newHeaders });
+                                                                        }}
+                                                                    />
+                                                                    <Button
+                                                                        type="text"
+                                                                        danger
+                                                                        onClick={() => {
+                                                                            const newHeaders = apiConfig.headers.filter((_, i) => i !== index);
+                                                                            setApiConfig({ ...apiConfig, headers: newHeaders });
+                                                                        }}
+                                                                    >
+                                                                        ×
+                                                                    </Button>
+                                                                </div>
+                                                            ))}
+                                                            <Button
+                                                                type="link"
+                                                                icon={<PlusOutlined />}
+                                                                onClick={() => {
+                                                                    setApiConfig({
+                                                                        ...apiConfig,
+                                                                        headers: [...apiConfig.headers, { key: '', value: '', enabled: true }]
+                                                                    });
+                                                                }}
+                                                            >
+                                                                添加请求头
+                                                            </Button>
+                                                        </div>
+                                                    ),
+                                                },
+                                                {
+                                                    key: 'body',
+                                                    label: 'Body',
+                                                    children: (
+                                                        <Input.TextArea
+                                                            placeholder="输入请求体"
+                                                            value={apiConfig.body}
+                                                            onChange={(e) => setApiConfig({ ...apiConfig, body: e.target.value })}
+                                                            style={{ fontFamily: 'monospace' }}
+                                                        />
+                                                    ),
+                                                },
+                                            ]}
                                         />
                                     </div>
 

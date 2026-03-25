@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -142,9 +143,20 @@ func (pm *ProjectManager) buildTree(dir string, node *ProjectTree) error {
 			node.Children = append(node.Children, child)
 		} else {
 			if filepath.Ext(entry.Name()) == ".curl" {
+				requestName := strings.TrimSuffix(entry.Name(), ".curl")
+				metaPath := filepath.Join(dir, requestName+".meta")
+				if metaData, err := os.ReadFile(metaPath); err == nil {
+					var meta map[string]string
+					if json.Unmarshal(metaData, &meta) == nil {
+						if name, ok := meta["name"]; ok && name != "" {
+							requestName = name
+						}
+					}
+				}
+
 				child := &ProjectTree{
 					ID:   uuid.New().String(),
-					Name: entry.Name(),
+					Name: requestName,
 					Type: "request",
 					Path: filepath.Join(dir, entry.Name()),
 				}
@@ -186,6 +198,14 @@ func (pm *ProjectManager) CreateRequest(projectID, folderPath, name string, cont
 		return nil, err
 	}
 
+	metaData := map[string]string{
+		"id":   requestID,
+		"name": name,
+	}
+	metaBytes, _ := json.Marshal(metaData)
+	metaPath := filepath.Join(folderPath, requestID+".meta")
+	os.WriteFile(metaPath, metaBytes, 0644)
+
 	request := &models.CurlRequest{
 		ID:        requestID,
 		Name:      name,
@@ -204,6 +224,9 @@ func (pm *ProjectManager) UpdateRequest(requestPath, content string) error {
 }
 
 func (pm *ProjectManager) DeleteRequest(requestPath string) error {
+	requestID := strings.TrimSuffix(filepath.Base(requestPath), ".curl")
+	metaPath := filepath.Join(filepath.Dir(requestPath), requestID+".meta")
+	os.Remove(metaPath)
 	return os.Remove(requestPath)
 }
 
@@ -213,9 +236,24 @@ func (pm *ProjectManager) GetRequest(requestPath string) (*models.CurlRequest, e
 		return nil, err
 	}
 
+	requestID := strings.TrimSuffix(filepath.Base(requestPath), ".curl")
+	metaPath := filepath.Join(filepath.Dir(requestPath), requestID+".meta")
+
+	var requestName string
+	if metaData, err := os.ReadFile(metaPath); err == nil {
+		var meta map[string]string
+		if json.Unmarshal(metaData, &meta) == nil {
+			requestName = meta["name"]
+		}
+	}
+
+	if requestName == "" {
+		requestName = strings.TrimSuffix(filepath.Base(requestPath), ".curl")
+	}
+
 	return &models.CurlRequest{
 		Path:    requestPath,
-		Name:    filepath.Base(requestPath),
+		Name:    requestName,
 		Content: string(content),
 	}, nil
 }
