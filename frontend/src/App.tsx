@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Button, Space, Modal, Input, message, Spin, Tree, Dropdown, Tabs, Card, Col, Row, Select, Collapse, Empty } from 'antd';
+import { Button, Space, Modal, Input, message, Spin, Tree, Dropdown, Tabs, Card, Col, Row, Select, Collapse, Empty, Radio } from 'antd';
 import { PlusOutlined, ApiOutlined, ProjectOutlined, FolderOutlined, FileOutlined, CloseOutlined, HomeOutlined, DragOutlined } from '@ant-design/icons';
 import type { DataNode } from 'antd/es/tree';
 import './App.css';
@@ -44,6 +44,9 @@ interface ApiConfig {
     headers: { key: string; value: string; enabled: boolean }[];
     params: { key: string; value: string; enabled: boolean }[];
     body: string;
+    bodyType: 'none' | 'form-data' | 'x-www-form-urlencoded' | 'json' | 'xml' | 'raw' | 'binary';
+    formData: { key: string; value: string }[];
+    urlencoded: { key: string; value: string }[];
 }
 
 function App() {
@@ -74,7 +77,10 @@ function App() {
         url: '',
         headers: [],
         params: [],
-        body: ''
+        body: '',
+        bodyType: 'none',
+        formData: [],
+        urlencoded: []
     });
 
     useEffect(() => {
@@ -276,7 +282,10 @@ function App() {
             url: '',
             headers: [],
             params: [],
-            body: ''
+            body: '',
+            bodyType: 'none',
+            formData: [],
+            urlencoded: []
         };
 
         const lines = curlCommand.split('\n');
@@ -350,8 +359,31 @@ function App() {
             }
         }
 
-        if (config.body) {
+        if (config.bodyType === 'none') {
+            // 不添加 body
+        } else if (config.bodyType === 'form-data' || config.bodyType === 'x-www-form-urlencoded') {
+            const data = config.bodyType === 'form-data' ? config.formData : config.urlencoded;
+            if (data.length > 0) {
+                if (config.bodyType === 'x-www-form-urlencoded') {
+                    curl += ` -H "Content-Type: application/x-www-form-urlencoded"`;
+                    const formBody = data.map(item => `${encodeURIComponent(item.key)}=${encodeURIComponent(item.value)}`).join('&');
+                    curl += ` -d '${formBody}'`;
+                } else {
+                    for (const item of data) {
+                        curl += ` -F "${item.key}=${item.value}"`;
+                    }
+                }
+            }
+        } else if (config.bodyType === 'json') {
+            curl += ` -H "Content-Type: application/json"`;
             curl += ` -d '${config.body}'`;
+        } else if (config.bodyType === 'xml') {
+            curl += ` -H "Content-Type: application/xml"`;
+            curl += ` -d '${config.body}'`;
+        } else if (config.bodyType === 'raw') {
+            curl += ` -d '${config.body}'`;
+        } else if (config.bodyType === 'binary') {
+            // Binary 类型需要文件路径，暂时不支持
         }
 
         curl += ` "${config.url}"`;
@@ -699,7 +731,8 @@ function App() {
                                     </div>
 
                                     <div className="api-config-section">
-                                        <Collapse
+                                        <Tabs
+                                            defaultActiveKey="params"
                                             items={[
                                                 {
                                                     key: 'params',
@@ -809,12 +842,98 @@ function App() {
                                                     key: 'body',
                                                     label: 'Body',
                                                     children: (
-                                                        <Input.TextArea
-                                                            placeholder="输入请求体"
-                                                            value={apiConfig.body}
-                                                            onChange={(e) => setApiConfig({ ...apiConfig, body: e.target.value })}
-                                                            style={{ fontFamily: 'monospace' }}
-                                                        />
+                                                        <div className="body-editor">
+                                                            <div className="body-type-selector">
+                                                                <Radio.Group
+                                                                    value={apiConfig.bodyType || 'none'}
+                                                                    onChange={(e) => setApiConfig({ ...apiConfig, bodyType: e.target.value })}
+                                                                    optionType="button"
+                                                                    buttonStyle="solid"
+                                                                >
+                                                                    <Radio.Button value="none">none</Radio.Button>
+                                                                    <Radio.Button value="form-data">form-data</Radio.Button>
+                                                                    <Radio.Button value="x-www-form-urlencoded">x-www-form-urlencoded</Radio.Button>
+                                                                    <Radio.Button value="json">JSON</Radio.Button>
+                                                                    <Radio.Button value="xml">XML</Radio.Button>
+                                                                    <Radio.Button value="raw">Raw</Radio.Button>
+                                                                    <Radio.Button value="binary">Binary</Radio.Button>
+                                                                </Radio.Group>
+                                                            </div>
+                                                            {apiConfig.bodyType === 'none' && (
+                                                                <div className="body-empty">This request does not have a body</div>
+                                                            )}
+                                                            {(apiConfig.bodyType === 'form-data' || apiConfig.bodyType === 'x-www-form-urlencoded') && (
+                                                                <div className="kv-editor">
+                                                                    {(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded).map((item: any, index: number) => (
+                                                                        <div key={index} className="kv-row">
+                                                                            <Input
+                                                                                placeholder="Key"
+                                                                                value={item.key}
+                                                                                onChange={(e) => {
+                                                                                    const newData = [...(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded)];
+                                                                                    newData[index].key = e.target.value;
+                                                                                    setApiConfig(apiConfig.bodyType === 'form-data'
+                                                                                        ? { ...apiConfig, formData: newData }
+                                                                                        : { ...apiConfig, urlencoded: newData });
+                                                                                }}
+                                                                            />
+                                                                            <Input
+                                                                                placeholder="Value"
+                                                                                value={item.value}
+                                                                                onChange={(e) => {
+                                                                                    const newData = [...(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded)];
+                                                                                    newData[index].value = e.target.value;
+                                                                                    setApiConfig(apiConfig.bodyType === 'form-data'
+                                                                                        ? { ...apiConfig, formData: newData }
+                                                                                        : { ...apiConfig, urlencoded: newData });
+                                                                                }}
+                                                                            />
+                                                                            <Button
+                                                                                type="text"
+                                                                                danger
+                                                                                onClick={() => {
+                                                                                    const newData = (apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded).filter((_: any, i: number) => i !== index);
+                                                                                    setApiConfig(apiConfig.bodyType === 'form-data'
+                                                                                        ? { ...apiConfig, formData: newData }
+                                                                                        : { ...apiConfig, urlencoded: newData });
+                                                                                }}
+                                                                            >
+                                                                                ×
+                                                                            </Button>
+                                                                        </div>
+                                                                    ))}
+                                                                    <Button
+                                                                        type="link"
+                                                                        icon={<PlusOutlined />}
+                                                                        onClick={() => {
+                                                                            const newData = [...(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded), { key: '', value: '' }];
+                                                                            setApiConfig(apiConfig.bodyType === 'form-data'
+                                                                                ? { ...apiConfig, formData: newData }
+                                                                                : { ...apiConfig, urlencoded: newData });
+                                                                        }}
+                                                                    >
+                                                                        添加字段
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+                                                            {(apiConfig.bodyType === 'json' || apiConfig.bodyType === 'xml' || apiConfig.bodyType === 'raw') && (
+                                                                <Input.TextArea
+                                                                    placeholder={apiConfig.bodyType === 'json' ? '{\n  "key": "value"\n}' : apiConfig.bodyType === 'xml' ? '<root>\n  <key>value</key>\n</root>' : 'Raw body content'}
+                                                                    value={apiConfig.body}
+                                                                    onChange={(e) => setApiConfig({ ...apiConfig, body: e.target.value })}
+                                                                    style={{
+                                                                        fontFamily: 'monospace',
+                                                                        minHeight: 150,
+                                                                        marginTop: 12
+                                                                    }}
+                                                                />
+                                                            )}
+                                                            {apiConfig.bodyType === 'binary' && (
+                                                                <div className="body-binary">
+                                                                    <Input type="file" />
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     ),
                                                 },
                                             ]}
