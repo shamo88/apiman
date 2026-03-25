@@ -179,6 +179,7 @@ func (pm *ProjectManager) CreateFolder(projectID, parentPath, name string) (*mod
 		ID:        uuid.New().String(),
 		Name:      name,
 		ProjectID: projectID,
+		Path:      folderPath,
 		CreatedAt: time.Now(),
 	}
 

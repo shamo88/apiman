@@ -137,74 +137,91 @@ function App() {
         if (!currentTree) return null;
 
         const filteredTree = filterTreeNodes(currentTree, searchKeyword, filterMethod);
-        if (!filteredTree || !filteredTree.children) return null;
+        if (!filteredTree) return null;
 
-        return filteredTree.children.map(folder => (
-            <div key={folder.path || folder.id} className="api-folder">
-                <div
-                    className="api-folder-header"
-                    onClick={() => toggleFolderCollapse(folder.path || folder.id)}
+        const folders = filteredTree.children?.filter(child => child.type === 'folder') || [];
+        const rootRequests = filteredTree.children?.filter(child => child.type === 'request') || [];
+
+        const renderRequestItem = (api: any) => (
+            <div
+                key={api.path}
+                className={`api-item ${currentRequest?.path === api.path ? 'active' : ''}`}
+                onClick={() => handleTreeItemClick(api)}
+                onMouseEnter={() => setHoveredItem(api.path || '')}
+                onMouseLeave={() => setHoveredItem(null)}
+            >
+                <span
+                    className="api-method-tag"
+                    style={{ backgroundColor: getMethodColor((api as any).method || 'GET') + '20', color: getMethodColor((api as any).method || 'GET') }}
                 >
-                    <span className="folder-toggle-icon">
-                        {collapsedFolders.has(folder.path || folder.id) ? <RightOutlined /> : <DownOutlined />}
-                    </span>
-                    <FolderOutlined className="folder-icon" />
-                    <span className="folder-name">{folder.name}</span>
-                    <span className="folder-count">{folder.children?.length || 0}</span>
+                    {((api as any).method || 'GET').substring(0, 3).toUpperCase()}
+                </span>
+                <span className="api-name">{api.name.replace('.curl', '')}</span>
+                {hoveredItem === api.path && (
                     <Dropdown
                         menu={{
                             items: [
-                                { key: 'add-request', icon: <PlusOutlined />, label: '新建请求', onClick: () => { setSelectedFolder(folder.path || currentProject?.path || ''); setCreateRequestModal(true); } },
-                                { key: 'add-folder', icon: <FolderOutlined />, label: '新建文件夹', onClick: () => { setSelectedFolder(folder.path || currentProject?.path || ''); setCreateFolderModal(true); } },
-                                { type: 'divider' },
-                                { key: 'delete', icon: <CloseOutlined />, label: '删除文件夹', danger: true, onClick: () => handleDeleteFolder(folder.path!) }
+                                { key: 'delete', icon: <CloseOutlined />, label: '删除', danger: true, onClick: () => { handleDeleteRequest(api.path!); } }
                             ]
                         }}
                         trigger={['click']}
                     >
-                        <button className="folder-action-btn" onClick={(e) => e.stopPropagation()}>
+                        <button className="api-action-btn" onClick={(e) => e.stopPropagation()}>
                             <MoreOutlined />
                         </button>
                     </Dropdown>
-                </div>
-
-                {!collapsedFolders.has(folder.path || folder.id) && folder.children && (
-                    <div className="api-folder-content">
-                        {folder.children.map(api => (
-                            <div
-                                key={api.path}
-                                className={`api-item ${currentRequest?.path === api.path ? 'active' : ''}`}
-                                onClick={() => handleTreeItemClick(api)}
-                                onMouseEnter={() => setHoveredItem(api.path || '')}
-                                onMouseLeave={() => setHoveredItem(null)}
-                            >
-                                <span
-                                    className="api-method-tag"
-                                    style={{ backgroundColor: getMethodColor((api as any).method || 'GET') + '20', color: getMethodColor((api as any).method || 'GET') }}
-                                >
-                                    {((api as any).method || 'GET').substring(0, 3).toUpperCase()}
-                                </span>
-                                <span className="api-name">{api.name.replace('.curl', '')}</span>
-                                {hoveredItem === api.path && (
-                                    <Dropdown
-                                        menu={{
-                                            items: [
-                                                { key: 'delete', icon: <CloseOutlined />, label: '删除', danger: true, onClick: () => { handleDeleteRequest(api.path!); } }
-                                            ]
-                                        }}
-                                        trigger={['click']}
-                                    >
-                                        <button className="api-action-btn" onClick={(e) => e.stopPropagation()}>
-                                            <MoreOutlined />
-                                        </button>
-                                    </Dropdown>
-                                )}
-                            </div>
-                        ))}
-                    </div>
                 )}
             </div>
-        ));
+        );
+
+        return (
+            <>
+                {rootRequests.length > 0 && (
+                    <div className="api-folder">
+                        <div className="api-folder-content">
+                            {rootRequests.map(renderRequestItem)}
+                        </div>
+                    </div>
+                )}
+
+                {folders.map(folder => (
+                    <div key={folder.path || folder.id} className="api-folder">
+                        <div
+                            className="api-folder-header"
+                            onClick={() => toggleFolderCollapse(folder.path || folder.id)}
+                        >
+                            <span className="folder-toggle-icon">
+                                {collapsedFolders.has(folder.path || folder.id) ? <RightOutlined /> : <DownOutlined />}
+                            </span>
+                            <FolderOutlined className="folder-icon" />
+                            <span className="folder-name">{folder.name}</span>
+                            <span className="folder-count">{folder.children?.length || 0}</span>
+                            <Dropdown
+                                menu={{
+                                    items: [
+                                        { key: 'add-request', icon: <PlusOutlined />, label: '新建请求', onClick: () => { setSelectedFolder(folder.path || currentProject?.path || ''); setCreateRequestModal(true); } },
+                                        { key: 'add-folder', icon: <FolderOutlined />, label: '新建文件夹', onClick: () => { setSelectedFolder(folder.path || currentProject?.path || ''); setCreateFolderModal(true); } },
+                                        { type: 'divider' },
+                                        { key: 'delete', icon: <CloseOutlined />, label: '删除文件夹', danger: true, onClick: () => handleDeleteFolder(folder.path!) }
+                                    ]
+                                }}
+                                trigger={['click']}
+                            >
+                                <button className="folder-action-btn" onClick={(e) => e.stopPropagation()}>
+                                    <MoreOutlined />
+                                </button>
+                            </Dropdown>
+                        </div>
+
+                        {!collapsedFolders.has(folder.path || folder.id) && folder.children && (
+                            <div className="api-folder-content">
+                                {folder.children.map(renderRequestItem)}
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </>
+        );
     };
 
     useEffect(() => {
@@ -315,6 +332,19 @@ function App() {
             setNewFolderName('');
             const tree = await GetProjectTree(currentProject.id);
             setProjectTrees(prev => ({ ...prev, [currentProject.id]: tree }));
+
+            // 清除折叠状态以显示新创建的文件夹
+            if (!selectedFolder) {
+                // 如果是在根目录创建，清除所有折叠状态
+                setCollapsedFolders(new Set());
+            } else {
+                // 如果是在某个文件夹内创建，确保父文件夹展开
+                setCollapsedFolders(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(selectedFolder);
+                    return newSet;
+                });
+            }
         } catch (error: any) {
             message.error(`创建失败: ${error?.message || error}`);
         }
@@ -362,6 +392,17 @@ function App() {
             setNewRequestName('');
             const tree = await GetProjectTree(currentProject.id);
             setProjectTrees(prev => ({ ...prev, [currentProject.id]: tree }));
+
+            // 清除折叠状态以显示新创建的请求
+            if (!selectedFolder) {
+                setCollapsedFolders(new Set());
+            } else {
+                setCollapsedFolders(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(selectedFolder);
+                    return newSet;
+                });
+            }
         } catch (error: any) {
             message.error(`创建失败: ${error?.message || error}`);
         }

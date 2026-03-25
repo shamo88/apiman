@@ -111,6 +111,7 @@ export namespace models {
 	    name: string;
 	    project_id: string;
 	    parent_id: string;
+	    path: string;
 	    // Go type: time
 	    created_at: any;
 	
@@ -124,6 +125,7 @@ export namespace models {
 	        this.name = source["name"];
 	        this.project_id = source["project_id"];
 	        this.parent_id = source["parent_id"];
+	        this.path = source["path"];
 	        this.created_at = this.convertValues(source["created_at"], null);
 	    }
 	

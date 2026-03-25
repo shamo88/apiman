@@ -23,6 +23,7 @@ type Folder struct {
 	Name      string    `json:"name"`
 	ProjectID string    `json:"project_id"`
 	ParentID  string    `json:"parent_id"`
+	Path      string    `json:"path"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
