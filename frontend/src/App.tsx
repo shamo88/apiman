@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button, Space, Modal, Input, message, Spin, Tree, Dropdown, Tabs, Card, Col, Row } from 'antd';
-import { PlusOutlined, ApiOutlined, ProjectOutlined, FolderOutlined, FileOutlined, CloseOutlined } from '@ant-design/icons';
+import { PlusOutlined, ApiOutlined, ProjectOutlined, FolderOutlined, FileOutlined, CloseOutlined, HomeOutlined } from '@ant-design/icons';
 import type { DataNode } from 'antd/es/tree';
 import './App.css';
 import { ListProjects, CreateProject, DeleteProject, GetProjectTree, CreateFolder, CreateRequest, GetRequest, DeleteRequest, DeleteFolder, ExecuteCurl } from '../wailsjs/go/main/App';
