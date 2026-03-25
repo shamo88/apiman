@@ -139,9 +139,6 @@ function App() {
         const filteredTree = filterTreeNodes(currentTree, searchKeyword, filterMethod);
         if (!filteredTree) return null;
 
-        const folders = filteredTree.children?.filter(child => child.type === 'folder') || [];
-        const rootRequests = filteredTree.children?.filter(child => child.type === 'request') || [];
-
         const renderRequestItem = (api: any) => (
             <div
                 key={api.path}
@@ -174,6 +171,56 @@ function App() {
             </div>
         );
 
+        // 递归渲染文件夹及其内容
+        const renderFolder = (folder: any) => {
+            const folderChildren = folder.children || [];
+            const subFolders = folderChildren.filter((child: any) => child.type === 'folder');
+            const requests = folderChildren.filter((child: any) => child.type === 'request');
+            const isCollapsed = collapsedFolders.has(folder.path || folder.id);
+            const totalCount = folderChildren.length;
+
+            return (
+                <div key={folder.path || folder.id} className="api-folder">
+                    <div
+                        className="api-folder-header"
+                        onClick={() => toggleFolderCollapse(folder.path || folder.id)}
+                    >
+                        <span className="folder-toggle-icon">
+                            {isCollapsed ? <RightOutlined /> : <DownOutlined />}
+                        </span>
+                        <FolderOutlined className="folder-icon" />
+                        <span className="folder-name">{folder.name}</span>
+                        <span className="folder-count">{totalCount}</span>
+                        <Dropdown
+                            menu={{
+                                items: [
+                                    { key: 'add-request', icon: <PlusOutlined />, label: '新建请求', onClick: () => { setSelectedFolder(folder.path || currentProject?.path || ''); setCreateRequestModal(true); } },
+                                    { key: 'add-folder', icon: <FolderOutlined />, label: '新建文件夹', onClick: () => { setSelectedFolder(folder.path || currentProject?.path || ''); setCreateFolderModal(true); } },
+                                    { type: 'divider' },
+                                    { key: 'delete', icon: <CloseOutlined />, label: '删除文件夹', danger: true, onClick: () => handleDeleteFolder(folder.path!) }
+                                ]
+                            }}
+                            trigger={['click']}
+                        >
+                            <button className="folder-action-btn" onClick={(e) => e.stopPropagation()}>
+                                <MoreOutlined />
+                            </button>
+                        </Dropdown>
+                    </div>
+
+                    {!isCollapsed && folderChildren.length > 0 && (
+                        <div className="api-folder-content">
+                            {requests.map(renderRequestItem)}
+                            {subFolders.map(renderFolder)}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const rootFolders = filteredTree.children?.filter((child: any) => child.type === 'folder') || [];
+        const rootRequests = filteredTree.children?.filter((child: any) => child.type === 'request') || [];
+
         return (
             <>
                 {rootRequests.length > 0 && (
@@ -183,43 +230,7 @@ function App() {
                         </div>
                     </div>
                 )}
-
-                {folders.map(folder => (
-                    <div key={folder.path || folder.id} className="api-folder">
-                        <div
-                            className="api-folder-header"
-                            onClick={() => toggleFolderCollapse(folder.path || folder.id)}
-                        >
-                            <span className="folder-toggle-icon">
-                                {collapsedFolders.has(folder.path || folder.id) ? <RightOutlined /> : <DownOutlined />}
-                            </span>
-                            <FolderOutlined className="folder-icon" />
-                            <span className="folder-name">{folder.name}</span>
-                            <span className="folder-count">{folder.children?.length || 0}</span>
-                            <Dropdown
-                                menu={{
-                                    items: [
-                                        { key: 'add-request', icon: <PlusOutlined />, label: '新建请求', onClick: () => { setSelectedFolder(folder.path || currentProject?.path || ''); setCreateRequestModal(true); } },
-                                        { key: 'add-folder', icon: <FolderOutlined />, label: '新建文件夹', onClick: () => { setSelectedFolder(folder.path || currentProject?.path || ''); setCreateFolderModal(true); } },
-                                        { type: 'divider' },
-                                        { key: 'delete', icon: <CloseOutlined />, label: '删除文件夹', danger: true, onClick: () => handleDeleteFolder(folder.path!) }
-                                    ]
-                                }}
-                                trigger={['click']}
-                            >
-                                <button className="folder-action-btn" onClick={(e) => e.stopPropagation()}>
-                                    <MoreOutlined />
-                                </button>
-                            </Dropdown>
-                        </div>
-
-                        {!collapsedFolders.has(folder.path || folder.id) && folder.children && (
-                            <div className="api-folder-content">
-                                {folder.children.map(renderRequestItem)}
-                            </div>
-                        )}
-                    </div>
-                ))}
+                {rootFolders.map(renderFolder)}
             </>
         );
     };
