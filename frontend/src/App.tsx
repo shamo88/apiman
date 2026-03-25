@@ -125,14 +125,21 @@ function App() {
             return null;
         }
 
-        const filteredChildren = tree.children
-            ?.map(child => filterTreeNodes(child, keyword, method))
-            .filter(child => child !== null) as ProjectTree[];
+        if (tree.type === 'folder') {
+            const filteredChildren = tree.children
+                ?.map(child => filterTreeNodes(child, keyword, method))
+                .filter(child => child !== null) as ProjectTree[];
 
-        if (filteredChildren && filteredChildren.length > 0) {
-            return { ...tree, children: filteredChildren };
+            // 如果有搜索条件，只返回匹配过滤的文件夹
+            if (keyword || method !== 'ALL') {
+                return { ...tree, children: filteredChildren };
+            }
+
+            // 如果没有搜索条件，显示所有文件夹（包括空的）
+            return tree;
         }
-        return null;
+
+        return tree;
     };
 
     const renderApiList = () => {
