@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { Button, Space, Modal, Input, message, Spin, Tree, Dropdown, Tabs, Card, Col, Row, Select, Collapse, Empty, Radio } from 'antd';
-import { PlusOutlined, ApiOutlined, ProjectOutlined, FolderOutlined, FileOutlined, CloseOutlined, HomeOutlined, DragOutlined } from '@ant-design/icons';
+import React, { useState, useEffect } from 'react';
+import { Button, Space, Modal, Input, message, Spin, Tree, Dropdown, Tabs, Card, Col, Row, Select, Collapse, Empty, Radio, InputRef } from 'antd';
+import { PlusOutlined, ApiOutlined, ProjectOutlined, FolderOutlined, FileOutlined, CloseOutlined, HomeOutlined, DragOutlined, SearchOutlined, RightOutlined, DownOutlined, MoreOutlined } from '@ant-design/icons';
 import type { DataNode } from 'antd/es/tree';
 import './App.css';
 import { ListProjects, CreateProject, DeleteProject, GetProjectTree, CreateFolder, CreateRequest, GetRequest, DeleteRequest, DeleteFolder, ExecuteCurl, UpdateRequest } from '../wailsjs/go/main/App';
@@ -82,6 +82,130 @@ function App() {
         formData: [],
         urlencoded: []
     });
+    const [searchKeyword, setSearchKeyword] = useState('');
+    const [filterMethod, setFilterMethod] = useState<string>('ALL');
+    const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
+    const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+    const searchInputRef = React.useRef<InputRef>(null);
+
+    const toggleFolderCollapse = (folderPath: string) => {
+        setCollapsedFolders(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(folderPath)) {
+                newSet.delete(folderPath);
+            } else {
+                newSet.add(folderPath);
+            }
+            return newSet;
+        });
+    };
+
+    const getMethodColor = (method: string) => {
+        const colors: Record<string, string> = {
+            GET: '#61affe',
+            POST: '#49cc90',
+            PUT: '#fca130',
+            DELETE: '#f93e3e',
+            PATCH: '#50e3c2',
+            OPTIONS: '#0d5aa7',
+            HEAD: '#9012fe'
+        };
+        return colors[method.toUpperCase()] || '#999';
+    };
+
+    const filterTreeNodes = (tree: ProjectTree | null, keyword: string, method: string): ProjectTree | null => {
+        if (!tree) return null;
+
+        if (tree.type === 'request') {
+            const matchKeyword = !keyword || tree.name.toLowerCase().includes(keyword.toLowerCase());
+            const matchMethod = method === 'ALL' || (tree as any).method === method;
+            if (matchKeyword && matchMethod) return tree;
+            return null;
+        }
+
+        const filteredChildren = tree.children
+            ?.map(child => filterTreeNodes(child, keyword, method))
+            .filter(child => child !== null) as ProjectTree[];
+
+        if (filteredChildren && filteredChildren.length > 0) {
+            return { ...tree, children: filteredChildren };
+        }
+        return null;
+    };
+
+    const renderApiList = () => {
+        if (!currentTree) return null;
+
+        const filteredTree = filterTreeNodes(currentTree, searchKeyword, filterMethod);
+        if (!filteredTree || !filteredTree.children) return null;
+
+        return filteredTree.children.map(folder => (
+            <div key={folder.path || folder.id} className="api-folder">
+                <div
+                    className="api-folder-header"
+                    onClick={() => toggleFolderCollapse(folder.path || folder.id)}
+                >
+                    <span className="folder-toggle-icon">
+                        {collapsedFolders.has(folder.path || folder.id) ? <RightOutlined /> : <DownOutlined />}
+                    </span>
+                    <FolderOutlined className="folder-icon" />
+                    <span className="folder-name">{folder.name}</span>
+                    <span className="folder-count">{folder.children?.length || 0}</span>
+                    <Dropdown
+                        menu={{
+                            items: [
+                                { key: 'add-request', icon: <PlusOutlined />, label: '新建请求', onClick: () => { setSelectedFolder(folder.path || currentProject?.path || ''); setCreateRequestModal(true); } },
+                                { key: 'add-folder', icon: <FolderOutlined />, label: '新建文件夹', onClick: () => { setSelectedFolder(folder.path || currentProject?.path || ''); setCreateFolderModal(true); } },
+                                { type: 'divider' },
+                                { key: 'delete', icon: <CloseOutlined />, label: '删除文件夹', danger: true, onClick: () => handleDeleteFolder(folder.path!) }
+                            ]
+                        }}
+                        trigger={['click']}
+                    >
+                        <button className="folder-action-btn" onClick={(e) => e.stopPropagation()}>
+                            <MoreOutlined />
+                        </button>
+                    </Dropdown>
+                </div>
+
+                {!collapsedFolders.has(folder.path || folder.id) && folder.children && (
+                    <div className="api-folder-content">
+                        {folder.children.map(api => (
+                            <div
+                                key={api.path}
+                                className={`api-item ${currentRequest?.path === api.path ? 'active' : ''}`}
+                                onClick={() => handleTreeItemClick(api)}
+                                onMouseEnter={() => setHoveredItem(api.path || '')}
+                                onMouseLeave={() => setHoveredItem(null)}
+                            >
+                                <span
+                                    className="api-method-tag"
+                                    style={{ backgroundColor: getMethodColor((api as any).method || 'GET') + '20', color: getMethodColor((api as any).method || 'GET') }}
+                                >
+                                    {((api as any).method || 'GET').substring(0, 3).toUpperCase()}
+                                </span>
+                                <span className="api-name">{api.name.replace('.curl', '')}</span>
+                                {hoveredItem === api.path && (
+                                    <Dropdown
+                                        menu={{
+                                            items: [
+                                                { key: 'delete', icon: <CloseOutlined />, label: '删除', danger: true, onClick: () => { handleDeleteRequest(api.path!); } }
+                                            ]
+                                        }}
+                                        trigger={['click']}
+                                    >
+                                        <button className="api-action-btn" onClick={(e) => e.stopPropagation()}>
+                                            <MoreOutlined />
+                                        </button>
+                                    </Dropdown>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        ));
+    };
 
     useEffect(() => {
         loadProjects();
@@ -628,7 +752,9 @@ function App() {
                     <div className="project-workspace">
                         <div className="project-sidebar">
                             <div className="sidebar-header">
-                                <span style={{ fontWeight: 500 }}>接口列表</span>
+                                <div className="sidebar-title">
+                                    <span>接口列表</span>
+                                </div>
                                 <Dropdown
                                     menu={{
                                         items: [
@@ -641,38 +767,45 @@ function App() {
                                     <Button size="small" icon={<PlusOutlined />} />
                                 </Dropdown>
                             </div>
+
+                            <div className="sidebar-search">
+                                <Input
+                                    prefix={<SearchOutlined style={{ color: '#8b8b9a' }} />}
+                                    placeholder="搜索接口..."
+                                    value={searchKeyword}
+                                    onChange={(e) => setSearchKeyword(e.target.value)}
+                                    allowClear
+                                    size="small"
+                                    style={{ backgroundColor: '#f5f7fa' }}
+                                />
+                            </div>
+
+                            <div className="sidebar-filters">
+                                <Select
+                                    value={filterMethod}
+                                    onChange={(value) => setFilterMethod(value)}
+                                    size="small"
+                                    style={{ width: '100%' }}
+                                    options={[
+                                        { value: 'ALL', label: '全部方法' },
+                                        { value: 'GET', label: 'GET' },
+                                        { value: 'POST', label: 'POST' },
+                                        { value: 'PUT', label: 'PUT' },
+                                        { value: 'DELETE', label: 'DELETE' },
+                                        { value: 'PATCH', label: 'PATCH' },
+                                    ]}
+                                />
+                            </div>
+
                             <div className="sidebar-content">
                                 {loading && <Spin style={{ display: 'block', margin: '20px auto' }} />}
-                                {currentTree && (
-                                    <Tree
-                                        treeData={currentTree.children?.map(child => convertTreeToDataNode(child))}
-                                        showIcon={false}
-                                        expandedKeys={expandedKeys}
-                                        selectedKeys={selectedKeys}
-                                        onExpand={(keys) => setExpandedKeys(keys as string[])}
-                                        onSelect={(keys) => {
-                                            const selectedKey = keys[0] as string;
-                                            if (selectedKey) {
-                                                const node = findTreeNode(currentTree, selectedKey);
-                                                if (node && node.type === 'folder') {
-                                                    setSelectedFolder(node.path || currentProject?.path || '');
-                                                } else {
-                                                    setSelectedFolder(null);
-                                                }
-                                            }
-                                            setSelectedKeys(keys.map(k => k as string));
-                                        }}
-                                        draggable
-                                        onDrop={(info) => {
-                                            const dragKey = info.dragNode.key as string;
-                                            const dropKey = info.dropToGap ? (info.node.key as string) : (info.node.key as string);
-                                            const dropNode = findTreeNode(currentTree, dropKey);
-                                            if (dropNode && dropNode.type === 'folder') {
-                                                moveRequest(dragKey, dropNode.path || '');
-                                            }
-                                        }}
-                                    />
+                                {!loading && !currentTree && (
+                                    <div className="empty-sidebar">
+                                        <ApiOutlined style={{ fontSize: 32, color: '#d0d0db', marginBottom: 12 }} />
+                                        <div>暂无接口</div>
+                                    </div>
                                 )}
+                                {!loading && currentTree && renderApiList()}
                             </div>
                         </div>
 
