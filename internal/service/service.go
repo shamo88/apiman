@@ -4,24 +4,28 @@ import (
 	"apiman/internal/config"
 	"apiman/internal/curl"
 	"apiman/internal/models"
+	"apiman/internal/postman"
 	"apiman/internal/project"
 )
 
 type Service struct {
-	ConfigManager *config.ConfigManager
-	ProjectMgr    *project.ProjectManager
-	CurlExecutor  *curl.CurlExecutor
+	ConfigManager   *config.ConfigManager
+	ProjectMgr      *project.ProjectManager
+	CurlExecutor    *curl.CurlExecutor
+	PostmanImporter *postman.PostmanImporter
 }
 
 func NewService() *Service {
 	cfgMgr := config.NewConfigManager()
 	projectMgr := project.NewProjectManager(cfgMgr)
 	curlExec := curl.NewCurlExecutor()
+	postmanImp := postman.NewPostmanImporter(cfgMgr)
 
 	return &Service{
-		ConfigManager: cfgMgr,
-		ProjectMgr:    projectMgr,
-		CurlExecutor:  curlExec,
+		ConfigManager:   cfgMgr,
+		ProjectMgr:      projectMgr,
+		CurlExecutor:    curlExec,
+		PostmanImporter: postmanImp,
 	}
 }
 
@@ -115,4 +119,8 @@ func (s *Service) LoadAppConfig() (*config.AppConfig, error) {
 
 func (s *Service) SaveAppConfig(cfg *config.AppConfig) error {
 	return s.ConfigManager.SaveAppConfig(cfg)
+}
+
+func (s *Service) ImportPostmanCollection(jsonData string) (*models.Project, error) {
+	return s.PostmanImporter.ImportCollection(jsonData)
 }

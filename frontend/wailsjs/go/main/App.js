@@ -62,6 +62,10 @@ export function GetRequest(arg1) {
   return window['go']['main']['App']['GetRequest'](arg1);
 }
 
+export function ImportPostmanCollection(arg1) {
+  return window['go']['main']['App']['ImportPostmanCollection'](arg1);
+}
+
 export function ListProjects() {
   return window['go']['main']['App']['ListProjects']();
 }

@@ -114,3 +114,7 @@ func (a *App) LoadAppConfig() (*config.AppConfig, error) {
 func (a *App) SaveAppConfig(config *config.AppConfig) error {
 	return a.service.SaveAppConfig(config)
 }
+
+func (a *App) ImportPostmanCollection(jsonData string) (*models.Project, error) {
+	return a.service.ImportPostmanCollection(jsonData)
+}

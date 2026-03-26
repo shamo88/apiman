@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Space, Modal, Input, message, Spin, Tree, Dropdown, Tabs, Card, Col, Row, Select, Collapse, Empty, Radio, InputRef } from 'antd';
-import { PlusOutlined, ApiOutlined, ProjectOutlined, FolderOutlined, FileOutlined, CloseOutlined, HomeOutlined, DragOutlined, SearchOutlined, RightOutlined, DownOutlined, MoreOutlined } from '@ant-design/icons';
+import { Button, Space, Modal, Input, message, Spin, Tree, Dropdown, Tabs, Card, Col, Row, Select, Collapse, Empty, Radio, InputRef, Upload } from 'antd';
+import { PlusOutlined, ApiOutlined, ProjectOutlined, FolderOutlined, FileOutlined, CloseOutlined, HomeOutlined, DragOutlined, SearchOutlined, RightOutlined, DownOutlined, MoreOutlined, ImportOutlined } from '@ant-design/icons';
 import type { DataNode } from 'antd/es/tree';
+import type { UploadProps } from 'antd';
 import './App.css';
 import { TitleBar } from './components/TitleBar';
-import { ListProjects, CreateProject, DeleteProject, GetProjectTree, CreateFolder, CreateRequest, GetRequest, DeleteRequest, DeleteFolder, ExecuteCurl, UpdateRequest } from '../wailsjs/go/main/App';
+import { ListProjects, CreateProject, DeleteProject, GetProjectTree, CreateFolder, CreateRequest, GetRequest, DeleteRequest, DeleteFolder, ExecuteCurl, UpdateRequest, ImportPostmanCollection } from '../wailsjs/go/main/App';
 
 interface Project {
     id: string;
@@ -89,6 +90,7 @@ function App() {
     const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
     const searchInputRef = React.useRef<InputRef>(null);
+    const [importing, setImporting] = useState(false);
 
     const toggleFolderCollapse = (folderPath: string) => {
         setCollapsedFolders(prev => {
@@ -261,6 +263,32 @@ function App() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleImportPostman = async (file: File) => {
+        setImporting(true);
+        try {
+            const text = await file.text();
+            const project = await ImportPostmanCollection(text);
+            message.success(`成功导入项目: ${project.name}`);
+            loadProjects();
+        } catch (error: any) {
+            console.error('Failed to import Postman collection:', error);
+            message.error(`导入失败: ${error?.message || error}`);
+        } finally {
+            setImporting(false);
+        }
+    };
+
+    const uploadProps: UploadProps = {
+        name: 'file',
+        multiple: false,
+        accept: '.json',
+        showUploadList: false,
+        beforeUpload: (file) => {
+            handleImportPostman(file);
+            return false;
+        },
     };
 
     const handleCreateProject = async () => {
@@ -770,9 +798,16 @@ function App() {
                     <div className="home-page">
                         <div className="home-header">
                             <h2>我的项目</h2>
-                            <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateProjectModal(true)}>
-                                新建项目
-                            </Button>
+                            <Space>
+                                <Upload {...uploadProps}>
+                                    <Button icon={<ImportOutlined />} loading={importing}>
+                                        导入 Postman
+                                    </Button>
+                                </Upload>
+                                <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateProjectModal(true)}>
+                                    新建项目
+                                </Button>
+                            </Space>
                         </div>
 
                         {loading && <Spin style={{ display: 'block', margin: '40px auto' }} />}

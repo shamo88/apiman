@@ -34,6 +34,8 @@ export function GetProjectsDir():Promise<string>;
 
 export function GetRequest(arg1:string):Promise<models.CurlRequest>;
 
+export function ImportPostmanCollection(arg1:string):Promise<models.Project>;
+
 export function ListProjects():Promise<Array<models.Project>>;
 
 export function LoadAppConfig():Promise<config.AppConfig>;
