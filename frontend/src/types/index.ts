@@ -18,6 +18,8 @@ export interface ProjectTree {
     id: string;
     name: string;
     type: 'project' | 'folder' | 'request';
+    method?: string;
+    url?: string;
     children?: ProjectTree[];
     path?: string;
 }

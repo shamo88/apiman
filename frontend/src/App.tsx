@@ -18,6 +18,7 @@ interface ProjectTree {
     name: string;
     type: string;
     method?: string;
+    url?: string;
     children?: ProjectTree[];
     path?: string;
 }
@@ -91,6 +92,7 @@ function App() {
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
     const searchInputRef = React.useRef<InputRef>(null);
     const [importing, setImporting] = useState(false);
+    const [searchVersion, setSearchVersion] = useState(0);
 
     const toggleFolderCollapse = (folderPath: string) => {
         setCollapsedFolders(prev => {
@@ -121,9 +123,17 @@ function App() {
         if (!tree) return null;
 
         if (tree.type === 'request') {
-            const matchKeyword = !keyword || tree.name.toLowerCase().includes(keyword.toLowerCase());
+            const searchLower = keyword.toLowerCase();
+            const nameLower = tree.name.toLowerCase();
+            const urlLower = tree.url ? tree.url.toLowerCase() : '';
+
+            const matchName = nameLower.includes(searchLower);
+            const matchURL = urlLower.includes(searchLower);
             const matchMethod = method === 'ALL' || tree.method === method;
-            if (matchKeyword && matchMethod) return tree;
+
+            if ((matchName || matchURL) && matchMethod) {
+                return tree;
+            }
             return null;
         }
 
@@ -132,23 +142,24 @@ function App() {
                 ?.map(child => filterTreeNodes(child, keyword, method))
                 .filter(child => child !== null) as ProjectTree[];
 
-            // 如果有搜索条件，只返回匹配过滤的文件夹
-            if (keyword || method !== 'ALL') {
+            if (filteredChildren.length > 0) {
                 return { ...tree, children: filteredChildren };
             }
-
-            // 如果没有搜索条件，显示所有文件夹（包括空的）
-            return tree;
+            return null;
         }
 
         return tree;
     };
 
     const renderApiList = () => {
-        if (!currentTree) return null;
+        if (!filteredTree) {
+            return <div style={{ padding: 20, color: '#999', textAlign: 'center' }}>没有找到匹配的接口</div>;
+        }
 
-        const filteredTree = filterTreeNodes(currentTree, searchKeyword, filterMethod);
-        if (!filteredTree) return null;
+        const allChildren = filteredTree.children || [];
+        if (allChildren.length === 0) {
+            return <div style={{ padding: 20, color: '#999', textAlign: 'center' }}>没有找到匹配的接口</div>;
+        }
 
         const renderRequestItem = (api: any) => (
             <div
@@ -760,6 +771,11 @@ function App() {
     const currentProject = projectTabs.find(t => t.id === activeTab)?.project;
     const currentTree = currentProject ? projectTrees[currentProject.id] : null;
 
+    const filteredTree = React.useMemo(() => {
+        if (!currentTree) return null;
+        return filterTreeNodes(currentTree, searchKeyword, filterMethod);
+    }, [currentTree, searchKeyword, filterMethod, searchVersion]);
+
     const tabItems = [
         {
             key: 'home',
@@ -867,7 +883,10 @@ function App() {
                                     prefix={<SearchOutlined style={{ color: '#8b8b9a' }} />}
                                     placeholder="搜索接口..."
                                     value={searchKeyword}
-                                    onChange={(e) => setSearchKeyword(e.target.value)}
+                                    onChange={(e) => {
+                                        setSearchKeyword(e.target.value);
+                                        setSearchVersion(v => v + 1);
+                                    }}
                                     allowClear
                                     size="small"
                                     style={{ backgroundColor: '#f5f7fa' }}

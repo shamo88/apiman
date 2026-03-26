@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -33,6 +34,7 @@ type ProjectTree struct {
 	Name     string         `json:"name"`
 	Type     string         `json:"type"`
 	Method   string         `json:"method,omitempty"`
+	URL      string         `json:"url,omitempty"`
 	Children []*ProjectTree `json:"children,omitempty"`
 	Path     string         `json:"path,omitempty"`
 }
@@ -147,9 +149,12 @@ func (pm *ProjectManager) buildTree(dir string, node *ProjectTree) error {
 				requestName := strings.TrimSuffix(entry.Name(), ".curl")
 				metaPath := filepath.Join(dir, requestName+".meta")
 				method := "GET"
+				url := ""
 
 				if content, err := os.ReadFile(filepath.Join(dir, entry.Name())); err == nil {
-					method = extractMethod(string(content))
+					contentStr := string(content)
+					method = extractMethod(contentStr)
+					url = extractURL(contentStr)
 				}
 
 				if metaData, err := os.ReadFile(metaPath); err == nil {
@@ -167,6 +172,7 @@ func (pm *ProjectManager) buildTree(dir string, node *ProjectTree) error {
 					Type:   "request",
 					Path:   filepath.Join(dir, entry.Name()),
 					Method: method,
+					URL:    url,
 				}
 				node.Children = append(node.Children, child)
 			}
@@ -209,6 +215,33 @@ func extractMethod(curlContent string) string {
 		}
 	}
 	return "GET"
+}
+
+func extractURL(curlContent string) string {
+	lines := strings.Split(curlContent, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		urlPattern := `['"]?(https?://[^\s'"]+)['"]?`
+		re := regexp.MustCompile(urlPattern)
+		matches := re.FindStringSubmatch(line)
+		if len(matches) > 1 {
+			return matches[1]
+		}
+
+		if strings.HasPrefix(line, "curl ") || strings.HasPrefix(line, "-X ") || strings.HasPrefix(line, "--request ") {
+			parts := strings.Fields(line)
+			for _, part := range parts {
+				if strings.HasPrefix(part, "http://") || strings.HasPrefix(part, "https://") {
+					return strings.Trim(part, "'\"")
+				}
+			}
+		}
+	}
+	return ""
 }
 
 func (pm *ProjectManager) CreateFolder(projectID, parentPath, name string) (*models.Folder, error) {

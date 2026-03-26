@@ -256,6 +256,7 @@ export namespace project {
 	    name: string;
 	    type: string;
 	    method?: string;
+	    url?: string;
 	    children?: ProjectTree[];
 	    path?: string;
 	
@@ -269,6 +270,7 @@ export namespace project {
 	        this.name = source["name"];
 	        this.type = source["type"];
 	        this.method = source["method"];
+	        this.url = source["url"];
 	        this.children = this.convertValues(source["children"], ProjectTree);
 	        this.path = source["path"];
 	    }
