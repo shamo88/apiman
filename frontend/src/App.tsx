@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Space, Modal, Input, message, Spin, Tree, Dropdown, Tabs, Card, Col, Row, Select, Collapse, Empty, Radio, InputRef, Upload } from 'antd';
-import { PlusOutlined, ApiOutlined, ProjectOutlined, FolderOutlined, FileOutlined, CloseOutlined, HomeOutlined, DragOutlined, SearchOutlined, RightOutlined, DownOutlined, MoreOutlined, ImportOutlined } from '@ant-design/icons';
+import { PlusOutlined, ApiOutlined, ProjectOutlined, FolderOutlined, FileOutlined, CopyOutlined, EditOutlined, CloseOutlined, HomeOutlined, DragOutlined, SearchOutlined, RightOutlined, DownOutlined, MoreOutlined, ImportOutlined } from '@ant-design/icons';
 import type { DataNode } from 'antd/es/tree';
 import type { UploadProps } from 'antd';
 import './App.css';
 import { TitleBar } from './components/TitleBar';
-import { ListProjects, CreateProject, DeleteProject, GetProjectTree, CreateFolder, CreateRequest, GetRequest, DeleteRequest, DeleteFolder, ExecuteCurl, UpdateRequest, ImportPostmanCollection } from '../wailsjs/go/main/App';
+import { ListProjects, CreateProject, DeleteProject, GetProjectTree, CreateFolder, CreateRequest, CopyRequest, RenameRequest, RenameFolder, GetRequest, DeleteRequest, DeleteFolder, ExecuteCurl, UpdateRequest, ImportPostmanCollection } from '../wailsjs/go/main/App';
 
 interface Project {
     id: string;
@@ -73,6 +73,10 @@ function App() {
     const [newFolderName, setNewFolderName] = useState('');
     const [createRequestModal, setCreateRequestModal] = useState(false);
     const [newRequestName, setNewRequestName] = useState('');
+    const [renameModal, setRenameModal] = useState(false);
+    const [renameType, setRenameType] = useState<'request' | 'folder'>('request');
+    const [renamePath, setRenamePath] = useState('');
+    const [renameValue, setRenameValue] = useState('');
     const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
     const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
     const [apiConfig, setApiConfig] = useState<ApiConfig>({
@@ -91,8 +95,30 @@ function App() {
     const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
     const searchInputRef = React.useRef<InputRef>(null);
+    const renameInputRef = React.useRef<InputRef>(null);
+    const renameSelectionEndRef = React.useRef<number>(0);
     const [importing, setImporting] = useState(false);
     const [searchVersion, setSearchVersion] = useState(0);
+
+    const trimRightSpaces = (value: string) => value.replace(/\s+$/g, '');
+    const getPrimaryName = (value: string) => value.replace(/-副本\d*$/u, '');
+
+    const collectFolderKeys = (tree: ProjectTree | null): string[] => {
+        if (!tree) return [];
+        const keys: string[] = [];
+
+        const walk = (node: ProjectTree) => {
+            if (node.type === 'folder') {
+                keys.push(node.path || node.id);
+            }
+            if (node.children) {
+                node.children.forEach(walk);
+            }
+        };
+
+        walk(tree);
+        return keys;
+    };
 
     const toggleFolderCollapse = (folderPath: string) => {
         setCollapsedFolders(prev => {
@@ -121,14 +147,14 @@ function App() {
 
     const filterTreeNodes = (tree: ProjectTree | null, keyword: string, method: string): ProjectTree | null => {
         if (!tree) return null;
+        const normalizedKeyword = keyword.trim().toLowerCase();
 
         if (tree.type === 'request') {
-            const searchLower = keyword.toLowerCase();
-            const nameLower = tree.name.toLowerCase();
-            const urlLower = tree.url ? tree.url.toLowerCase() : '';
+            const nameLower = (tree.name || '').toLowerCase();
+            const urlLower = (tree.url || '').toLowerCase();
 
-            const matchName = nameLower.includes(searchLower);
-            const matchURL = urlLower.includes(searchLower);
+            const matchName = normalizedKeyword === '' || nameLower.includes(normalizedKeyword);
+            const matchURL = normalizedKeyword === '' || urlLower.includes(normalizedKeyword);
             const matchMethod = method === 'ALL' || tree.method === method;
 
             if ((matchName || matchURL) && matchMethod) {
@@ -146,6 +172,17 @@ function App() {
                 return { ...tree, children: filteredChildren };
             }
             return null;
+        }
+
+        if (tree.type === 'project') {
+            const filteredChildren = tree.children
+                ?.map(child => filterTreeNodes(child, keyword, method))
+                .filter(child => child !== null) as ProjectTree[];
+
+            return {
+                ...tree,
+                children: filteredChildren || []
+            };
         }
 
         return tree;
@@ -180,6 +217,8 @@ function App() {
                     <Dropdown
                         menu={{
                             items: [
+                                { key: 'copy', icon: <CopyOutlined />, label: '复制', onClick: () => { handleCopyRequest(api.path!); } },
+                                { key: 'rename', icon: <EditOutlined />, label: '重命名', onClick: () => { openRenameModal('request', api.path!, api.name); } },
                                 { key: 'delete', icon: <CloseOutlined />, label: '删除', danger: true, onClick: () => { handleDeleteRequest(api.path!); } }
                             ]
                         }}
@@ -218,6 +257,7 @@ function App() {
                                 items: [
                                     { key: 'add-request', icon: <PlusOutlined />, label: '新建请求', onClick: () => { setSelectedFolder(folder.path || currentProject?.path || ''); setCreateRequestModal(true); } },
                                     { key: 'add-folder', icon: <FolderOutlined />, label: '新建文件夹', onClick: () => { setSelectedFolder(folder.path || currentProject?.path || ''); setCreateFolderModal(true); } },
+                                    { key: 'rename', icon: <EditOutlined />, label: '重命名', onClick: () => openRenameModal('folder', folder.path!, folder.name) },
                                     { type: 'divider' },
                                     { key: 'delete', icon: <CloseOutlined />, label: '删除文件夹', danger: true, onClick: () => handleDeleteFolder(folder.path!) }
                                 ]
@@ -355,6 +395,12 @@ function App() {
             try {
                 const tree = await GetProjectTree(project.id);
                 setProjectTrees(prev => ({ ...prev, [project.id]: tree }));
+                const folderKeys = collectFolderKeys(tree);
+                setCollapsedFolders(prev => {
+                    const next = new Set(prev);
+                    folderKeys.forEach((key) => next.add(key));
+                    return next;
+                });
                 setExpandedKeys([project.id]);
             } catch (error: any) {
                 console.error('Failed to load project tree:', error);
@@ -705,6 +751,82 @@ function App() {
             }
         });
     };
+
+    const handleCopyRequest = async (path: string) => {
+        try {
+            await CopyRequest(path);
+            message.success('请求复制成功');
+            const currentProject = projectTabs.find(t => t.id === activeTab)?.project;
+            if (currentProject) {
+                const tree = await GetProjectTree(currentProject.id);
+                setProjectTrees(prev => ({ ...prev, [currentProject.id]: tree }));
+            }
+        } catch (error: any) {
+            message.error(`复制失败: ${error?.message || error}`);
+        }
+    };
+
+    const openRenameModal = (type: 'request' | 'folder', path: string, currentName: string) => {
+        const normalizedName = trimRightSpaces(currentName);
+        const primaryName = getPrimaryName(normalizedName);
+        setRenameType(type);
+        setRenamePath(path);
+        setRenameValue(normalizedName);
+        renameSelectionEndRef.current = primaryName.length;
+        setRenameModal(true);
+    };
+
+    const handleRename = async () => {
+        const newName = renameValue.trim();
+        if (!newName) {
+            message.warning('请输入名称');
+            return;
+        }
+
+        try {
+            if (renameType === 'request') {
+                const renamed = await RenameRequest(renamePath, newName);
+
+                setRequestTabs(prev => prev.map(tab => tab.path === renamePath
+                    ? { ...tab, path: renamed.path, title: renamed.name }
+                    : tab));
+
+                if (currentRequest?.path === renamePath) {
+                    setCurrentRequest({ ...currentRequest, path: renamed.path, name: renamed.name });
+                    setApiConfig({ ...apiConfig, name: renamed.name });
+                }
+            } else {
+                await RenameFolder(renamePath, newName);
+            }
+
+            message.success('重命名成功');
+            setRenameModal(false);
+
+            const currentProject = projectTabs.find(t => t.id === activeTab)?.project;
+            if (currentProject) {
+                const tree = await GetProjectTree(currentProject.id);
+                setProjectTrees(prev => ({ ...prev, [currentProject.id]: tree }));
+            }
+        } catch (error: any) {
+            const msg = String(error?.message || error || '');
+            if (msg.includes('同名') || msg.includes('已存在')) {
+                message.warning(renameType === 'request' ? '重命名失败：同级目录下已存在同名接口' : '重命名失败：同级目录下已存在同名文件夹');
+            } else {
+                message.error(`重命名失败: ${msg}`);
+            }
+        }
+    };
+
+    useEffect(() => {
+        if (!renameModal) return;
+        setTimeout(() => {
+            const input = renameInputRef.current?.input;
+            if (!input) return;
+            input.focus();
+            const end = Math.max(0, Math.min(renameSelectionEndRef.current, input.value.length));
+            input.setSelectionRange(0, end);
+        }, 0);
+    }, [renameModal]);
 
     const handleDeleteFolder = async (path: string) => {
         Modal.confirm({
@@ -1260,6 +1382,21 @@ function App() {
                     value={newRequestName}
                     onChange={(e) => setNewRequestName(e.target.value)}
                     onPressEnter={handleCreateRequest}
+                />
+            </Modal>
+
+            <Modal
+                title={renameType === 'request' ? '重命名请求' : '重命名文件夹'}
+                open={renameModal}
+                onOk={handleRename}
+                onCancel={() => { setRenameModal(false); setRenamePath(''); setRenameValue(''); }}
+            >
+                <Input
+                    ref={renameInputRef}
+                    placeholder="输入新名称"
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(trimRightSpaces(e.target.value))}
+                    onPressEnter={handleRename}
                 />
             </Modal>
 

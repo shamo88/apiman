@@ -1,8 +1,9 @@
 import React from 'react';
-import { Tabs, Modal, Form, Input, Button, Switch, Select, Divider, Row, Col } from 'antd';
+import { Tabs, Modal, Form, Input, InputNumber, Button, Switch, Divider, Row, Col } from 'antd';
 import { MinusOutlined, CloseOutlined, AppstoreOutlined, SettingOutlined, InfoCircleOutlined, GlobalOutlined } from '@ant-design/icons';
 import { WindowMinimise, WindowToggleMaximise, Quit } from '../../wailsjs/runtime/runtime';
 import { LoadAppConfig, SaveAppConfig } from '../../wailsjs/go/main/App';
+import { config as wailsConfig } from '../../wailsjs/go/models';
 
 interface TitleBarProps {
     title?: string;
@@ -12,19 +13,23 @@ interface TitleBarProps {
     tabItems?: any[];
 }
 
-interface ProxyConfig {
-    enabled: boolean;
-    httpHost: string;
-    httpPort: number;
-    httpsHost: string;
-    httpsPort: number;
-    socks5Host: string;
-    socks5Port: number;
-}
+const parsePort = (value: unknown): number | undefined => {
+    if (value === null || value === undefined || value === '') {
+        return undefined;
+    }
 
-interface AppConfig {
-    proxy: ProxyConfig;
-}
+    const parsed = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(parsed)) {
+        return undefined;
+    }
+
+    const intPort = Math.trunc(parsed);
+    if (intPort < 1 || intPort > 65535) {
+        return undefined;
+    }
+
+    return intPort;
+};
 
 export const TitleBar: React.FC<TitleBarProps> = ({
     title = 'Apiman',
@@ -84,8 +89,19 @@ export const TitleBar: React.FC<TitleBarProps> = ({
     const handleSaveSettings = async () => {
         try {
             const values = await form.validateFields();
-            console.log('Saving config:', values);
-            await SaveAppConfig(values);
+            const configToSave = new wailsConfig.AppConfig({
+                proxy: {
+                    enabled: Boolean(values?.proxy?.enabled),
+                    httpHost: values?.proxy?.httpHost || '',
+                    httpPort: parsePort(values?.proxy?.httpPort),
+                    httpsHost: values?.proxy?.httpsHost || '',
+                    httpsPort: parsePort(values?.proxy?.httpsPort),
+                    socks5Host: values?.proxy?.socks5Host || '',
+                    socks5Port: parsePort(values?.proxy?.socks5Port),
+                }
+            });
+
+            await SaveAppConfig(configToSave);
             console.log('Config saved successfully');
             setSettingsVisible(false);
         } catch (error) {
@@ -258,7 +274,13 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                                                     </td>
                                                     <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
                                                         <Form.Item name={['proxy', 'httpPort']} style={{ marginBottom: 0 }}>
-                                                            <Input type="number" placeholder="端口" />
+                                                            <InputNumber
+                                                                placeholder="端口"
+                                                                style={{ width: '100%' }}
+                                                                min={1}
+                                                                max={65535}
+                                                                precision={0}
+                                                            />
                                                         </Form.Item>
                                                     </td>
                                                 </tr>
@@ -271,7 +293,13 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                                                     </td>
                                                     <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
                                                         <Form.Item name={['proxy', 'httpsPort']} style={{ marginBottom: 0 }}>
-                                                            <Input type="number" placeholder="端口" />
+                                                            <InputNumber
+                                                                placeholder="端口"
+                                                                style={{ width: '100%' }}
+                                                                min={1}
+                                                                max={65535}
+                                                                precision={0}
+                                                            />
                                                         </Form.Item>
                                                     </td>
                                                 </tr>
@@ -284,7 +312,13 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                                                     </td>
                                                     <td style={{ padding: '8px 12px' }}>
                                                         <Form.Item name={['proxy', 'socks5Port']} style={{ marginBottom: 0 }}>
-                                                            <Input type="number" placeholder="端口" />
+                                                            <InputNumber
+                                                                placeholder="端口"
+                                                                style={{ width: '100%' }}
+                                                                min={1}
+                                                                max={65535}
+                                                                precision={0}
+                                                            />
                                                         </Form.Item>
                                                     </td>
                                                 </tr>

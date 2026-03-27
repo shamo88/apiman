@@ -4,6 +4,8 @@ import {models} from '../models';
 import {project} from '../models';
 import {config} from '../models';
 
+export function CopyRequest(arg1:string):Promise<models.CurlRequest>;
+
 export function CreateEnvironment(arg1:string,arg2:Record<string, string>):Promise<models.Environment>;
 
 export function CreateFolder(arg1:string,arg2:string,arg3:string):Promise<models.Folder>;
@@ -41,6 +43,10 @@ export function ListProjects():Promise<Array<models.Project>>;
 export function LoadAppConfig():Promise<config.AppConfig>;
 
 export function LoadEnvironments():Promise<Array<models.Environment>>;
+
+export function RenameFolder(arg1:string,arg2:string):Promise<models.Folder>;
+
+export function RenameRequest(arg1:string,arg2:string):Promise<models.CurlRequest>;
 
 export function ReplaceVariables(arg1:string,arg2:Record<string, string>):Promise<string>;
 

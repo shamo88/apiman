@@ -4,9 +4,11 @@ import (
 	"apiman/internal/config"
 	"apiman/internal/models"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,6 +39,11 @@ type ProjectTree struct {
 	URL      string         `json:"url,omitempty"`
 	Children []*ProjectTree `json:"children,omitempty"`
 	Path     string         `json:"path,omitempty"`
+}
+
+type folderMeta struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 func (pm *ProjectManager) ListProjects() ([]models.Project, error) {
@@ -71,7 +78,8 @@ func (pm *ProjectManager) ListProjects() ([]models.Project, error) {
 
 func (pm *ProjectManager) CreateProject(name string) (*models.Project, error) {
 	projectID := uuid.New().String()
-	projectPath := filepath.Join(pm.configManager.GetProjectsDir(), projectID)
+	projectDirName := buildSlugUUIDName(name, projectID)
+	projectPath := filepath.Join(pm.configManager.GetProjectsDir(), projectDirName)
 
 	if err := os.MkdirAll(projectPath, 0755); err != nil {
 		return nil, err
@@ -99,16 +107,58 @@ func (pm *ProjectManager) CreateProject(name string) (*models.Project, error) {
 }
 
 func (pm *ProjectManager) DeleteProject(id string) error {
-	projectPath := filepath.Join(pm.configManager.GetProjectsDir(), id)
-	return os.RemoveAll(projectPath)
+	projectsDir := pm.configManager.GetProjectsDir()
+	entries, err := os.ReadDir(projectsDir)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		if strings.HasSuffix(entry.Name(), "__"+id) || entry.Name() == id {
+			return os.RemoveAll(filepath.Join(projectsDir, entry.Name()))
+		}
+	}
+
+	return os.ErrNotExist
 }
 
 func (pm *ProjectManager) GetProjectTree(projectID string) (*ProjectTree, error) {
-	projectPath := filepath.Join(pm.configManager.GetProjectsDir(), projectID)
+	projectsDir := pm.configManager.GetProjectsDir()
+	entries, err := os.ReadDir(projectsDir)
+	if err != nil {
+		return nil, err
+	}
+
+	var projectPath string
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		if strings.HasSuffix(entry.Name(), "__"+projectID) || entry.Name() == projectID {
+			projectPath = filepath.Join(projectsDir, entry.Name())
+			break
+		}
+	}
+
+	if projectPath == "" {
+		return nil, os.ErrNotExist
+	}
+
+	projectName := filepath.Base(projectPath)
+	metaFile := filepath.Join(projectPath, "meta.json")
+	if metaData, readErr := os.ReadFile(metaFile); readErr == nil {
+		var project models.Project
+		if json.Unmarshal(metaData, &project) == nil && project.Name != "" {
+			projectName = project.Name
+		}
+	}
 
 	tree := &ProjectTree{
 		ID:   projectID,
-		Name: filepath.Base(projectPath),
+		Name: projectName,
 		Type: "project",
 		Path: projectPath,
 	}
@@ -128,15 +178,30 @@ func (pm *ProjectManager) buildTree(dir string, node *ProjectTree) error {
 
 	for _, entry := range entries {
 		if entry.IsDir() {
-			if entry.Name() == "meta.json" {
+			if entry.Name() == "meta.json" || entry.Name() == ".folder.meta" {
 				continue
 			}
 
+			folderPath := filepath.Join(dir, entry.Name())
+			folderID := extractTrailingUUID(entry.Name())
+			if folderID == "" {
+				folderID = uuid.New().String()
+			}
+			displayName := stripUUIDSuffix(entry.Name())
+			if meta, err := loadFolderMeta(folderPath); err == nil {
+				if meta.ID != "" {
+					folderID = meta.ID
+				}
+				if meta.Name != "" {
+					displayName = meta.Name
+				}
+			}
+
 			child := &ProjectTree{
-				ID:   uuid.New().String(),
-				Name: entry.Name(),
+				ID:   folderID,
+				Name: displayName,
 				Type: "folder",
-				Path: filepath.Join(dir, entry.Name()),
+				Path: folderPath,
 			}
 
 			if err := pm.buildTree(filepath.Join(dir, entry.Name()), child); err != nil {
@@ -147,7 +212,8 @@ func (pm *ProjectManager) buildTree(dir string, node *ProjectTree) error {
 		} else {
 			if filepath.Ext(entry.Name()) == ".curl" {
 				requestName := strings.TrimSuffix(entry.Name(), ".curl")
-				metaPath := filepath.Join(dir, requestName+".meta")
+				requestID := extractTrailingUUID(requestName)
+				metaPath := filepath.Join(dir, requestID+".meta")
 				method := "GET"
 				url := ""
 
@@ -218,41 +284,98 @@ func extractMethod(curlContent string) string {
 }
 
 func extractURL(curlContent string) string {
-	lines := strings.Split(curlContent, "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "#") {
+	normalized := strings.ReplaceAll(curlContent, "\\\n", " ")
+	normalized = strings.ReplaceAll(normalized, "\n", " ")
+	parts := strings.Fields(normalized)
+	if len(parts) == 0 {
+		return ""
+	}
+
+	optionsWithValue := map[string]bool{
+		"-X":               true,
+		"--request":        true,
+		"-H":               true,
+		"--header":         true,
+		"-d":               true,
+		"--data":           true,
+		"--data-raw":       true,
+		"--data-binary":    true,
+		"--data-urlencode": true,
+		"-u":               true,
+		"--user":           true,
+		"-A":               true,
+		"--user-agent":     true,
+		"-e":               true,
+		"--referer":        true,
+		"-b":               true,
+		"--cookie":         true,
+		"-o":               true,
+		"--output":         true,
+		"-k":               false,
+		"--insecure":       false,
+		"-s":               false,
+		"--silent":         false,
+		"-L":               false,
+		"--location":       false,
+	}
+
+	for i := 0; i < len(parts); i++ {
+		token := strings.Trim(parts[i], "'\"")
+		if token == "" || token == "curl" {
 			continue
 		}
 
-		urlPattern := `['"]?(https?://[^\s'"]+)['"]?`
-		re := regexp.MustCompile(urlPattern)
-		matches := re.FindStringSubmatch(line)
-		if len(matches) > 1 {
-			return matches[1]
+		if token == "--url" {
+			if i+1 < len(parts) {
+				return strings.Trim(parts[i+1], "'\"")
+			}
+			continue
 		}
 
-		if strings.HasPrefix(line, "curl ") || strings.HasPrefix(line, "-X ") || strings.HasPrefix(line, "--request ") {
-			parts := strings.Fields(line)
-			for _, part := range parts {
-				if strings.HasPrefix(part, "http://") || strings.HasPrefix(part, "https://") {
-					return strings.Trim(part, "'\"")
-				}
+		if needsValue, exists := optionsWithValue[token]; exists {
+			if needsValue {
+				i++
 			}
+			continue
+		}
+
+		if strings.HasPrefix(token, "-") {
+			continue
+		}
+
+		if strings.HasPrefix(token, "http://") ||
+			strings.HasPrefix(token, "https://") ||
+			strings.HasPrefix(token, "//") ||
+			strings.HasPrefix(token, "{{") ||
+			strings.HasPrefix(token, "/") {
+			return token
 		}
 	}
+
+	quotedURLPattern := regexp.MustCompile(`['"]((?:https?:)?//[^'"]+|/\S+|\{\{[^}]+\}\}\S*)['"]`)
+	matches := quotedURLPattern.FindStringSubmatch(normalized)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+
 	return ""
 }
 
 func (pm *ProjectManager) CreateFolder(projectID, parentPath, name string) (*models.Folder, error) {
-	folderPath := filepath.Join(parentPath, name)
+	folderID := uuid.New().String()
+	folderDirName := buildSlugUUIDName(name, folderID)
+	folderPath := filepath.Join(parentPath, folderDirName)
 
 	if err := os.MkdirAll(folderPath, 0755); err != nil {
 		return nil, err
 	}
 
+	if err := saveFolderMeta(folderPath, folderID, name); err != nil {
+		return nil, err
+	}
+
 	folder := &models.Folder{
-		ID:        uuid.New().String(),
+		ID:        folderID,
 		Name:      name,
 		ProjectID: projectID,
 		Path:      folderPath,
@@ -268,7 +391,7 @@ func (pm *ProjectManager) DeleteFolder(path string) error {
 
 func (pm *ProjectManager) CreateRequest(projectID, folderPath, name string, content string) (*models.CurlRequest, error) {
 	requestID := uuid.New().String()
-	requestName := requestID + ".curl"
+	requestName := buildSlugUUIDName(name, requestID) + ".curl"
 	requestPath := filepath.Join(folderPath, requestName)
 
 	if err := os.WriteFile(requestPath, []byte(content), 0644); err != nil {
@@ -296,12 +419,86 @@ func (pm *ProjectManager) CreateRequest(projectID, folderPath, name string, cont
 	return request, nil
 }
 
+func buildSlugUUIDName(name, id string) string {
+	base := strings.TrimSpace(strings.ToLower(name))
+	if base == "" {
+		base = "item"
+	}
+
+	re := regexp.MustCompile(`[^\p{L}\p{N}]+`)
+	slug := strings.Trim(re.ReplaceAllString(base, "-"), "-")
+	if slug == "" {
+		slug = "item"
+	}
+
+	return slug + "__" + id
+}
+
+func stripUUIDSuffix(name string) string {
+	parts := strings.Split(name, "__")
+	if len(parts) < 2 {
+		return name
+	}
+
+	suffix := parts[len(parts)-1]
+	if _, err := uuid.Parse(suffix); err == nil {
+		return strings.Join(parts[:len(parts)-1], "__")
+	}
+
+	return name
+}
+
+func extractTrailingUUID(name string) string {
+	parts := strings.Split(name, "__")
+	if len(parts) < 2 {
+		return ""
+	}
+
+	suffix := parts[len(parts)-1]
+	if _, err := uuid.Parse(suffix); err == nil {
+		return suffix
+	}
+
+	return ""
+}
+
+func saveFolderMeta(folderPath, id, name string) error {
+	meta := folderMeta{
+		ID:   id,
+		Name: name,
+	}
+
+	data, err := json.MarshalIndent(meta, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(filepath.Join(folderPath, ".folder.meta"), data, 0644)
+}
+
+func loadFolderMeta(folderPath string) (*folderMeta, error) {
+	data, err := os.ReadFile(filepath.Join(folderPath, ".folder.meta"))
+	if err != nil {
+		return nil, err
+	}
+
+	var meta folderMeta
+	if err := json.Unmarshal(data, &meta); err != nil {
+		return nil, err
+	}
+	return &meta, nil
+}
+
 func (pm *ProjectManager) UpdateRequest(requestPath, content string) error {
 	return os.WriteFile(requestPath, []byte(content), 0644)
 }
 
 func (pm *ProjectManager) DeleteRequest(requestPath string) error {
-	requestID := strings.TrimSuffix(filepath.Base(requestPath), ".curl")
+	requestName := strings.TrimSuffix(filepath.Base(requestPath), ".curl")
+	requestID := extractTrailingUUID(requestName)
+	if requestID == "" {
+		requestID = requestName
+	}
 	metaPath := filepath.Join(filepath.Dir(requestPath), requestID+".meta")
 	os.Remove(metaPath)
 	return os.Remove(requestPath)
@@ -313,7 +510,11 @@ func (pm *ProjectManager) GetRequest(requestPath string) (*models.CurlRequest, e
 		return nil, err
 	}
 
-	requestID := strings.TrimSuffix(filepath.Base(requestPath), ".curl")
+	requestNameKey := strings.TrimSuffix(filepath.Base(requestPath), ".curl")
+	requestID := extractTrailingUUID(requestNameKey)
+	if requestID == "" {
+		requestID = requestNameKey
+	}
 	metaPath := filepath.Join(filepath.Dir(requestPath), requestID+".meta")
 
 	var requestName string
@@ -333,4 +534,239 @@ func (pm *ProjectManager) GetRequest(requestPath string) (*models.CurlRequest, e
 		Name:    requestName,
 		Content: string(content),
 	}, nil
+}
+
+func (pm *ProjectManager) CopyRequest(requestPath string) (*models.CurlRequest, error) {
+	req, err := pm.GetRequest(requestPath)
+	if err != nil {
+		return nil, err
+	}
+
+	folderPath := filepath.Dir(requestPath)
+	existingNames, err := pm.listRequestDisplayNames(folderPath)
+	if err != nil {
+		return nil, err
+	}
+
+	baseCopyName := req.Name + "-副本"
+	copyName := baseCopyName
+	for i := 2; ; i++ {
+		if _, exists := existingNames[copyName]; !exists {
+			break
+		}
+		copyName = baseCopyName + strconv.Itoa(i)
+	}
+
+	requestID := uuid.New().String()
+	fileName := buildSlugUUIDName(copyName, requestID) + ".curl"
+	newRequestPath := filepath.Join(folderPath, fileName)
+
+	if err := os.WriteFile(newRequestPath, []byte(req.Content), 0644); err != nil {
+		return nil, err
+	}
+
+	metaData := map[string]string{
+		"id":   requestID,
+		"name": copyName,
+	}
+	metaBytes, err := json.Marshal(metaData)
+	if err != nil {
+		return nil, err
+	}
+	metaPath := filepath.Join(folderPath, requestID+".meta")
+	if err := os.WriteFile(metaPath, metaBytes, 0644); err != nil {
+		return nil, err
+	}
+
+	return &models.CurlRequest{
+		ID:        requestID,
+		Name:      copyName,
+		Path:      newRequestPath,
+		Content:   req.Content,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}, nil
+}
+
+func (pm *ProjectManager) listRequestDisplayNames(folderPath string) (map[string]struct{}, error) {
+	names := make(map[string]struct{})
+
+	entries, err := os.ReadDir(folderPath)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".curl" {
+			continue
+		}
+
+		requestNameKey := strings.TrimSuffix(entry.Name(), ".curl")
+		requestID := extractTrailingUUID(requestNameKey)
+		if requestID == "" {
+			requestID = requestNameKey
+		}
+
+		displayName := requestNameKey
+		metaPath := filepath.Join(folderPath, requestID+".meta")
+		if metaData, readErr := os.ReadFile(metaPath); readErr == nil {
+			var meta map[string]string
+			if json.Unmarshal(metaData, &meta) == nil && meta["name"] != "" {
+				displayName = meta["name"]
+			}
+		}
+
+		names[displayName] = struct{}{}
+	}
+
+	return names, nil
+}
+
+func (pm *ProjectManager) RenameRequest(requestPath, newName string) (*models.CurlRequest, error) {
+	newName = strings.TrimSpace(newName)
+	if newName == "" {
+		return nil, os.ErrInvalid
+	}
+
+	req, err := pm.GetRequest(requestPath)
+	if err != nil {
+		return nil, err
+	}
+
+	requestNameKey := strings.TrimSuffix(filepath.Base(requestPath), ".curl")
+	requestID := extractTrailingUUID(requestNameKey)
+	if requestID == "" {
+		requestID = requestNameKey
+	}
+
+	folderPath := filepath.Dir(requestPath)
+	if exists, err := pm.requestNameExists(folderPath, newName, requestPath); err != nil {
+		return nil, err
+	} else if exists {
+		return nil, errors.New("同级目录下已存在同名接口")
+	}
+
+	newFileName := buildSlugUUIDName(newName, requestID) + ".curl"
+	newRequestPath := filepath.Join(folderPath, newFileName)
+
+	if newRequestPath != requestPath {
+		if err := os.Rename(requestPath, newRequestPath); err != nil {
+			return nil, err
+		}
+	}
+
+	metaData := map[string]string{
+		"id":   requestID,
+		"name": newName,
+	}
+	metaBytes, err := json.Marshal(metaData)
+	if err != nil {
+		return nil, err
+	}
+	metaPath := filepath.Join(filepath.Dir(newRequestPath), requestID+".meta")
+	if err := os.WriteFile(metaPath, metaBytes, 0644); err != nil {
+		return nil, err
+	}
+
+	return &models.CurlRequest{
+		ID:        requestID,
+		Name:      newName,
+		Path:      newRequestPath,
+		Content:   req.Content,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}, nil
+}
+
+func (pm *ProjectManager) RenameFolder(folderPath, newName string) (*models.Folder, error) {
+	newName = strings.TrimSpace(newName)
+	if newName == "" {
+		return nil, os.ErrInvalid
+	}
+
+	parentPath := filepath.Dir(folderPath)
+	if exists, err := pm.folderNameExists(parentPath, newName, folderPath); err != nil {
+		return nil, err
+	} else if exists {
+		return nil, errors.New("同级目录下已存在同名文件夹")
+	}
+
+	folderID := extractTrailingUUID(filepath.Base(folderPath))
+	if folderID == "" {
+		if meta, err := loadFolderMeta(folderPath); err == nil && meta.ID != "" {
+			folderID = meta.ID
+		}
+	}
+	if folderID == "" {
+		folderID = uuid.New().String()
+	}
+
+	newFolderName := buildSlugUUIDName(newName, folderID)
+	newFolderPath := filepath.Join(parentPath, newFolderName)
+
+	if newFolderPath != folderPath {
+		if err := os.Rename(folderPath, newFolderPath); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := saveFolderMeta(newFolderPath, folderID, newName); err != nil {
+		return nil, err
+	}
+
+	return &models.Folder{
+		ID:        folderID,
+		Name:      newName,
+		Path:      newFolderPath,
+		CreatedAt: time.Now(),
+	}, nil
+}
+
+func (pm *ProjectManager) requestNameExists(folderPath, name, excludePath string) (bool, error) {
+	names, err := pm.listRequestDisplayNames(folderPath)
+	if err != nil {
+		return false, err
+	}
+	if _, exists := names[name]; !exists {
+		return false, nil
+	}
+
+	if excludePath == "" {
+		return true, nil
+	}
+
+	req, err := pm.GetRequest(excludePath)
+	if err != nil {
+		return true, nil
+	}
+	return req.Name != name, nil
+}
+
+func (pm *ProjectManager) folderNameExists(parentPath, name, excludePath string) (bool, error) {
+	entries, err := os.ReadDir(parentPath)
+	if err != nil {
+		return false, err
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		childPath := filepath.Join(parentPath, entry.Name())
+		if excludePath != "" && childPath == excludePath {
+			continue
+		}
+
+		displayName := stripUUIDSuffix(entry.Name())
+		if meta, metaErr := loadFolderMeta(childPath); metaErr == nil && meta.Name != "" {
+			displayName = meta.Name
+		}
+
+		if displayName == name {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }

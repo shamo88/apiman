@@ -421,13 +421,13 @@ body,
 }
 
 .api-folder {
-    margin-bottom: 4px;
+    margin-bottom: 2px;
 }
 
 .api-folder-header {
     display: flex;
     align-items: center;
-    padding: 8px 16px;
+    padding: 6px 12px;
     cursor: pointer;
     transition: all 0.2s ease;
     color: var(--text-secondary);
@@ -446,13 +446,13 @@ body,
     justify-content: center;
     width: 16px;
     height: 16px;
-    margin-right: 8px;
+    margin-right: 6px;
     font-size: 10px;
     color: var(--text-muted);
 }
 
 .folder-icon {
-    margin-right: 8px;
+    margin-right: 6px;
     color: #faad14;
     font-size: 14px;
 }
@@ -470,7 +470,7 @@ body,
     background: var(--bg-tertiary);
     padding: 2px 6px;
     border-radius: 10px;
-    margin-left: 8px;
+    margin-left: 6px;
     font-weight: 500;
 }
 
@@ -482,7 +482,7 @@ body,
     cursor: pointer;
     color: var(--text-muted);
     transition: all 0.2s;
-    margin-left: 8px;
+    margin-left: 6px;
     border-radius: 4px;
     display: flex;
     align-items: center;
@@ -499,13 +499,13 @@ body,
 }
 
 .api-folder-content {
-    padding-left: 16px;
+    padding-left: 12px;
 }
 
 .api-item {
     display: flex;
     align-items: center;
-    padding: 8px 16px;
+    padding: 5px 12px;
     cursor: pointer;
     transition: all 0.2s ease;
     border-left: 2px solid transparent;
@@ -526,13 +526,13 @@ body,
 }
 
 .api-method-tag {
-    padding: 2px 8px;
+    padding: 1px 6px;
     border-radius: 4px;
     font-size: 10px;
     font-weight: 700;
-    margin-right: 10px;
+    margin-right: 8px;
     letter-spacing: 0.5px;
-    min-width: 48px;
+    min-width: 44px;
     text-align: center;
 }
 

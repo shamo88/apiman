@@ -6,7 +6,10 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -76,6 +79,10 @@ func (pi *PostmanImporter) ImportCollection(jsonData string) (*models.Project, e
 	if projectName == "" {
 		projectName = "Imported from Postman"
 	}
+	projectName, err := pi.ensureUniqueProjectName(projectName)
+	if err != nil {
+		return nil, err
+	}
 
 	project, err := pi.createProject(projectName)
 	if err != nil {
@@ -91,16 +98,19 @@ func (pi *PostmanImporter) ImportCollection(jsonData string) (*models.Project, e
 
 func (pi *PostmanImporter) createProject(name string) (*models.Project, error) {
 	projectID := uuid.New().String()
-	projectPath := filepath.Join(pi.configManager.GetProjectsDir(), projectID)
+	projectDirName := buildSlugUUIDName(name, projectID)
+	projectPath := filepath.Join(pi.configManager.GetProjectsDir(), projectDirName)
 
 	if err := os.MkdirAll(projectPath, 0755); err != nil {
 		return nil, err
 	}
 
 	project := &models.Project{
-		ID:   projectID,
-		Name: name,
-		Path: projectPath,
+		ID:        projectID,
+		Name:      name,
+		Path:      projectPath,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 
 	metaFile := filepath.Join(projectPath, "meta.json")
@@ -116,6 +126,63 @@ func (pi *PostmanImporter) createProject(name string) (*models.Project, error) {
 	return project, nil
 }
 
+func (pi *PostmanImporter) ensureUniqueProjectName(baseName string) (string, error) {
+	baseName = strings.TrimSpace(baseName)
+	if baseName == "" {
+		baseName = "Imported from Postman"
+	}
+
+	projects, err := pi.loadExistingProjectNames()
+	if err != nil {
+		return "", err
+	}
+
+	if _, exists := projects[baseName]; !exists {
+		return baseName, nil
+	}
+
+	for i := 2; ; i++ {
+		candidate := baseName + "-导入" + strconv.Itoa(i)
+		if _, exists := projects[candidate]; !exists {
+			return candidate, nil
+		}
+	}
+}
+
+func (pi *PostmanImporter) loadExistingProjectNames() (map[string]struct{}, error) {
+	result := make(map[string]struct{})
+	projectsDir := pi.configManager.GetProjectsDir()
+	entries, err := os.ReadDir(projectsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return result, nil
+		}
+		return nil, err
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		metaFile := filepath.Join(projectsDir, entry.Name(), "meta.json")
+		data, readErr := os.ReadFile(metaFile)
+		if readErr != nil {
+			continue
+		}
+
+		var project models.Project
+		if json.Unmarshal(data, &project) != nil {
+			continue
+		}
+		name := strings.TrimSpace(project.Name)
+		if name != "" {
+			result[name] = struct{}{}
+		}
+	}
+
+	return result, nil
+}
+
 func (pi *PostmanImporter) processItems(items []PostmanItem, parentPath string) error {
 	for _, item := range items {
 		if item.Request != nil {
@@ -123,8 +190,12 @@ func (pi *PostmanImporter) processItems(items []PostmanItem, parentPath string) 
 				continue
 			}
 		} else if len(item.Item) > 0 {
-			folderPath := filepath.Join(parentPath, sanitizeFolderName(item.Name))
+			folderID := uuid.New().String()
+			folderPath := filepath.Join(parentPath, buildSlugUUIDName(item.Name, folderID))
 			if err := os.MkdirAll(folderPath, 0755); err != nil {
+				continue
+			}
+			if err := pi.saveFolderMeta(folderPath, folderID, item.Name); err != nil {
 				continue
 			}
 			if err := pi.processItems(item.Item, folderPath); err != nil {
@@ -137,7 +208,7 @@ func (pi *PostmanImporter) processItems(items []PostmanItem, parentPath string) 
 
 func (pi *PostmanImporter) createRequest(folderPath, name string, request *PostmanRequest) error {
 	requestID := uuid.New().String()
-	requestName := requestID + ".curl"
+	requestName := buildSlugUUIDName(name, requestID) + ".curl"
 	requestPath := filepath.Join(folderPath, requestName)
 
 	curlContent := pi.convertToCurl(request)
@@ -207,17 +278,29 @@ func (pi *PostmanImporter) extractURL(urlInterface interface{}) string {
 	return ""
 }
 
-func sanitizeFolderName(name string) string {
-	replacer := strings.NewReplacer(
-		"/", "_",
-		"\\", "_",
-		":", "_",
-		"*", "_",
-		"?", "_",
-		"\"", "_",
-		"<", "_",
-		">", "_",
-		"|", "_",
-	)
-	return replacer.Replace(name)
+func buildSlugUUIDName(name, id string) string {
+	base := strings.TrimSpace(strings.ToLower(name))
+	if base == "" {
+		base = "item"
+	}
+
+	re := regexp.MustCompile(`[^\p{L}\p{N}]+`)
+	slug := strings.Trim(re.ReplaceAllString(base, "-"), "-")
+	if slug == "" {
+		slug = "item"
+	}
+
+	return slug + "__" + id
+}
+
+func (pi *PostmanImporter) saveFolderMeta(folderPath, id, name string) error {
+	meta := map[string]string{
+		"id":   id,
+		"name": name,
+	}
+	data, err := json.MarshalIndent(meta, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(folderPath, ".folder.meta"), data, 0644)
 }

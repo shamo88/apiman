@@ -95,6 +95,18 @@ func (a *App) GetRequest(requestPath string) (*models.CurlRequest, error) {
 	return a.service.GetRequest(requestPath)
 }
 
+func (a *App) CopyRequest(requestPath string) (*models.CurlRequest, error) {
+	return a.service.CopyRequest(requestPath)
+}
+
+func (a *App) RenameRequest(requestPath, newName string) (*models.CurlRequest, error) {
+	return a.service.RenameRequest(requestPath, newName)
+}
+
+func (a *App) RenameFolder(folderPath, newName string) (*models.Folder, error) {
+	return a.service.RenameFolder(folderPath, newName)
+}
+
 func (a *App) ExecuteCurl(command string) (*models.CurlResponse, error) {
 	return a.service.ExecuteCurl(command)
 }
