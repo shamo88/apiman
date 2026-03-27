@@ -599,7 +599,7 @@ import { WindowMinimise, WindowMaximise, WindowUnmaximise, WindowToggleMaximise,
 - ✅ 兼容 JavaScript 使用习惯，用户心智接近 Postman
 - ✅ 可在后端统一接入请求执行链路，避免前端绕过
 - ✅ 可控安全边界（超时、内存、API 白名单）
-- ⚠️ 需要设计 `pm` 兼容 API 与沙箱机制
+- ⚠️ 需要设计 `am` 运行时 API 与沙箱机制
 
 不采用外部 Node 子进程作为首版实现，以降低跨平台打包和安全维护复杂度。
 
@@ -623,7 +623,7 @@ import { WindowMinimise, WindowMaximise, WindowUnmaximise, WindowToggleMaximise,
 - 模块建议：`internal/script/`
 - 核心职责：
   - 初始化 JS VM（`goja.Runtime`）
-  - 注入 `pm` 对象与受控 API
+  - 注入 `am` 对象与受控 API
   - 控制超时、错误恢复、输出收集
   - 产出执行结果（变量变更、测试报告、日志）
 
@@ -639,29 +639,29 @@ type ScriptExecutionContext struct {
 }
 ```
 
-### **`pm` API（首版建议子集）**
+### **`am` API（首版建议子集）**
 
 为兼容常见使用习惯，首版提供受控最小集：
 
-- `pm.environment.get(key)`（只读，不提供 set/unset）
-- `pm.globals.get(key) / set(key, value) / unset(key)`
-- `pm.locals.get(key) / set(key, value) / unset(key)`（仅当前脚本运行期有效）
-- `pm.request.method / url`
-- `pm.request.headers.all() / add({key, value}) / upsert({key, value}) / remove(key)`
-- `pm.request.params.all() / add({key, value}) / upsert({key, value}) / remove(key)`
-- `pm.request.body.type / raw`
-- `pm.request.body.update(raw)`
-- `pm.request.body.formData.all() / add({key, value}) / upsert({key, value}) / remove(key)`
-- `pm.request.body.urlencoded.all() / add({key, value}) / upsert({key, value}) / remove(key)`
-- `pm.response.code`
-- `pm.response.headers.all()`
-- `pm.response.text()`
-- `pm.response.json()`
-- `pm.test(name, fn)`
-- `pm.expect(actual)`（仅实现常用断言：`to.eql`、`to.include`、`to.be.true/false`）
+- `am.environment.get(key)`（只读，不提供 set/unset）
+- `am.globals.get(key) / set(key, value) / unset(key)`
+- `am.locals.get(key) / set(key, value) / unset(key)`（仅当前脚本运行期有效）
+- `am.request.method / url`
+- `am.request.headers.all() / get(key) / set(key, value) / unset(key)`
+- `am.request.params.all() / get(key) / set(key, value) / unset(key)`
+- `am.request.body.type / raw`
+- `am.request.body.update(raw)`
+- `am.request.body.formData.all() / get(key) / set(key, value) / unset(key)`
+- `am.request.body.urlencoded.all() / get(key) / set(key, value) / unset(key)`
+- `am.response.code`
+- `am.response.headers.all()`
+- `am.response.text()`
+- `am.response.json()`
+- `am.test(name, fn)`
+- `am.expect(actual)`（仅实现常用断言：`to.eql`、`to.include`、`to.be.true/false`）
 - `console.log(...)`（写入脚本日志面板）
 
-> 首版不开放 `pm.sendRequest`，避免引入嵌套请求、并发与安全复杂度。
+> 首版不开放 `am.sendRequest`，避免引入嵌套请求、并发与安全复杂度。
 
 ### **数据模型与持久化扩展**
 
@@ -683,8 +683,8 @@ type CurlRequest struct {
   "method": "GET",
   "url": "https://api.example.com/user",
   "scripts": {
-    "pre_request": "pm.locals.set('ts', String(Date.now()))",
-    "test": "pm.test('status is 200', function () { pm.expect(pm.response.code).to.eql(200) })"
+    "pre_request": "am.locals.set('ts', String(Date.now()))",
+    "test": "am.test('status is 200', function () { am.expect(am.response.code).to.eql(200) })"
   }
 }
 ```
@@ -693,29 +693,29 @@ type CurlRequest struct {
 
 变量读取优先级建议如下：
 
-1. `local`（`pm.locals`，当前脚本临时变量）
-2. `global`（`pm.globals`，运行时全局变量）
-3. `environment`（`pm.environment`，当前环境只读变量）
+1. `local`（`am.locals`，当前脚本临时变量）
+2. `global`（`am.globals`，运行时全局变量）
+3. `environment`（`am.environment`，当前环境只读变量）
 
 变量写入策略建议：
 
-- `pm.locals.set`：仅当前脚本运行期间生效，不持久化，不跨请求共享
-- `pm.environment`：只读，不允许 set/unset
-- `pm.globals.set`：写回全局变量并持久化
+- `am.locals.set`：仅当前脚本运行期间生效，不持久化，不跨请求共享
+- `am.environment`：只读，不允许 set/unset
+- `am.globals.set`：写回全局变量并持久化
 
 ### **错误处理与失败策略**
 
 - Pre-script 执行失败：**默认中断请求发送**，并返回脚本错误
 - Test-script 执行失败：请求已完成，标记测试失败并返回错误详情
 - 脚本运行异常（语法/运行时）：记录错误堆栈（脱敏后展示）
-- `pm.test` 结果输出：`name`、`passed`、`message`、`duration`
+- `am.test` 结果输出：`name`、`passed`、`message`、`duration`
 
 ### **安全与资源限制**
 
 首版必须实现以下限制：
 
 - ⏱️ **执行超时**：单脚本最大执行时间（建议 300~1000ms）
-- 🔒 **能力白名单**：仅暴露 `pm` 与 `console`，不提供文件系统/网络/系统命令
+- 🔒 **能力白名单**：仅暴露 `am` 与 `console`，不提供文件系统/网络/系统命令
 - 🧱 **隔离执行**：每次执行使用独立 VM，上下文不跨请求泄漏
 - 📏 **输出限制**：日志最大长度、测试数量上限，防止 UI 与内存膨胀
 - 🧼 **敏感信息保护**：错误日志中对 token/password 等字段做脱敏展示
@@ -741,7 +741,7 @@ type CurlRequest struct {
 #### v1（MVP）
 
 - 请求级 Pre/Test 脚本
-- 最小 `pm` API
+- 最小 `am` API
 - 日志 + 测试结果面板
 - 超时和安全白名单
 
@@ -753,7 +753,7 @@ type CurlRequest struct {
 
 #### v3（高级）
 
-- `pm.sendRequest`（受控放开）
+- `am.sendRequest`（受控放开）
 - 脚本调试能力（断点/单步）
 - Postman 脚本兼容增强
 
