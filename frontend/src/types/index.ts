@@ -31,6 +31,18 @@ export interface CurlRequest {
     folder_id?: string;
     path: string;
     content: string;
+    pre_script_id?: string;
+    post_script_id?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface ProjectScript {
+    id: string;
+    project_id: string;
+    name: string;
+    path: string;
+    content: string;
     created_at?: string;
     updated_at?: string;
 }

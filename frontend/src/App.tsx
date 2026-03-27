@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Space, Modal, Input, message, Spin, Tree, Dropdown, Tabs, Card, Col, Row, Select, Collapse, Empty, Radio, InputRef, Upload } from 'antd';
-import { PlusOutlined, ApiOutlined, ProjectOutlined, FolderOutlined, FileOutlined, CopyOutlined, EditOutlined, CloseOutlined, HomeOutlined, DragOutlined, SearchOutlined, RightOutlined, DownOutlined, MoreOutlined, ImportOutlined } from '@ant-design/icons';
+import { Button, Space, Modal, Input, message, Spin, Tree, Dropdown, Tabs, Card, Col, Row, Select, Collapse, Empty, Radio, InputRef, Upload, Tooltip } from 'antd';
+import { PlusOutlined, ApiOutlined, ProjectOutlined, FolderOutlined, FileOutlined, CopyOutlined, EditOutlined, CloseOutlined, HomeOutlined, DragOutlined, SearchOutlined, RightOutlined, DownOutlined, MoreOutlined, ImportOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import type { DataNode } from 'antd/es/tree';
 import type { UploadProps } from 'antd';
+import CodeMirror from '@uiw/react-codemirror';
+import { javascript } from '@codemirror/lang-javascript';
 import './App.css';
 import { TitleBar } from './components/TitleBar';
-import { ListProjects, CreateProject, DeleteProject, RenameProject, GetProjectTree, CreateFolder, CreateRequest, CopyRequest, RenameRequest, RenameFolder, MoveRequest, MoveFolder, GetRequest, DeleteRequest, DeleteFolder, ExecuteCurl, UpdateRequest, ImportPostmanCollection, LoadAppConfig, LoadEnvironments, CreateEnvironment, UpdateEnvironment, DeleteEnvironment } from '../wailsjs/go/main/App';
+import { ListProjects, CreateProject, DeleteProject, RenameProject, GetProjectTree, CreateFolder, CreateRequest, CopyRequest, RenameRequest, RenameFolder, MoveRequest, MoveFolder, GetRequest, DeleteRequest, DeleteFolder, ExecuteCurl, UpdateRequest, ImportPostmanCollection, LoadAppConfig, LoadEnvironments, CreateEnvironment, UpdateEnvironment, DeleteEnvironment, ListProjectScripts, CreateProjectScript, UpdateProjectScript, DeleteProjectScript, UpdateRequestScripts } from '../wailsjs/go/main/App';
 
 interface Project {
     id: string;
@@ -27,6 +29,8 @@ interface CurlRequest {
     path: string;
     name: string;
     content: string;
+    pre_script_id?: string;
+    post_script_id?: string;
 }
 
 interface ProjectTab {
@@ -62,6 +66,14 @@ interface EnvironmentEditorTab {
     isNew?: boolean;
 }
 
+interface ProjectScript {
+    id: string;
+    project_id: string;
+    name: string;
+    path: string;
+    content: string;
+}
+
 interface ApiConfig {
     name: string;
     method: string;
@@ -72,6 +84,8 @@ interface ApiConfig {
     bodyType: 'none' | 'form-data' | 'x-www-form-urlencoded' | 'json' | 'xml' | 'raw' | 'binary';
     formData: { key: string; value: string }[];
     urlencoded: { key: string; value: string }[];
+    preScriptId?: string;
+    postScriptId?: string;
 }
 
 interface ProjectWorkspaceState {
@@ -100,7 +114,9 @@ const createDefaultApiConfig = (): ApiConfig => ({
     body: '',
     bodyType: 'none',
     formData: [],
-    urlencoded: []
+    urlencoded: [],
+    preScriptId: '',
+    postScriptId: '',
 });
 
 const createEmptyWorkspaceState = (): ProjectWorkspaceState => ({
@@ -410,7 +426,7 @@ function App() {
     const [draggingGroupName, setDraggingGroupName] = useState<string | null>(null);
     const [groupSortDropTarget, setGroupSortDropTarget] = useState<string | null>(null);
     const [projectGroupsLoaded, setProjectGroupsLoaded] = useState(false);
-    const [sidebarMenu, setSidebarMenu] = useState<'apis' | 'environments'>('apis');
+    const [sidebarMenu, setSidebarMenu] = useState<'apis' | 'environments' | 'scripts'>('apis');
     const [environments, setEnvironments] = useState<Environment[]>([]);
     const [selectedEnvironmentId, setSelectedEnvironmentId] = useState<string>('');
     const [editingEnvironmentId, setEditingEnvironmentId] = useState<string>('');
@@ -420,6 +436,13 @@ function App() {
     const [envSaving, setEnvSaving] = useState(false);
     const [environmentTabs, setEnvironmentTabs] = useState<EnvironmentEditorTab[]>([]);
     const [activeEnvironmentTab, setActiveEnvironmentTab] = useState<string>('');
+    const [projectScripts, setProjectScripts] = useState<ProjectScript[]>([]);
+    const [editingScriptId, setEditingScriptId] = useState<string>('');
+    const [scriptFormName, setScriptFormName] = useState('');
+    const [scriptFormContent, setScriptFormContent] = useState('// 在这里编写 JavaScript 脚本\n');
+    const [scriptsLoading, setScriptsLoading] = useState(false);
+    const [scriptSaving, setScriptSaving] = useState(false);
+    const [scriptHelpVisible, setScriptHelpVisible] = useState(false);
     const forceAnimationTimerRef = React.useRef<number | null>(null);
     const movedHighlightTimerRef = React.useRef<number | null>(null);
 
@@ -627,6 +650,95 @@ function App() {
         } finally {
             setEnvLoading(false);
         }
+    };
+
+    const loadProjectScriptsData = async (projectID: string) => {
+        setScriptsLoading(true);
+        try {
+            const scripts = await ListProjectScripts(projectID);
+            setProjectScripts(scripts || []);
+            if (scripts && scripts.length > 0) {
+                const target = scripts.find(item => item.id === editingScriptId) || scripts[0];
+                setEditingScriptId(target.id);
+                setScriptFormName(target.name);
+                setScriptFormContent(target.content || '');
+            } else {
+                setEditingScriptId('');
+                setScriptFormName('');
+                setScriptFormContent('// 在这里编写 JavaScript 脚本\n');
+            }
+        } catch (error: any) {
+            console.error('Failed to load scripts:', error);
+            message.error(`加载脚本失败: ${error?.message || error}`);
+        } finally {
+            setScriptsLoading(false);
+        }
+    };
+
+    const handleCreateScript = async () => {
+        if (!currentProject?.id) return;
+        const scriptName = `脚本${projectScripts.length + 1}`;
+        setScriptSaving(true);
+        try {
+            const created = await CreateProjectScript(currentProject.id, scriptName, '// 在这里编写 JavaScript 脚本\n');
+            message.success('脚本已创建');
+            await loadProjectScriptsData(currentProject.id);
+            setEditingScriptId(created.id);
+            setScriptFormName(created.name);
+            setScriptFormContent(created.content || '');
+            setSidebarMenu('scripts');
+        } catch (error: any) {
+            message.error(`创建脚本失败: ${error?.message || error}`);
+        } finally {
+            setScriptSaving(false);
+        }
+    };
+
+    const handleSelectScriptEditor = (script: ProjectScript) => {
+        setEditingScriptId(script.id);
+        setScriptFormName(script.name);
+        setScriptFormContent(script.content || '');
+    };
+
+    const handleSaveScript = async () => {
+        if (!currentProject?.id || !editingScriptId) return;
+        const name = scriptFormName.trim();
+        if (!name) {
+            message.warning('请输入脚本名称');
+            return;
+        }
+        setScriptSaving(true);
+        try {
+            await UpdateProjectScript(currentProject.id, editingScriptId, name, scriptFormContent);
+            message.success('脚本已保存');
+            await loadProjectScriptsData(currentProject.id);
+        } catch (error: any) {
+            message.error(`保存脚本失败: ${error?.message || error}`);
+        } finally {
+            setScriptSaving(false);
+        }
+    };
+
+    const handleDeleteScriptCurrent = async () => {
+        if (!currentProject?.id || !editingScriptId) return;
+        Modal.confirm({
+            title: '删除脚本',
+            content: '确定删除当前脚本吗？接口中已绑定该脚本的配置会被清空。',
+            onOk: async () => {
+                try {
+                    await DeleteProjectScript(currentProject.id, editingScriptId);
+                    message.success('脚本已删除');
+                    await loadProjectScriptsData(currentProject.id);
+                    setApiConfig(prev => ({
+                        ...prev,
+                        preScriptId: prev.preScriptId === editingScriptId ? '' : prev.preScriptId,
+                        postScriptId: prev.postScriptId === editingScriptId ? '' : prev.postScriptId,
+                    }));
+                } catch (error: any) {
+                    message.error(`删除脚本失败: ${error?.message || error}`);
+                }
+            }
+        });
     };
 
     const openEnvironmentEditor = (env: Environment) => {
@@ -927,6 +1039,18 @@ function App() {
             resetEnvironmentEditor();
         }
     }, [environments, selectedEnvironmentId, editingEnvironmentId]);
+
+    useEffect(() => {
+        const activeProject = projectTabs.find(t => t.id === activeTab)?.project;
+        if (!activeProject?.id) {
+            setProjectScripts([]);
+            setEditingScriptId('');
+            setScriptFormName('');
+            setScriptFormContent('// 在这里编写 JavaScript 脚本\n');
+            return;
+        }
+        loadProjectScriptsData(activeProject.id);
+    }, [activeTab, projectTabs]);
 
     useEffect(() => {
         setEnvironmentTabs(prev => prev
@@ -1508,7 +1632,7 @@ function App() {
             try {
                 const request = await GetRequest(treeNode.path);
                 setCurrentRequest(request);
-                const parsedConfig = parseCurlToConfig(request.content, request.name);
+                const parsedConfig = parseCurlToConfig(request.content, request.name, request.pre_script_id, request.post_script_id);
                 setApiConfig(parsedConfig);
                 setRequestContent(request.content);
                 setResponse(null);
@@ -1532,7 +1656,7 @@ function App() {
         }
     };
 
-    const parseCurlToConfig = (curlCommand: string, name: string): ApiConfig => {
+    const parseCurlToConfig = (curlCommand: string, name: string, preScriptId?: string, postScriptId?: string): ApiConfig => {
         const config: ApiConfig = {
             name: name,
             method: 'GET',
@@ -1542,7 +1666,9 @@ function App() {
             body: '',
             bodyType: 'none',
             formData: [],
-            urlencoded: []
+            urlencoded: [],
+            preScriptId: preScriptId || '',
+            postScriptId: postScriptId || '',
         };
 
         const lines = curlCommand.split('\n');
@@ -1712,6 +1838,7 @@ function App() {
         try {
             const request = await GetRequest(path);
             setCurrentRequest(request);
+            setApiConfig(parseCurlToConfig(request.content, request.name, request.pre_script_id, request.post_script_id));
             setRequestContent(request.content);
             setResponse(null);
         } catch (error: any) {
@@ -1830,6 +1957,7 @@ function App() {
         try {
             const curlCommand = configToCurl(apiConfig);
             await UpdateRequest(currentRequest.path, curlCommand);
+            await UpdateRequestScripts(currentRequest.path, apiConfig.preScriptId || '', apiConfig.postScriptId || '');
             setRequestContent(curlCommand);
             message.success('请求已保存');
             setStatus('请求已保存');
@@ -2285,6 +2413,12 @@ function App() {
                                     >
                                         环境变量
                                     </button>
+                                    <button
+                                        className={`sidebar-menu-item ${sidebarMenu === 'scripts' ? 'active' : ''}`}
+                                        onClick={() => setSidebarMenu('scripts')}
+                                    >
+                                        脚本
+                                    </button>
                                 </div>
                                 {sidebarMenu === 'apis' ? (
                                     <Dropdown
@@ -2298,8 +2432,10 @@ function App() {
                                     >
                                         <Button size="small" icon={<PlusOutlined />} />
                                     </Dropdown>
-                                ) : (
+                                ) : sidebarMenu === 'environments' ? (
                                     <Button size="small" icon={<PlusOutlined />} onClick={handleCreateEnvironmentClick} />
+                                ) : (
+                                    <Button size="small" icon={<PlusOutlined />} loading={scriptSaving} onClick={handleCreateScript} />
                                 )}
                             </div>
 
@@ -2382,7 +2518,7 @@ function App() {
                                         {!loading && currentTree && renderApiList()}
                                     </div>
                                 </>
-                            ) : (
+                            ) : sidebarMenu === 'environments' ? (
                                 <div className="sidebar-content environment-sidebar-content">
                                     <Spin spinning={envLoading}>
                                         <div className="environment-list">
@@ -2397,6 +2533,25 @@ function App() {
                                             ))}
                                             {environments.length === 0 && (
                                                 <div className="empty-sidebar">暂无环境，点击右上角“新建”创建</div>
+                                            )}
+                                        </div>
+                                    </Spin>
+                                </div>
+                            ) : (
+                                <div className="sidebar-content environment-sidebar-content">
+                                    <Spin spinning={scriptsLoading}>
+                                        <div className="environment-list">
+                                            {projectScripts.map(script => (
+                                                <button
+                                                    key={script.id}
+                                                    className={`environment-list-item ${editingScriptId === script.id ? 'active' : ''}`}
+                                                    onClick={() => handleSelectScriptEditor(script)}
+                                                >
+                                                    <span className="environment-list-item-name">{script.name}</span>
+                                                </button>
+                                            ))}
+                                            {projectScripts.length === 0 && (
+                                                <div className="empty-sidebar">暂无脚本，点击右上角“新建”创建</div>
                                             )}
                                         </div>
                                     </Spin>
@@ -2527,6 +2682,43 @@ function App() {
                                         </>
                                     ) : (
                                         <Empty description="请先在左侧选择环境，或点击新建" />
+                                    )}
+                                </div>
+                            ) : sidebarMenu === 'scripts' ? (
+                                <div className="request-panel">
+                                    {editingScriptId ? (
+                                        <div className="environment-panel script-panel">
+                                            <div className="script-editor-header">
+                                                <Input
+                                                    placeholder="脚本名称"
+                                                    value={scriptFormName}
+                                                    onChange={(e) => setScriptFormName(e.target.value)}
+                                                    style={{ maxWidth: 360 }}
+                                                />
+                                                <Space>
+                                                    <Tooltip title="脚本开发指南">
+                                                        <Button
+                                                            type="text"
+                                                            icon={<QuestionCircleOutlined />}
+                                                            onClick={() => setScriptHelpVisible(true)}
+                                                        />
+                                                    </Tooltip>
+                                                    <Button danger onClick={handleDeleteScriptCurrent}>删除</Button>
+                                                    <Button type="primary" loading={scriptSaving} onClick={handleSaveScript}>保存脚本</Button>
+                                                </Space>
+                                            </div>
+                                            <div className="script-editor-wrapper">
+                                                <CodeMirror
+                                                    value={scriptFormContent}
+                                                    height="100%"
+                                                    theme="light"
+                                                    extensions={[javascript()]}
+                                                    onChange={(value) => setScriptFormContent(value)}
+                                                />
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <Empty description="请先在左侧选择脚本，或点击新建" />
                                     )}
                                 </div>
                             ) : currentRequest ? (
@@ -2774,6 +2966,46 @@ function App() {
                                                         </div>
                                                     ),
                                                 },
+                                                {
+                                                    key: 'pre-script',
+                                                    label: '前置脚本',
+                                                    children: (
+                                                        <div className="script-binding-panel">
+                                                            <div className="script-binding-row">
+                                                                <span>选择项目脚本</span>
+                                                                <Select
+                                                                    value={apiConfig.preScriptId || '__none__'}
+                                                                    onChange={(value) => setApiConfig({ ...apiConfig, preScriptId: value === '__none__' ? '' : value })}
+                                                                    style={{ width: 320 }}
+                                                                    options={[
+                                                                        { label: '不使用前置脚本', value: '__none__' },
+                                                                        ...projectScripts.map(script => ({ label: script.name, value: script.id }))
+                                                                    ]}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    ),
+                                                },
+                                                {
+                                                    key: 'post-script',
+                                                    label: '后置脚本',
+                                                    children: (
+                                                        <div className="script-binding-panel">
+                                                            <div className="script-binding-row">
+                                                                <span>选择项目脚本</span>
+                                                                <Select
+                                                                    value={apiConfig.postScriptId || '__none__'}
+                                                                    onChange={(value) => setApiConfig({ ...apiConfig, postScriptId: value === '__none__' ? '' : value })}
+                                                                    style={{ width: 320 }}
+                                                                    options={[
+                                                                        { label: '不使用后置脚本', value: '__none__' },
+                                                                        ...projectScripts.map(script => ({ label: script.name, value: script.id }))
+                                                                    ]}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    ),
+                                                },
                                             ]}
                                         />
                                     </div>
@@ -2930,6 +3162,85 @@ function App() {
                     onChange={(e) => setRenameValue(trimRightSpaces(e.target.value))}
                     onPressEnter={handleRename}
                 />
+            </Modal>
+
+            <Modal
+                title="脚本开发指南"
+                open={scriptHelpVisible}
+                onCancel={() => setScriptHelpVisible(false)}
+                footer={null}
+                width={760}
+            >
+                <div className="script-help-content">
+                    <p><strong>1. 存储位置</strong></p>
+                    <ul>
+                        <li>每个项目的脚本都保存在项目目录下：<code>scripts/</code></li>
+                        <li>脚本源码文件：<code>{'{script-slug}__{script-uuid}.js'}</code></li>
+                        <li>脚本元数据文件：<code>{'{script-uuid}.meta'}</code>（保存名称/时间等配置）</li>
+                    </ul>
+
+                    <p><strong>2. 使用流程</strong></p>
+                    <ul>
+                        <li>先在左侧「脚本」菜单中创建并保存脚本</li>
+                        <li>再到请求页，在「前置脚本 / 后置脚本」标签中绑定脚本</li>
+                        <li>请求点击“保存”后，接口与脚本的绑定关系会落盘到请求 meta</li>
+                    </ul>
+
+                    <p><strong>3. 脚本职责建议</strong></p>
+                    <ul>
+                        <li><strong>前置脚本</strong>：生成时间戳、nonce、签名、动态 header、变量拼装</li>
+                        <li><strong>后置脚本</strong>：校验响应、抽取关键字段、记录调试日志</li>
+                    </ul>
+
+                    <p><strong>4. 当前可用方法 / 函数（本版本）</strong></p>
+                    <ul>
+                        <li><code>console.log(...args)</code>：输出调试日志，日志会显示在脚本执行日志区域（后续运行时接入）。</li>
+                        <li><code>Date.now()</code>：获取毫秒时间戳，常用于签名时间参数。</li>
+                        <li><code>Math.random()</code>：生成随机数，可用于 nonce。</li>
+                        <li><code>JSON.parse(text)</code> / <code>JSON.stringify(obj)</code>：JSON 解析与序列化。</li>
+                        <li><code>String(value)</code> / <code>Number(value)</code> / <code>Boolean(value)</code>：基础类型转换。</li>
+                        <li><code>encodeURIComponent(value)</code> / <code>decodeURIComponent(value)</code>：URL 编解码。</li>
+                    </ul>
+                    <p>
+                        说明：当前版本先完成了「脚本管理 + 请求绑定 + 持久化」链路，上述为推荐使用的 JS 基础能力。
+                        运行时专用 API（如 <code>pm.environment.get/set</code>、<code>pm.response.json()</code>）将在后续脚本执行引擎版本中补齐。
+                    </p>
+
+                    <p><strong>5. 前置脚本示例（签名/动态头）</strong></p>
+                    <pre>{`// 示例：生成时间戳并打印，后续可用于签名
+const timestamp = Date.now().toString();
+const nonce = Math.random().toString(36).slice(2, 10);
+console.log("timestamp =", timestamp);
+console.log("nonce =", nonce);
+
+// 你可以在这里编写签名逻辑，比如：
+// const sign = sha256(appKey + timestamp + nonce + body);
+// console.log("sign =", sign);`}</pre>
+
+                    <p><strong>6. 后置脚本示例（响应校验）</strong></p>
+                    <pre>{`// 伪代码示例（按你的运行时能力替换）
+// const ok = response.status === 200;
+// if (!ok) {
+//   throw new Error("状态码不是 200");
+// }
+// const data = JSON.parse(response.body || "{}");
+// console.log("userId =", data?.data?.id);`}</pre>
+
+                    <p><strong>7. 编写建议</strong></p>
+                    <ul>
+                        <li>脚本尽量保持纯函数化，避免写太多临时状态</li>
+                        <li>敏感信息（token、secret）建议只打印前后几位，避免完整输出</li>
+                        <li>脚本里优先做“请求相关逻辑”，不要放过重计算</li>
+                        <li>一个脚本只做一类事情，便于复用与排障</li>
+                    </ul>
+
+                    <p><strong>8. 常见问题排查</strong></p>
+                    <ul>
+                        <li>绑定后不生效：确认请求已点击“保存”</li>
+                        <li>脚本列表为空：确认当前项目下已创建脚本</li>
+                        <li>删除脚本后请求失效：请求绑定会自动清空，需要重新选择脚本</li>
+                    </ul>
+                </div>
             </Modal>
 
         </div>

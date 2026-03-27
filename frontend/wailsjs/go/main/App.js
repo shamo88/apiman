@@ -18,6 +18,10 @@ export function CreateProject(arg1) {
   return window['go']['main']['App']['CreateProject'](arg1);
 }
 
+export function CreateProjectScript(arg1, arg2, arg3) {
+  return window['go']['main']['App']['CreateProjectScript'](arg1, arg2, arg3);
+}
+
 export function CreateRequest(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CreateRequest'](arg1, arg2, arg3, arg4);
 }
@@ -32,6 +36,10 @@ export function DeleteFolder(arg1) {
 
 export function DeleteProject(arg1) {
   return window['go']['main']['App']['DeleteProject'](arg1);
+}
+
+export function DeleteProjectScript(arg1, arg2) {
+  return window['go']['main']['App']['DeleteProjectScript'](arg1, arg2);
 }
 
 export function DeleteRequest(arg1) {
@@ -68,6 +76,10 @@ export function GetRequest(arg1) {
 
 export function ImportPostmanCollection(arg1) {
   return window['go']['main']['App']['ImportPostmanCollection'](arg1);
+}
+
+export function ListProjectScripts(arg1) {
+  return window['go']['main']['App']['ListProjectScripts'](arg1);
 }
 
 export function ListProjects() {
@@ -126,6 +138,14 @@ export function UpdateEnvironment(arg1, arg2, arg3) {
   return window['go']['main']['App']['UpdateEnvironment'](arg1, arg2, arg3);
 }
 
+export function UpdateProjectScript(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['UpdateProjectScript'](arg1, arg2, arg3, arg4);
+}
+
 export function UpdateRequest(arg1, arg2) {
   return window['go']['main']['App']['UpdateRequest'](arg1, arg2);
+}
+
+export function UpdateRequestScripts(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UpdateRequestScripts'](arg1, arg2, arg3);
 }

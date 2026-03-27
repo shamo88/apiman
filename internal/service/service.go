@@ -97,6 +97,10 @@ func (s *Service) UpdateRequest(requestPath, content string) error {
 	return s.ProjectMgr.UpdateRequest(requestPath, content)
 }
 
+func (s *Service) UpdateRequestScripts(requestPath, preScriptID, postScriptID string) error {
+	return s.ProjectMgr.UpdateRequestScripts(requestPath, preScriptID, postScriptID)
+}
+
 func (s *Service) DeleteRequest(requestPath string) error {
 	return s.ProjectMgr.DeleteRequest(requestPath)
 }
@@ -170,4 +174,20 @@ func (s *Service) LoadProjectGroupsState() (*project.ProjectGroupsState, error) 
 
 func (s *Service) SaveProjectGroupsState(state *project.ProjectGroupsState) error {
 	return s.ProjectMgr.SaveProjectGroupsState(state)
+}
+
+func (s *Service) ListProjectScripts(projectID string) ([]models.ProjectScript, error) {
+	return s.ProjectMgr.ListProjectScripts(projectID)
+}
+
+func (s *Service) CreateProjectScript(projectID, name, content string) (*models.ProjectScript, error) {
+	return s.ProjectMgr.CreateProjectScript(projectID, name, content)
+}
+
+func (s *Service) UpdateProjectScript(projectID, scriptID, name, content string) (*models.ProjectScript, error) {
+	return s.ProjectMgr.UpdateProjectScript(projectID, scriptID, name, content)
+}
+
+func (s *Service) DeleteProjectScript(projectID, scriptID string) error {
+	return s.ProjectMgr.DeleteProjectScript(projectID, scriptID)
 }

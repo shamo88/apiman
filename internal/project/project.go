@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -44,6 +45,20 @@ type ProjectTree struct {
 type folderMeta struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+type requestMeta struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	PreScriptID  string `json:"pre_script_id,omitempty"`
+	PostScriptID string `json:"post_script_id,omitempty"`
+}
+
+type scriptMeta struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type ProjectGroupsState struct {
@@ -142,6 +157,9 @@ func (pm *ProjectManager) CreateProject(name string) (*models.Project, error) {
 	projectPath := filepath.Join(pm.configManager.GetProjectsDir(), projectDirName)
 
 	if err := os.MkdirAll(projectPath, 0755); err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(filepath.Join(projectPath, "scripts"), 0755); err != nil {
 		return nil, err
 	}
 
@@ -346,12 +364,9 @@ func (pm *ProjectManager) buildTree(dir string, node *ProjectTree) error {
 					url = extractURL(contentStr)
 				}
 
-				if metaData, err := os.ReadFile(metaPath); err == nil {
-					var meta map[string]string
-					if json.Unmarshal(metaData, &meta) == nil {
-						if name, ok := meta["name"]; ok && name != "" {
-							requestName = name
-						}
+				if meta, err := loadRequestMeta(metaPath); err == nil {
+					if meta.Name != "" {
+						requestName = meta.Name
 					}
 				}
 
@@ -521,9 +536,9 @@ func (pm *ProjectManager) CreateRequest(projectID, folderPath, name string, cont
 		return nil, err
 	}
 
-	metaData := map[string]string{
-		"id":   requestID,
-		"name": name,
+	metaData := requestMeta{
+		ID:   requestID,
+		Name: name,
 	}
 	metaBytes, _ := json.Marshal(metaData)
 	metaPath := filepath.Join(folderPath, requestID+".meta")
@@ -640,22 +655,22 @@ func (pm *ProjectManager) GetRequest(requestPath string) (*models.CurlRequest, e
 	}
 	metaPath := filepath.Join(filepath.Dir(requestPath), requestID+".meta")
 
-	var requestName string
-	if metaData, err := os.ReadFile(metaPath); err == nil {
-		var meta map[string]string
-		if json.Unmarshal(metaData, &meta) == nil {
-			requestName = meta["name"]
-		}
+	var meta requestMeta
+	if loadedMeta, err := loadRequestMeta(metaPath); err == nil {
+		meta = *loadedMeta
 	}
+	requestName := meta.Name
 
 	if requestName == "" {
 		requestName = strings.TrimSuffix(filepath.Base(requestPath), ".curl")
 	}
 
 	return &models.CurlRequest{
-		Path:    requestPath,
-		Name:    requestName,
-		Content: string(content),
+		Path:         requestPath,
+		Name:         requestName,
+		Content:      string(content),
+		PreScriptID:  meta.PreScriptID,
+		PostScriptID: meta.PostScriptID,
 	}, nil
 }
 
@@ -688,9 +703,9 @@ func (pm *ProjectManager) CopyRequest(requestPath string) (*models.CurlRequest, 
 		return nil, err
 	}
 
-	metaData := map[string]string{
-		"id":   requestID,
-		"name": copyName,
+	metaData := requestMeta{
+		ID:   requestID,
+		Name: copyName,
 	}
 	metaBytes, err := json.Marshal(metaData)
 	if err != nil {
@@ -732,11 +747,8 @@ func (pm *ProjectManager) listRequestDisplayNames(folderPath string) (map[string
 
 		displayName := requestNameKey
 		metaPath := filepath.Join(folderPath, requestID+".meta")
-		if metaData, readErr := os.ReadFile(metaPath); readErr == nil {
-			var meta map[string]string
-			if json.Unmarshal(metaData, &meta) == nil && meta["name"] != "" {
-				displayName = meta["name"]
-			}
+		if meta, readErr := loadRequestMeta(metaPath); readErr == nil && meta.Name != "" {
+			displayName = meta.Name
 		}
 
 		names[displayName] = struct{}{}
@@ -778,9 +790,11 @@ func (pm *ProjectManager) RenameRequest(requestPath, newName string) (*models.Cu
 		}
 	}
 
-	metaData := map[string]string{
-		"id":   requestID,
-		"name": newName,
+	metaData := requestMeta{
+		ID:           requestID,
+		Name:         newName,
+		PreScriptID:  req.PreScriptID,
+		PostScriptID: req.PostScriptID,
 	}
 	metaBytes, err := json.Marshal(metaData)
 	if err != nil {
@@ -1003,4 +1017,250 @@ func (pm *ProjectManager) folderNameExists(parentPath, name, excludePath string)
 	}
 
 	return false, nil
+}
+
+func (pm *ProjectManager) UpdateRequestScripts(requestPath, preScriptID, postScriptID string) error {
+	requestNameKey := strings.TrimSuffix(filepath.Base(requestPath), ".curl")
+	requestID := extractTrailingUUID(requestNameKey)
+	if requestID == "" {
+		requestID = requestNameKey
+	}
+	metaPath := filepath.Join(filepath.Dir(requestPath), requestID+".meta")
+	meta, err := loadRequestMeta(metaPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		meta = &requestMeta{
+			ID:   requestID,
+			Name: requestNameKey,
+		}
+	}
+	meta.PreScriptID = strings.TrimSpace(preScriptID)
+	meta.PostScriptID = strings.TrimSpace(postScriptID)
+	return saveRequestMeta(metaPath, meta)
+}
+
+func (pm *ProjectManager) ListProjectScripts(projectID string) ([]models.ProjectScript, error) {
+	projectPath, err := pm.findProjectPathByID(projectID)
+	if err != nil {
+		return nil, err
+	}
+	scriptsDir := filepath.Join(projectPath, "scripts")
+	if err := os.MkdirAll(scriptsDir, 0755); err != nil {
+		return nil, err
+	}
+
+	entries, err := os.ReadDir(scriptsDir)
+	if err != nil {
+		return nil, err
+	}
+
+	scripts := make([]models.ProjectScript, 0)
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".meta" {
+			continue
+		}
+		metaPath := filepath.Join(scriptsDir, entry.Name())
+		meta, err := loadScriptMeta(metaPath)
+		if err != nil || meta.ID == "" {
+			continue
+		}
+		scriptPath := filepath.Join(scriptsDir, buildSlugUUIDName(meta.Name, meta.ID)+".js")
+		if _, statErr := os.Stat(scriptPath); statErr != nil {
+			scriptPath = filepath.Join(scriptsDir, meta.ID+".js")
+		}
+		content, _ := os.ReadFile(scriptPath)
+		scripts = append(scripts, models.ProjectScript{
+			ID:        meta.ID,
+			ProjectID: projectID,
+			Name:      meta.Name,
+			Path:      scriptPath,
+			Content:   string(content),
+			CreatedAt: meta.CreatedAt,
+			UpdatedAt: meta.UpdatedAt,
+		})
+	}
+	sort.Slice(scripts, func(i, j int) bool { return scripts[i].UpdatedAt.After(scripts[j].UpdatedAt) })
+	return scripts, nil
+}
+
+func (pm *ProjectManager) CreateProjectScript(projectID, name, content string) (*models.ProjectScript, error) {
+	projectPath, err := pm.findProjectPathByID(projectID)
+	if err != nil {
+		return nil, err
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, os.ErrInvalid
+	}
+	scriptsDir := filepath.Join(projectPath, "scripts")
+	if err := os.MkdirAll(scriptsDir, 0755); err != nil {
+		return nil, err
+	}
+	scriptID := uuid.New().String()
+	now := time.Now()
+	scriptPath := filepath.Join(scriptsDir, buildSlugUUIDName(name, scriptID)+".js")
+	if err := os.WriteFile(scriptPath, []byte(content), 0644); err != nil {
+		return nil, err
+	}
+	meta := &scriptMeta{
+		ID:        scriptID,
+		Name:      name,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := saveScriptMeta(filepath.Join(scriptsDir, scriptID+".meta"), meta); err != nil {
+		return nil, err
+	}
+	return &models.ProjectScript{
+		ID:        scriptID,
+		ProjectID: projectID,
+		Name:      name,
+		Path:      scriptPath,
+		Content:   content,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}, nil
+}
+
+func (pm *ProjectManager) UpdateProjectScript(projectID, scriptID, name, content string) (*models.ProjectScript, error) {
+	projectPath, err := pm.findProjectPathByID(projectID)
+	if err != nil {
+		return nil, err
+	}
+	scriptsDir := filepath.Join(projectPath, "scripts")
+	metaPath := filepath.Join(scriptsDir, scriptID+".meta")
+	meta, err := loadScriptMeta(metaPath)
+	if err != nil {
+		return nil, err
+	}
+	oldName := meta.Name
+	if strings.TrimSpace(name) != "" {
+		meta.Name = strings.TrimSpace(name)
+	}
+	oldPath := filepath.Join(scriptsDir, buildSlugUUIDName(oldName, meta.ID)+".js")
+	if _, statErr := os.Stat(oldPath); statErr != nil {
+		oldPath = filepath.Join(scriptsDir, meta.ID+".js")
+	}
+	meta.UpdatedAt = time.Now()
+	newPath := filepath.Join(scriptsDir, buildSlugUUIDName(meta.Name, meta.ID)+".js")
+	if oldPath != newPath {
+		_ = os.Rename(oldPath, newPath)
+	}
+	if err := os.WriteFile(newPath, []byte(content), 0644); err != nil {
+		return nil, err
+	}
+	if err := saveScriptMeta(metaPath, meta); err != nil {
+		return nil, err
+	}
+	return &models.ProjectScript{
+		ID:        meta.ID,
+		ProjectID: projectID,
+		Name:      meta.Name,
+		Path:      newPath,
+		Content:   content,
+		CreatedAt: meta.CreatedAt,
+		UpdatedAt: meta.UpdatedAt,
+	}, nil
+}
+
+func (pm *ProjectManager) DeleteProjectScript(projectID, scriptID string) error {
+	projectPath, err := pm.findProjectPathByID(projectID)
+	if err != nil {
+		return err
+	}
+	scriptsDir := filepath.Join(projectPath, "scripts")
+	metaPath := filepath.Join(scriptsDir, scriptID+".meta")
+	meta, _ := loadScriptMeta(metaPath)
+	if meta != nil && meta.Name != "" {
+		_ = os.Remove(filepath.Join(scriptsDir, buildSlugUUIDName(meta.Name, meta.ID)+".js"))
+	}
+	_ = os.Remove(filepath.Join(scriptsDir, scriptID+".js"))
+	_ = os.Remove(metaPath)
+	return pm.clearScriptBindingsInProject(projectPath, scriptID)
+}
+
+func (pm *ProjectManager) clearScriptBindingsInProject(projectPath, scriptID string) error {
+	var firstErr error
+	err := filepath.WalkDir(projectPath, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || filepath.Ext(path) != ".meta" {
+			return nil
+		}
+		if filepath.Dir(path) == filepath.Join(projectPath, "scripts") {
+			return nil
+		}
+		meta, loadErr := loadRequestMeta(path)
+		if loadErr != nil {
+			return nil
+		}
+		changed := false
+		if meta.PreScriptID == scriptID {
+			meta.PreScriptID = ""
+			changed = true
+		}
+		if meta.PostScriptID == scriptID {
+			meta.PostScriptID = ""
+			changed = true
+		}
+		if changed {
+			if saveErr := saveRequestMeta(path, meta); saveErr != nil && firstErr == nil {
+				firstErr = saveErr
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return firstErr
+}
+
+func loadRequestMeta(metaPath string) (*requestMeta, error) {
+	data, err := os.ReadFile(metaPath)
+	if err != nil {
+		return nil, err
+	}
+	meta := &requestMeta{}
+	if err := json.Unmarshal(data, meta); err == nil && (meta.ID != "" || meta.Name != "") {
+		return meta, nil
+	}
+	var legacy map[string]string
+	if err := json.Unmarshal(data, &legacy); err != nil {
+		return nil, err
+	}
+	return &requestMeta{
+		ID:           legacy["id"],
+		Name:         legacy["name"],
+		PreScriptID:  legacy["pre_script_id"],
+		PostScriptID: legacy["post_script_id"],
+	}, nil
+}
+
+func saveRequestMeta(metaPath string, meta *requestMeta) error {
+	data, err := json.Marshal(meta)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(metaPath, data, 0644)
+}
+
+func loadScriptMeta(metaPath string) (*scriptMeta, error) {
+	data, err := os.ReadFile(metaPath)
+	if err != nil {
+		return nil, err
+	}
+	var meta scriptMeta
+	if err := json.Unmarshal(data, &meta); err != nil {
+		return nil, err
+	}
+	return &meta, nil
+}
+
+func saveScriptMeta(metaPath string, meta *scriptMeta) error {
+	data, err := json.MarshalIndent(meta, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(metaPath, data, 0644)
 }

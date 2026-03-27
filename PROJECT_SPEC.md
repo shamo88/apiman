@@ -583,6 +583,190 @@ import { WindowMinimise, WindowMaximise, WindowUnmaximise, WindowToggleMaximise,
 
 ---
 
+## 🧪 前后置脚本设计（方案 B：内嵌 JavaScript 引擎）
+
+### **目标**
+
+新增类似 Postman 的脚本能力，在请求生命周期中支持两类脚本：
+
+- **前置脚本（Pre-request Script）**：发送请求前执行，用于动态生成签名、时间戳、token、请求头等。
+- **后置脚本（Tests Script）**：响应返回后执行，用于断言结果、提取变量、驱动后续请求。
+
+### **方案选型结论**
+
+采用 **Go 后端内嵌 JavaScript 引擎**（推荐 `goja`）实现脚本运行时：
+
+- ✅ 兼容 JavaScript 使用习惯，用户心智接近 Postman
+- ✅ 可在后端统一接入请求执行链路，避免前端绕过
+- ✅ 可控安全边界（超时、内存、API 白名单）
+- ⚠️ 需要设计 `pm` 兼容 API 与沙箱机制
+
+不采用外部 Node 子进程作为首版实现，以降低跨平台打包和安全维护复杂度。
+
+### **执行链路设计**
+
+请求发送完整流程：
+
+1. 读取请求配置（URL/Method/Headers/Body/Params）
+2. 组装变量上下文（Global + Environment + Request Local）
+3. 执行 **Pre-request Script**
+4. 将脚本对请求的修改（Header/URL/Body/Vars）应用到实际请求
+5. 执行 HTTP 请求（现有 curl 引擎）
+6. 构造响应上下文（status/headers/body/duration）
+7. 执行 **Tests Script**
+8. 返回：响应数据 + 脚本日志 + 测试结果 + 脚本错误（若有）
+
+### **脚本运行时与上下文模型**
+
+#### 运行时容器（后端）
+
+- 模块建议：`internal/script/`
+- 核心职责：
+  - 初始化 JS VM（`goja.Runtime`）
+  - 注入 `pm` 对象与受控 API
+  - 控制超时、错误恢复、输出收集
+  - 产出执行结果（变量变更、测试报告、日志）
+
+#### 执行上下文（建议）
+
+```go
+type ScriptExecutionContext struct {
+    Request      RequestSnapshot
+    Response     *ResponseSnapshot // pre 阶段为 nil
+    Globals      map[string]string
+    Environment  map[string]string
+    LocalVars    map[string]string
+}
+```
+
+### **`pm` API（首版建议子集）**
+
+为兼容常见使用习惯，首版提供受控最小集：
+
+- `pm.environment.get(key)`（只读，不提供 set/unset）
+- `pm.globals.get(key) / set(key, value) / unset(key)`
+- `pm.locals.get(key) / set(key, value) / unset(key)`（仅当前脚本运行期有效）
+- `pm.request.method / url`
+- `pm.request.headers.all() / add({key, value}) / upsert({key, value}) / remove(key)`
+- `pm.request.params.all() / add({key, value}) / upsert({key, value}) / remove(key)`
+- `pm.request.body.type / raw`
+- `pm.request.body.update(raw)`
+- `pm.request.body.formData.all() / add({key, value}) / upsert({key, value}) / remove(key)`
+- `pm.request.body.urlencoded.all() / add({key, value}) / upsert({key, value}) / remove(key)`
+- `pm.response.code`
+- `pm.response.headers.all()`
+- `pm.response.text()`
+- `pm.response.json()`
+- `pm.test(name, fn)`
+- `pm.expect(actual)`（仅实现常用断言：`to.eql`、`to.include`、`to.be.true/false`）
+- `console.log(...)`（写入脚本日志面板）
+
+> 首版不开放 `pm.sendRequest`，避免引入嵌套请求、并发与安全复杂度。
+
+### **数据模型与持久化扩展**
+
+在请求模型新增脚本字段（请求级）：
+
+```go
+type CurlRequest struct {
+    // ... existing fields
+    PreScript  string `json:"pre_script,omitempty"`
+    TestScript string `json:"test_script,omitempty"`
+}
+```
+
+请求文件（`.curl`）建议增加 `scripts` 块（或通过 meta 文件扩展）：
+
+```json
+{
+  "name": "Get User",
+  "method": "GET",
+  "url": "https://api.example.com/user",
+  "scripts": {
+    "pre_request": "pm.locals.set('ts', String(Date.now()))",
+    "test": "pm.test('status is 200', function () { pm.expect(pm.response.code).to.eql(200) })"
+  }
+}
+```
+
+### **作用域与变量优先级**
+
+变量读取优先级建议如下：
+
+1. `local`（`pm.locals`，当前脚本临时变量）
+2. `global`（`pm.globals`，运行时全局变量）
+3. `environment`（`pm.environment`，当前环境只读变量）
+
+变量写入策略建议：
+
+- `pm.locals.set`：仅当前脚本运行期间生效，不持久化，不跨请求共享
+- `pm.environment`：只读，不允许 set/unset
+- `pm.globals.set`：写回全局变量并持久化
+
+### **错误处理与失败策略**
+
+- Pre-script 执行失败：**默认中断请求发送**，并返回脚本错误
+- Test-script 执行失败：请求已完成，标记测试失败并返回错误详情
+- 脚本运行异常（语法/运行时）：记录错误堆栈（脱敏后展示）
+- `pm.test` 结果输出：`name`、`passed`、`message`、`duration`
+
+### **安全与资源限制**
+
+首版必须实现以下限制：
+
+- ⏱️ **执行超时**：单脚本最大执行时间（建议 300~1000ms）
+- 🔒 **能力白名单**：仅暴露 `pm` 与 `console`，不提供文件系统/网络/系统命令
+- 🧱 **隔离执行**：每次执行使用独立 VM，上下文不跨请求泄漏
+- 📏 **输出限制**：日志最大长度、测试数量上限，防止 UI 与内存膨胀
+- 🧼 **敏感信息保护**：错误日志中对 token/password 等字段做脱敏展示
+
+### **前端交互设计（请求编辑区）**
+
+请求编辑面板新增 `Scripts` 标签页，包含两个子页签：
+
+- `Pre-request`
+- `Tests`
+
+每个编辑器支持：
+
+- 语法高亮（JavaScript）
+- 代码保存（随请求保存）
+- 运行后展示：
+  - Console Logs
+  - Test Results（通过/失败）
+  - Script Error
+
+### **版本迭代计划**
+
+#### v1（MVP）
+
+- 请求级 Pre/Test 脚本
+- 最小 `pm` API
+- 日志 + 测试结果面板
+- 超时和安全白名单
+
+#### v2（增强）
+
+- Folder/Project 级脚本继承（执行链：Project -> Folder -> Request）
+- 断言能力扩展（JSONPath、schema 校验）
+- 脚本模板库（签名、鉴权、变量提取）
+
+#### v3（高级）
+
+- `pm.sendRequest`（受控放开）
+- 脚本调试能力（断点/单步）
+- Postman 脚本兼容增强
+
+### **与现有模块的集成点**
+
+- `internal/models`：扩展请求结构脚本字段
+- `internal/service`：编排脚本执行时机与变量写回
+- `internal/curl`：保持请求执行职责，接收脚本变更后的最终请求
+- `internal/config`：持久化环境变量/全局变量更新
+- `frontend/src/App.tsx`：新增 Scripts UI 与结果展示区
+
+---
+
 ## 📊 数据存储
 
 ### **存储位置**

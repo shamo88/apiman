@@ -3,11 +3,11 @@ package models
 import "time"
 
 type Environment struct {
-	ID         string            `json:"id"`
-	Name       string            `json:"name"`
-	Variables  map[string]string `json:"variables"`
-	CreatedAt  time.Time         `json:"created_at"`
-	UpdatedAt  time.Time         `json:"updated_at"`
+	ID        string            `json:"id"`
+	Name      string            `json:"name"`
+	Variables map[string]string `json:"variables"`
+	CreatedAt time.Time         `json:"created_at"`
+	UpdatedAt time.Time         `json:"updated_at"`
 }
 
 type Project struct {
@@ -28,10 +28,22 @@ type Folder struct {
 }
 
 type CurlRequest struct {
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	ProjectID    string    `json:"project_id"`
+	FolderID     string    `json:"folder_id"`
+	Path         string    `json:"path"`
+	Content      string    `json:"content"`
+	PreScriptID  string    `json:"pre_script_id,omitempty"`
+	PostScriptID string    `json:"post_script_id,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+type ProjectScript struct {
 	ID        string    `json:"id"`
-	Name      string    `json:"name"`
 	ProjectID string    `json:"project_id"`
-	FolderID  string    `json:"folder_id"`
+	Name      string    `json:"name"`
 	Path      string    `json:"path"`
 	Content   string    `json:"content"`
 	CreatedAt time.Time `json:"created_at"`

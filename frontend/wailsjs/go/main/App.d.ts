@@ -12,6 +12,8 @@ export function CreateFolder(arg1:string,arg2:string,arg3:string):Promise<models
 
 export function CreateProject(arg1:string):Promise<models.Project>;
 
+export function CreateProjectScript(arg1:string,arg2:string,arg3:string):Promise<models.ProjectScript>;
+
 export function CreateRequest(arg1:string,arg2:string,arg3:string,arg4:string):Promise<models.CurlRequest>;
 
 export function DeleteEnvironment(arg1:string):Promise<void>;
@@ -19,6 +21,8 @@ export function DeleteEnvironment(arg1:string):Promise<void>;
 export function DeleteFolder(arg1:string):Promise<void>;
 
 export function DeleteProject(arg1:string):Promise<void>;
+
+export function DeleteProjectScript(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteRequest(arg1:string):Promise<void>;
 
@@ -37,6 +41,8 @@ export function GetProjectsDir():Promise<string>;
 export function GetRequest(arg1:string):Promise<models.CurlRequest>;
 
 export function ImportPostmanCollection(arg1:string):Promise<models.Project>;
+
+export function ListProjectScripts(arg1:string):Promise<Array<models.ProjectScript>>;
 
 export function ListProjects():Promise<Array<models.Project>>;
 
@@ -66,4 +72,8 @@ export function SaveProjectGroupsState(arg1:project.ProjectGroupsState):Promise<
 
 export function UpdateEnvironment(arg1:string,arg2:string,arg3:Record<string, string>):Promise<void>;
 
+export function UpdateProjectScript(arg1:string,arg2:string,arg3:string,arg4:string):Promise<models.ProjectScript>;
+
 export function UpdateRequest(arg1:string,arg2:string):Promise<void>;
+
+export function UpdateRequestScripts(arg1:string,arg2:string,arg3:string):Promise<void>;
