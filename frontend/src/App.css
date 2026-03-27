@@ -388,6 +388,7 @@ body,
     cursor: pointer;
     height: 100%;
     box-shadow: var(--shadow-card);
+    position: relative;
 }
 
 .project-card[draggable="true"] {
@@ -439,6 +440,29 @@ body,
 
 .project-card .ant-card-actions li button:hover {
     color: #ef4444 !important;
+}
+
+.project-card-menu-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 2;
+}
+
+.project-card-menu-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
 }
 
 .project-group-select-row {

@@ -98,6 +98,10 @@ export function RenameFolder(arg1, arg2) {
   return window['go']['main']['App']['RenameFolder'](arg1, arg2);
 }
 
+export function RenameProject(arg1, arg2) {
+  return window['go']['main']['App']['RenameProject'](arg1, arg2);
+}
+
 export function RenameRequest(arg1, arg2) {
   return window['go']['main']['App']['RenameRequest'](arg1, arg2);
 }

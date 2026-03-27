@@ -167,10 +167,73 @@ func (pm *ProjectManager) CreateProject(name string) (*models.Project, error) {
 }
 
 func (pm *ProjectManager) DeleteProject(id string) error {
+	projectPath, err := pm.findProjectPathByID(id)
+	if err != nil {
+		return err
+	}
+	if err := os.RemoveAll(projectPath); err != nil {
+		return err
+	}
+	state, loadErr := pm.LoadProjectGroupsState()
+	if loadErr == nil {
+		if _, exists := state.Assignments[id]; exists {
+			delete(state.Assignments, id)
+			_ = pm.SaveProjectGroupsState(state)
+		}
+	}
+	return nil
+}
+
+func (pm *ProjectManager) RenameProject(id, newName string) (*models.Project, error) {
+	newName = strings.TrimSpace(newName)
+	if newName == "" {
+		return nil, os.ErrInvalid
+	}
+
+	projectPath, err := pm.findProjectPathByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	projectDirName := buildSlugUUIDName(newName, id)
+	newProjectPath := filepath.Join(pm.configManager.GetProjectsDir(), projectDirName)
+	if projectPath != newProjectPath {
+		if _, statErr := os.Stat(newProjectPath); statErr == nil {
+			return nil, errors.New("已存在同名项目")
+		}
+		if err := os.Rename(projectPath, newProjectPath); err != nil {
+			return nil, err
+		}
+	}
+
+	metaFile := filepath.Join(newProjectPath, "meta.json")
+	var project models.Project
+	if data, readErr := os.ReadFile(metaFile); readErr == nil {
+		_ = json.Unmarshal(data, &project)
+	}
+	if project.ID == "" {
+		project.ID = id
+		project.CreatedAt = time.Now()
+	}
+	project.Name = newName
+	project.Path = newProjectPath
+	project.UpdatedAt = time.Now()
+
+	data, err := json.MarshalIndent(project, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(metaFile, data, 0644); err != nil {
+		return nil, err
+	}
+	return &project, nil
+}
+
+func (pm *ProjectManager) findProjectPathByID(id string) (string, error) {
 	projectsDir := pm.configManager.GetProjectsDir()
 	entries, err := os.ReadDir(projectsDir)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	for _, entry := range entries {
@@ -178,21 +241,11 @@ func (pm *ProjectManager) DeleteProject(id string) error {
 			continue
 		}
 		if strings.HasSuffix(entry.Name(), "__"+id) || entry.Name() == id {
-			if err := os.RemoveAll(filepath.Join(projectsDir, entry.Name())); err != nil {
-				return err
-			}
-			state, loadErr := pm.LoadProjectGroupsState()
-			if loadErr == nil {
-				if _, exists := state.Assignments[id]; exists {
-					delete(state.Assignments, id)
-					_ = pm.SaveProjectGroupsState(state)
-				}
-			}
-			return nil
+			return filepath.Join(projectsDir, entry.Name()), nil
 		}
 	}
 
-	return os.ErrNotExist
+	return "", os.ErrNotExist
 }
 
 func (pm *ProjectManager) GetProjectTree(projectID string) (*ProjectTree, error) {

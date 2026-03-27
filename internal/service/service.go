@@ -73,6 +73,10 @@ func (s *Service) DeleteProject(id string) error {
 	return s.ProjectMgr.DeleteProject(id)
 }
 
+func (s *Service) RenameProject(id, newName string) (*models.Project, error) {
+	return s.ProjectMgr.RenameProject(id, newName)
+}
+
 func (s *Service) GetProjectTree(projectID string) (*project.ProjectTree, error) {
 	return s.ProjectMgr.GetProjectTree(projectID)
 }

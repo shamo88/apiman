@@ -5,7 +5,7 @@ import type { DataNode } from 'antd/es/tree';
 import type { UploadProps } from 'antd';
 import './App.css';
 import { TitleBar } from './components/TitleBar';
-import { ListProjects, CreateProject, DeleteProject, GetProjectTree, CreateFolder, CreateRequest, CopyRequest, RenameRequest, RenameFolder, MoveRequest, MoveFolder, GetRequest, DeleteRequest, DeleteFolder, ExecuteCurl, UpdateRequest, ImportPostmanCollection, LoadAppConfig } from '../wailsjs/go/main/App';
+import { ListProjects, CreateProject, DeleteProject, RenameProject, GetProjectTree, CreateFolder, CreateRequest, CopyRequest, RenameRequest, RenameFolder, MoveRequest, MoveFolder, GetRequest, DeleteRequest, DeleteFolder, ExecuteCurl, UpdateRequest, ImportPostmanCollection, LoadAppConfig } from '../wailsjs/go/main/App';
 
 interface Project {
     id: string;
@@ -141,6 +141,9 @@ function App() {
     const [projectGroupAssignments, setProjectGroupAssignments] = useState<Record<string, string>>({});
     const [createGroupModal, setCreateGroupModal] = useState(false);
     const [newGroupName, setNewGroupName] = useState('');
+    const [renameProjectModal, setRenameProjectModal] = useState(false);
+    const [renameProjectId, setRenameProjectId] = useState('');
+    const [renameProjectValue, setRenameProjectValue] = useState('');
     const [collapsedProjectGroups, setCollapsedProjectGroups] = useState<Set<string>>(new Set());
     const [draggingProjectId, setDraggingProjectId] = useState<string | null>(null);
     const [projectDropTargetGroup, setProjectDropTargetGroup] = useState<string | null>(null);
@@ -700,8 +703,8 @@ function App() {
         }
     };
 
-    const handleDeleteProject = async (projectId: string, e: React.MouseEvent) => {
-        e.stopPropagation();
+    const handleDeleteProject = async (projectId: string, e?: React.MouseEvent) => {
+        e?.stopPropagation();
         Modal.confirm({
             title: '删除项目',
             content: '确定要删除这个项目吗？此操作不可恢复。',
@@ -716,6 +719,42 @@ function App() {
                 }
             }
         });
+    };
+
+    const openRenameProjectModal = (project: Project, e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        setRenameProjectId(project.id);
+        setRenameProjectValue(project.name);
+        setRenameProjectModal(true);
+    };
+
+    const handleRenameProject = async () => {
+        const newName = renameProjectValue.trim();
+        if (!renameProjectId) return;
+        if (!newName) {
+            message.warning('请输入项目名称');
+            return;
+        }
+        try {
+            const renamed = await RenameProject(renameProjectId, newName);
+            setProjectTabs(prev => prev.map(tab => (
+                tab.project.id === renameProjectId
+                    ? { ...tab, title: renamed.name, project: { ...tab.project, name: renamed.name, path: renamed.path } }
+                    : tab
+            )));
+            setRenameProjectModal(false);
+            setRenameProjectId('');
+            setRenameProjectValue('');
+            message.success('项目重命名成功');
+            await loadProjects();
+        } catch (error: any) {
+            const msg = String(error?.message || error || '');
+            if (msg.includes('同名') || msg.includes('已存在')) {
+                message.warning('重命名失败：已存在同名项目');
+            } else {
+                message.error(`重命名失败: ${msg}`);
+            }
+        }
     };
 
     const handleCreateProjectGroup = () => {
@@ -1649,10 +1688,37 @@ function App() {
                                                                 setProjectDropTargetGroup(null);
                                                             }}
                                                             onClick={() => handleOpenProject(project)}
-                                                            actions={[
-                                                                <CloseOutlined key="delete" onClick={(e) => handleDeleteProject(project.id, e)} />,
-                                                            ]}
                                                         >
+                                                            <Dropdown
+                                                                trigger={['click']}
+                                                                menu={{
+                                                                    items: [
+                                                                        {
+                                                                            key: 'rename',
+                                                                            icon: <EditOutlined />,
+                                                                            label: '重命名',
+                                                                            onClick: ({ domEvent }) => {
+                                                                                domEvent.stopPropagation();
+                                                                                openRenameProjectModal(project);
+                                                                            }
+                                                                        },
+                                                                        {
+                                                                            key: 'delete',
+                                                                            icon: <CloseOutlined />,
+                                                                            label: '删除',
+                                                                            danger: true,
+                                                                            onClick: ({ domEvent }) => {
+                                                                                domEvent.stopPropagation();
+                                                                                handleDeleteProject(project.id);
+                                                                            }
+                                                                        },
+                                                                    ]
+                                                                }}
+                                                            >
+                                                                <button className="project-card-menu-btn" onClick={(e) => e.stopPropagation()}>
+                                                                    <MoreOutlined />
+                                                                </button>
+                                                            </Dropdown>
                                                             <Card.Meta
                                                                 avatar={<ProjectOutlined style={{ fontSize: 32, color: '#1890ff' }} />}
                                                                 title={project.name}
@@ -2120,6 +2186,24 @@ function App() {
                     value={newGroupName}
                     onChange={(e) => setNewGroupName(e.target.value)}
                     onPressEnter={handleCreateProjectGroup}
+                />
+            </Modal>
+
+            <Modal
+                title="重命名项目"
+                open={renameProjectModal}
+                onOk={handleRenameProject}
+                onCancel={() => {
+                    setRenameProjectModal(false);
+                    setRenameProjectId('');
+                    setRenameProjectValue('');
+                }}
+            >
+                <Input
+                    placeholder="输入新项目名称"
+                    value={renameProjectValue}
+                    onChange={(e) => setRenameProjectValue(e.target.value)}
+                    onPressEnter={handleRenameProject}
                 />
             </Modal>
 

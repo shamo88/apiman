@@ -52,6 +52,8 @@ export function MoveRequest(arg1:string,arg2:string):Promise<string>;
 
 export function RenameFolder(arg1:string,arg2:string):Promise<models.Folder>;
 
+export function RenameProject(arg1:string,arg2:string):Promise<models.Project>;
+
 export function RenameRequest(arg1:string,arg2:string):Promise<models.CurlRequest>;
 
 export function ReplaceVariables(arg1:string,arg2:Record<string, string>):Promise<string>;
