@@ -122,6 +122,216 @@ const createEnvironmentVariableRow = (key: string = '', value: string = ''): Env
 
 const DEFAULT_PROJECT_GROUP = '未分组';
 
+const escapeHtml = (text: string) => (text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+const getCaretOffset = (root: HTMLElement): number => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return 0;
+    const range = selection.getRangeAt(0);
+    const preRange = range.cloneRange();
+    preRange.selectNodeContents(root);
+    preRange.setEnd(range.endContainer, range.endOffset);
+    return preRange.toString().length;
+};
+
+const setCaretOffset = (root: HTMLElement, targetOffset: number) => {
+    const selection = window.getSelection();
+    if (!selection) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    let currentOffset = 0;
+    let foundNode: Node | null = null;
+    let foundOffset = 0;
+
+    while (walker.nextNode()) {
+        const textNode = walker.currentNode;
+        const textLength = textNode.textContent?.length || 0;
+        if (currentOffset + textLength >= targetOffset) {
+            foundNode = textNode;
+            foundOffset = Math.max(0, targetOffset - currentOffset);
+            break;
+        }
+        currentOffset += textLength;
+    }
+
+    if (!foundNode) {
+        foundNode = root;
+        foundOffset = root.childNodes.length;
+    }
+
+    const range = document.createRange();
+    range.setStart(foundNode, foundOffset);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+};
+
+const renderHighlightedVariableHtml = (value: string, environmentVariables: Record<string, string>) => {
+    const input = value || '';
+    const regex = /\{\{(\w+)\}\}/g;
+    let html = '';
+    let lastIndex = 0;
+    let match = regex.exec(input);
+
+    while (match) {
+        const token = match[0];
+        const varName = match[1];
+        const start = match.index;
+        const end = start + token.length;
+        if (start > lastIndex) {
+            html += `<span class="variable-inline-text">${escapeHtml(input.slice(lastIndex, start))}</span>`;
+        }
+        const exists = Object.prototype.hasOwnProperty.call(environmentVariables, varName);
+        html += `<span class="variable-inline-token ${exists ? 'active' : 'missing'}">${escapeHtml(token)}</span>`;
+        lastIndex = end;
+        match = regex.exec(input);
+    }
+
+    if (lastIndex < input.length) {
+        html += `<span class="variable-inline-text">${escapeHtml(input.slice(lastIndex))}</span>`;
+    }
+
+    if (!html) {
+        html = `<span class="variable-inline-text"></span>`;
+    }
+    return html;
+};
+
+const getVariableSuggestions = (text: string, caretIndex: number, environmentVariables: Record<string, string>) => {
+    const beforeCaret = (text || '').slice(0, Math.max(0, caretIndex));
+    const match = beforeCaret.match(/\{\{(\w*)$/);
+    if (!match) return { items: [] as string[], rangeStart: -1, rangeEnd: -1 };
+    const keyword = (match[1] || '').toLowerCase();
+    const items = Object.keys(environmentVariables).filter(name => name.toLowerCase().includes(keyword));
+    return {
+        items,
+        rangeStart: beforeCaret.length - match[0].length,
+        rangeEnd: beforeCaret.length,
+    };
+};
+
+const VariableEditableInput: React.FC<{
+    value: string;
+    onChange: (next: string) => void;
+    placeholder: string;
+    style?: React.CSSProperties;
+    environmentVariables: Record<string, string>;
+    multiline?: boolean;
+}> = ({ value, onChange, placeholder, style, environmentVariables, multiline = false }) => {
+    const editorRef = React.useRef<HTMLDivElement | null>(null);
+    const [caretIndex, setCaretIndex] = useState<number>((value || '').length);
+    const [focused, setFocused] = useState(false);
+    const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
+    const suggestions = getVariableSuggestions(value, caretIndex, environmentVariables);
+
+    useEffect(() => {
+        const editor = editorRef.current;
+        if (!editor) return;
+        const html = renderHighlightedVariableHtml(value, environmentVariables);
+        if (editor.innerHTML !== html) {
+            editor.innerHTML = html;
+            if (focused) {
+                setCaretOffset(editor, Math.min(caretIndex, (value || '').length));
+            }
+        }
+    }, [value, focused, caretIndex, environmentVariables]);
+
+    useEffect(() => {
+        if (suggestions.items.length === 0) {
+            setActiveSuggestionIndex(0);
+            return;
+        }
+        setActiveSuggestionIndex((prev) => Math.min(prev, suggestions.items.length - 1));
+    }, [suggestions.items.length]);
+
+    const applySuggestion = (name: string) => {
+        if (suggestions.rangeStart < 0 || suggestions.rangeEnd < 0) return;
+        const token = `{{${name}}}`;
+        const next = (value || '').slice(0, suggestions.rangeStart) + token + (value || '').slice(suggestions.rangeEnd);
+        const nextCaret = suggestions.rangeStart + token.length;
+        onChange(next);
+        setCaretIndex(nextCaret);
+        window.requestAnimationFrame(() => {
+            if (editorRef.current) {
+                setCaretOffset(editorRef.current, nextCaret);
+                editorRef.current.focus();
+            }
+        });
+    };
+
+    return (
+        <div className="variable-editable-wrapper" style={style}>
+            <div
+                ref={editorRef}
+                className="variable-editable"
+                data-multiline={multiline ? 'true' : 'false'}
+                contentEditable
+                suppressContentEditableWarning
+                data-placeholder={placeholder}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                onInput={(e) => {
+                    const nextText = multiline
+                        ? (e.currentTarget.textContent || '')
+                        : (e.currentTarget.textContent || '').replace(/\n/g, '');
+                    onChange(nextText);
+                    setCaretIndex(getCaretOffset(e.currentTarget));
+                }}
+                onKeyDown={(e) => {
+                    if (suggestions.items.length > 0) {
+                        if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            setActiveSuggestionIndex((prev) => (prev + 1) % suggestions.items.length);
+                            return;
+                        }
+                        if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            setActiveSuggestionIndex((prev) => (prev - 1 + suggestions.items.length) % suggestions.items.length);
+                            return;
+                        }
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const name = suggestions.items[activeSuggestionIndex];
+                            if (name) {
+                                applySuggestion(name);
+                            }
+                            return;
+                        }
+                        if (e.key === 'Escape') {
+                            e.preventDefault();
+                            setActiveSuggestionIndex(0);
+                            return;
+                        }
+                    }
+                    if (!multiline && e.key === 'Enter') e.preventDefault();
+                }}
+                onKeyUp={(e) => {
+                    setCaretIndex(getCaretOffset(e.currentTarget));
+                }}
+            />
+            {focused && suggestions.items.length > 0 && (
+                <div className="variable-editable-suggestions">
+                    {suggestions.items.map((name, idx) => (
+                        <div
+                            key={name}
+                            className={`variable-editable-suggestion-item ${idx === activeSuggestionIndex ? 'active' : ''}`}
+                            onMouseDown={(e) => {
+                                e.preventDefault();
+                                applySuggestion(name);
+                            }}
+                            onMouseEnter={() => setActiveSuggestionIndex(idx)}
+                        >
+                            {`{{${name}}}`}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
 function App() {
     const [status, setStatus] = useState('初始化中...');
     const [projects, setProjects] = useState<Project[]>([]);
@@ -1396,6 +1606,19 @@ function App() {
         });
     };
 
+    const currentEnvironmentVariables = React.useMemo(() => {
+        const env = environments.find(item => item.id === selectedEnvironmentId);
+        return env?.variables || {};
+    }, [environments, selectedEnvironmentId]);
+
+    const renderVariableAwareInput = (
+        value: string,
+        onChange: (next: string) => void,
+        placeholder: string,
+        style?: React.CSSProperties,
+        multiline: boolean = false
+    ) => <VariableEditableInput value={value} onChange={onChange} placeholder={placeholder} style={style} environmentVariables={currentEnvironmentVariables} multiline={multiline} />;
+
     const configToCurl = (config: ApiConfig): string => {
         let curl = 'curl';
         let requestURL = config.url || '';
@@ -2305,12 +2528,12 @@ function App() {
                                                 { value: 'PATCH', label: 'PATCH' },
                                             ]}
                                         />
-                                        <Input
-                                            placeholder="输入请求 URL"
-                                            value={apiConfig.url}
-                                            onChange={(e) => setApiConfig({ ...apiConfig, url: e.target.value })}
-                                            style={{ flex: 1 }}
-                                        />
+                                        {renderVariableAwareInput(
+                                            apiConfig.url,
+                                            (value) => setApiConfig({ ...apiConfig, url: value }),
+                                            '输入请求 URL',
+                                            { flex: 1 }
+                                        )}
                                         <Button type="primary" onClick={handleExecuteCurl} loading={executing}>
                                             发送
                                         </Button>
@@ -2318,7 +2541,6 @@ function App() {
                                             保存
                                         </Button>
                                     </div>
-
                                     <div className="api-config-section">
                                         <Tabs
                                             defaultActiveKey="params"
@@ -2339,15 +2561,16 @@ function App() {
                                                                             setApiConfig({ ...apiConfig, params: newParams });
                                                                         }}
                                                                     />
-                                                                    <Input
-                                                                        placeholder="Value"
-                                                                        value={param.value}
-                                                                        onChange={(e) => {
+                                                                    {renderVariableAwareInput(
+                                                                        param.value,
+                                                                        (value) => {
                                                                             const newParams = [...apiConfig.params];
-                                                                            newParams[index].value = e.target.value;
+                                                                            newParams[index].value = value;
                                                                             setApiConfig({ ...apiConfig, params: newParams });
-                                                                        }}
-                                                                    />
+                                                                        },
+                                                                        'Value',
+                                                                        { flex: 1 }
+                                                                    )}
                                                                     <Button
                                                                         type="text"
                                                                         danger
@@ -2391,15 +2614,16 @@ function App() {
                                                                             setApiConfig({ ...apiConfig, headers: newHeaders });
                                                                         }}
                                                                     />
-                                                                    <Input
-                                                                        placeholder="Value"
-                                                                        value={header.value}
-                                                                        onChange={(e) => {
+                                                                    {renderVariableAwareInput(
+                                                                        header.value,
+                                                                        (value) => {
                                                                             const newHeaders = [...apiConfig.headers];
-                                                                            newHeaders[index].value = e.target.value;
+                                                                            newHeaders[index].value = value;
                                                                             setApiConfig({ ...apiConfig, headers: newHeaders });
-                                                                        }}
-                                                                    />
+                                                                        },
+                                                                        'Value',
+                                                                        { flex: 1 }
+                                                                    )}
                                                                     <Button
                                                                         type="text"
                                                                         danger
@@ -2455,28 +2679,30 @@ function App() {
                                                                 <div className="kv-editor">
                                                                     {(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded).map((item: any, index: number) => (
                                                                         <div key={index} className="kv-row">
-                                                                            <Input
-                                                                                placeholder="Key"
-                                                                                value={item.key}
-                                                                                onChange={(e) => {
+                                                                            {renderVariableAwareInput(
+                                                                                item.key,
+                                                                                (value) => {
                                                                                     const newData = [...(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded)];
-                                                                                    newData[index].key = e.target.value;
+                                                                                    newData[index].key = value;
                                                                                     setApiConfig(apiConfig.bodyType === 'form-data'
                                                                                         ? { ...apiConfig, formData: newData }
                                                                                         : { ...apiConfig, urlencoded: newData });
-                                                                                }}
-                                                                            />
-                                                                            <Input
-                                                                                placeholder="Value"
-                                                                                value={item.value}
-                                                                                onChange={(e) => {
+                                                                                },
+                                                                                'Key',
+                                                                                { flex: 1 }
+                                                                            )}
+                                                                            {renderVariableAwareInput(
+                                                                                item.value,
+                                                                                (value) => {
                                                                                     const newData = [...(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded)];
-                                                                                    newData[index].value = e.target.value;
+                                                                                    newData[index].value = value;
                                                                                     setApiConfig(apiConfig.bodyType === 'form-data'
                                                                                         ? { ...apiConfig, formData: newData }
                                                                                         : { ...apiConfig, urlencoded: newData });
-                                                                                }}
-                                                                            />
+                                                                                },
+                                                                                'Value',
+                                                                                { flex: 1 }
+                                                                            )}
                                                                             <Button
                                                                                 type="text"
                                                                                 danger
@@ -2506,16 +2732,23 @@ function App() {
                                                                 </div>
                                                             )}
                                                             {(apiConfig.bodyType === 'json' || apiConfig.bodyType === 'xml' || apiConfig.bodyType === 'raw') && (
-                                                                <Input.TextArea
-                                                                    placeholder={apiConfig.bodyType === 'json' ? '{\n  "key": "value"\n}' : apiConfig.bodyType === 'xml' ? '<root>\n  <key>value</key>\n</root>' : 'Raw body content'}
-                                                                    value={apiConfig.body}
-                                                                    onChange={(e) => setApiConfig({ ...apiConfig, body: e.target.value })}
-                                                                    style={{
-                                                                        fontFamily: 'monospace',
-                                                                        minHeight: 150,
-                                                                        marginTop: 12
-                                                                    }}
-                                                                />
+                                                                <>
+                                                                    {renderVariableAwareInput(
+                                                                        apiConfig.body,
+                                                                        (value) => setApiConfig({ ...apiConfig, body: value }),
+                                                                        apiConfig.bodyType === 'json'
+                                                                            ? '{\n  "key": "value"\n}'
+                                                                            : apiConfig.bodyType === 'xml'
+                                                                                ? '<root>\n  <key>value</key>\n</root>'
+                                                                                : 'Raw body content',
+                                                                        {
+                                                                            fontFamily: 'monospace',
+                                                                            minHeight: 150,
+                                                                            marginTop: 12
+                                                                        },
+                                                                        true
+                                                                    )}
+                                                                </>
                                                             )}
                                                             {apiConfig.bodyType === 'binary' && (
                                                                 <div className="body-binary">
