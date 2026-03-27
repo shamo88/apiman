@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/url"
@@ -53,7 +54,25 @@ func (c *CurlExecutor) ExecuteWithProxy(curlCommand string, proxyOpts *ProxyOpti
 	startTime := time.Now()
 
 	var body io.Reader
-	if parts.Data != "" {
+	if len(parts.FormFields) > 0 {
+		var formBuffer bytes.Buffer
+		formWriter := multipart.NewWriter(&formBuffer)
+		for key, value := range parts.FormFields {
+			if err := formWriter.WriteField(key, value); err != nil {
+				return &models.CurlResponse{
+					Error: fmt.Sprintf("Failed to build multipart form data: %v", err),
+				}, nil
+			}
+		}
+		if err := formWriter.Close(); err != nil {
+			return &models.CurlResponse{
+				Error: fmt.Sprintf("Failed to finalize multipart form data: %v", err),
+			}, nil
+		}
+		body = &formBuffer
+		// multipart 必须带 boundary；如果用户配置了错误 Content-Type（如 application/json），这里强制修正。
+		parts.Headers["Content-Type"] = formWriter.FormDataContentType()
+	} else if parts.Data != "" {
 		body = strings.NewReader(parts.Data)
 	}
 
@@ -217,16 +236,18 @@ func normalizeProxyHost(raw string) string {
 }
 
 type ParsedCurl struct {
-	Method  string
-	URL     string
-	Headers map[string]string
-	Data    string
-	Auth    string
+	Method     string
+	URL        string
+	Headers    map[string]string
+	Data       string
+	FormFields map[string]string
+	Auth       string
 }
 
 func (c *CurlExecutor) parseCurlCommand(command string) (*ParsedCurl, error) {
 	parts := &ParsedCurl{
-		Headers: make(map[string]string),
+		Headers:    make(map[string]string),
+		FormFields: make(map[string]string),
 	}
 
 	command = strings.TrimSpace(command)
@@ -255,6 +276,7 @@ func (c *CurlExecutor) parseCurlCommand(command string) (*ParsedCurl, error) {
 	}
 
 	parts.Data = extractDataArgument(command)
+	parts.FormFields = extractFormFields(command)
 
 	if matches := patterns["user"].FindStringSubmatch(command); len(matches) > 1 {
 		auth := matches[1]
@@ -301,6 +323,32 @@ func extractDataArgument(command string) string {
 	}
 
 	return ""
+}
+
+func extractFormFields(command string) map[string]string {
+	fields := make(map[string]string)
+	pattern := regexp.MustCompile(`(?:^|\s)-F\s+['"]([^'"]+)['"]`)
+	matches := pattern.FindAllStringSubmatch(command, -1)
+	for _, match := range matches {
+		if len(match) < 2 {
+			continue
+		}
+		item := strings.TrimSpace(match[1])
+		if item == "" {
+			continue
+		}
+		parts := strings.SplitN(item, "=", 2)
+		key := strings.TrimSpace(parts[0])
+		if key == "" {
+			continue
+		}
+		value := ""
+		if len(parts) == 2 {
+			value = parts[1]
+		}
+		fields[key] = value
+	}
+	return fields
 }
 
 func base64Encode(input string) string {
