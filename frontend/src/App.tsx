@@ -224,7 +224,9 @@ const VariableEditableInput: React.FC<{
     const [caretIndex, setCaretIndex] = useState<number>((value || '').length);
     const [focused, setFocused] = useState(false);
     const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
+    const [forceSuggestAll, setForceSuggestAll] = useState(false);
     const suggestions = getVariableSuggestions(value, caretIndex, environmentVariables);
+    const suggestionItems = forceSuggestAll ? Object.keys(environmentVariables) : suggestions.items;
 
     useEffect(() => {
         const editor = editorRef.current;
@@ -239,20 +241,27 @@ const VariableEditableInput: React.FC<{
     }, [value, focused, caretIndex, environmentVariables]);
 
     useEffect(() => {
-        if (suggestions.items.length === 0) {
+        if (suggestionItems.length === 0) {
             setActiveSuggestionIndex(0);
             return;
         }
-        setActiveSuggestionIndex((prev) => Math.min(prev, suggestions.items.length - 1));
-    }, [suggestions.items.length]);
+        setActiveSuggestionIndex((prev) => Math.min(prev, suggestionItems.length - 1));
+    }, [suggestionItems.length]);
 
     const applySuggestion = (name: string) => {
-        if (suggestions.rangeStart < 0 || suggestions.rangeEnd < 0) return;
         const token = `{{${name}}}`;
-        const next = (value || '').slice(0, suggestions.rangeStart) + token + (value || '').slice(suggestions.rangeEnd);
-        const nextCaret = suggestions.rangeStart + token.length;
+        let next = value || '';
+        let nextCaret = caretIndex;
+        if (suggestions.rangeStart >= 0 && suggestions.rangeEnd >= 0) {
+            next = (value || '').slice(0, suggestions.rangeStart) + token + (value || '').slice(suggestions.rangeEnd);
+            nextCaret = suggestions.rangeStart + token.length;
+        } else {
+            next = (value || '').slice(0, Math.max(0, caretIndex)) + token + (value || '').slice(Math.max(0, caretIndex));
+            nextCaret = Math.max(0, caretIndex) + token.length;
+        }
         onChange(next);
         setCaretIndex(nextCaret);
+        setForceSuggestAll(false);
         window.requestAnimationFrame(() => {
             if (editorRef.current) {
                 setCaretOffset(editorRef.current, nextCaret);
@@ -271,29 +280,37 @@ const VariableEditableInput: React.FC<{
                 suppressContentEditableWarning
                 data-placeholder={placeholder}
                 onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
+                onBlur={() => {
+                    setFocused(false);
+                    setForceSuggestAll(false);
+                }}
+                onDoubleClick={(e) => {
+                    setCaretIndex(getCaretOffset(e.currentTarget));
+                    setForceSuggestAll(true);
+                }}
                 onInput={(e) => {
                     const nextText = multiline
                         ? (e.currentTarget.textContent || '')
                         : (e.currentTarget.textContent || '').replace(/\n/g, '');
                     onChange(nextText);
                     setCaretIndex(getCaretOffset(e.currentTarget));
+                    setForceSuggestAll(false);
                 }}
                 onKeyDown={(e) => {
-                    if (suggestions.items.length > 0) {
+                    if (suggestionItems.length > 0) {
                         if (e.key === 'ArrowDown') {
                             e.preventDefault();
-                            setActiveSuggestionIndex((prev) => (prev + 1) % suggestions.items.length);
+                            setActiveSuggestionIndex((prev) => (prev + 1) % suggestionItems.length);
                             return;
                         }
                         if (e.key === 'ArrowUp') {
                             e.preventDefault();
-                            setActiveSuggestionIndex((prev) => (prev - 1 + suggestions.items.length) % suggestions.items.length);
+                            setActiveSuggestionIndex((prev) => (prev - 1 + suggestionItems.length) % suggestionItems.length);
                             return;
                         }
                         if (e.key === 'Enter') {
                             e.preventDefault();
-                            const name = suggestions.items[activeSuggestionIndex];
+                            const name = suggestionItems[activeSuggestionIndex];
                             if (name) {
                                 applySuggestion(name);
                             }
@@ -302,6 +319,7 @@ const VariableEditableInput: React.FC<{
                         if (e.key === 'Escape') {
                             e.preventDefault();
                             setActiveSuggestionIndex(0);
+                            setForceSuggestAll(false);
                             return;
                         }
                     }
@@ -311,9 +329,9 @@ const VariableEditableInput: React.FC<{
                     setCaretIndex(getCaretOffset(e.currentTarget));
                 }}
             />
-            {focused && suggestions.items.length > 0 && (
+            {focused && suggestionItems.length > 0 && (
                 <div className="variable-editable-suggestions">
-                    {suggestions.items.map((name, idx) => (
+                    {suggestionItems.map((name, idx) => (
                         <div
                             key={name}
                             className={`variable-editable-suggestion-item ${idx === activeSuggestionIndex ? 'active' : ''}`}
