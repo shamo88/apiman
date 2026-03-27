@@ -63,6 +63,12 @@ interface ProjectWorkspaceState {
     apiConfig: ApiConfig;
 }
 
+interface ProjectGroupStore {
+    groups: string[];
+    assignments: Record<string, string>;
+    collapsedGroups?: string[];
+}
+
 const createDefaultApiConfig = (): ApiConfig => ({
     name: '',
     method: 'GET',
@@ -84,6 +90,9 @@ const createEmptyWorkspaceState = (): ProjectWorkspaceState => ({
     selectedKeys: [],
     apiConfig: createDefaultApiConfig()
 });
+
+const PROJECT_GROUP_STORAGE_KEY = 'apiman.projectGroups.v1';
+const DEFAULT_PROJECT_GROUP = '未分组';
 
 function App() {
     const [status, setStatus] = useState('初始化中...');
@@ -128,6 +137,19 @@ function App() {
     const [projectWorkspaceStates, setProjectWorkspaceStates] = useState<Record<string, ProjectWorkspaceState>>({});
     const [listAnimationEnabled, setListAnimationEnabled] = useState(false);
     const [forceListAnimation, setForceListAnimation] = useState(false);
+    const [projectSearchKeyword, setProjectSearchKeyword] = useState('');
+    const [projectGroups, setProjectGroups] = useState<string[]>([]);
+    const [projectGroupAssignments, setProjectGroupAssignments] = useState<Record<string, string>>({});
+    const [createGroupModal, setCreateGroupModal] = useState(false);
+    const [newGroupName, setNewGroupName] = useState('');
+    const [collapsedProjectGroups, setCollapsedProjectGroups] = useState<Set<string>>(new Set());
+    const [draggingProjectId, setDraggingProjectId] = useState<string | null>(null);
+    const [projectDropTargetGroup, setProjectDropTargetGroup] = useState<string | null>(null);
+    const [renameGroupModal, setRenameGroupModal] = useState(false);
+    const [renameGroupValue, setRenameGroupValue] = useState('');
+    const [editingGroupName, setEditingGroupName] = useState('');
+    const [draggingGroupName, setDraggingGroupName] = useState<string | null>(null);
+    const [groupSortDropTarget, setGroupSortDropTarget] = useState<string | null>(null);
     const forceAnimationTimerRef = React.useRef<number | null>(null);
     const movedHighlightTimerRef = React.useRef<number | null>(null);
 
@@ -543,6 +565,48 @@ function App() {
     }, []);
 
     useEffect(() => {
+        try {
+            const raw = window.localStorage.getItem(PROJECT_GROUP_STORAGE_KEY);
+            if (!raw) return;
+            const parsed = JSON.parse(raw) as ProjectGroupStore;
+            setProjectGroups(Array.isArray(parsed?.groups) ? parsed.groups.filter(Boolean) : []);
+            setProjectGroupAssignments(parsed?.assignments || {});
+            setCollapsedProjectGroups(new Set(Array.isArray(parsed?.collapsedGroups) ? parsed.collapsedGroups : []));
+        } catch (error) {
+            console.error('Failed to load project groups from localStorage:', error);
+        }
+    }, []);
+
+    useEffect(() => {
+        try {
+            const payload: ProjectGroupStore = {
+                groups: projectGroups,
+                assignments: projectGroupAssignments,
+                collapsedGroups: Array.from(collapsedProjectGroups),
+            };
+            window.localStorage.setItem(PROJECT_GROUP_STORAGE_KEY, JSON.stringify(payload));
+        } catch (error) {
+            console.error('Failed to save project groups to localStorage:', error);
+        }
+    }, [projectGroups, projectGroupAssignments, collapsedProjectGroups]);
+
+    useEffect(() => {
+        const projectIds = new Set(projects.map(p => p.id));
+        setProjectGroupAssignments(prev => {
+            let changed = false;
+            const next: Record<string, string> = {};
+            Object.entries(prev).forEach(([projectId, groupName]) => {
+                if (projectIds.has(projectId)) {
+                    next[projectId] = groupName;
+                } else {
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+    }, [projects]);
+
+    useEffect(() => {
         return () => {
             if (forceAnimationTimerRef.current) {
                 window.clearTimeout(forceAnimationTimerRef.current);
@@ -648,6 +712,167 @@ function App() {
                 }
             }
         });
+    };
+
+    const handleCreateProjectGroup = () => {
+        const groupName = newGroupName.trim();
+        if (!groupName) {
+            message.warning('请输入分组名称');
+            return;
+        }
+        if (groupName === DEFAULT_PROJECT_GROUP) {
+            message.warning('该名称为系统默认分组，请使用其他名称');
+            return;
+        }
+        if (projectGroups.includes(groupName)) {
+            message.warning('分组名称已存在');
+            return;
+        }
+        setProjectGroups(prev => [...prev, groupName]);
+        setCreateGroupModal(false);
+        setNewGroupName('');
+        message.success('分组创建成功');
+    };
+
+    const handleAssignProjectGroup = (projectId: string, groupName: string) => {
+        if (!groupName || groupName === DEFAULT_PROJECT_GROUP) {
+            setProjectGroupAssignments(prev => {
+                const next = { ...prev };
+                delete next[projectId];
+                return next;
+            });
+            return;
+        }
+        setProjectGroupAssignments(prev => ({ ...prev, [projectId]: groupName }));
+    };
+
+    const toggleProjectGroupCollapse = (groupName: string) => {
+        setCollapsedProjectGroups(prev => {
+            const next = new Set(prev);
+            if (next.has(groupName)) {
+                next.delete(groupName);
+            } else {
+                next.add(groupName);
+            }
+            return next;
+        });
+    };
+
+    const openRenameProjectGroupModal = (groupName: string) => {
+        if (groupName === DEFAULT_PROJECT_GROUP) {
+            message.warning('默认分组不支持重命名');
+            return;
+        }
+        setEditingGroupName(groupName);
+        setRenameGroupValue(groupName);
+        setRenameGroupModal(true);
+    };
+
+    const handleRenameProjectGroup = () => {
+        const nextName = renameGroupValue.trim();
+        if (!editingGroupName) return;
+        if (!nextName) {
+            message.warning('请输入分组名称');
+            return;
+        }
+        if (nextName === DEFAULT_PROJECT_GROUP) {
+            message.warning('该名称为系统默认分组，请使用其他名称');
+            return;
+        }
+        if (nextName !== editingGroupName && projectGroups.includes(nextName)) {
+            message.warning('分组名称已存在');
+            return;
+        }
+
+        setProjectGroups(prev => prev.map(name => (name === editingGroupName ? nextName : name)));
+        setProjectGroupAssignments(prev => {
+            const next = { ...prev };
+            Object.keys(next).forEach(projectId => {
+                if (next[projectId] === editingGroupName) {
+                    next[projectId] = nextName;
+                }
+            });
+            return next;
+        });
+        setCollapsedProjectGroups(prev => {
+            const next = new Set(prev);
+            if (next.delete(editingGroupName)) {
+                next.add(nextName);
+            }
+            return next;
+        });
+
+        setRenameGroupModal(false);
+        setEditingGroupName('');
+        setRenameGroupValue('');
+        message.success('分组重命名成功');
+    };
+
+    const handleDeleteProjectGroup = (groupName: string) => {
+        if (groupName === DEFAULT_PROJECT_GROUP) {
+            message.warning('默认分组不支持删除');
+            return;
+        }
+        const affectedCount = Object.values(projectGroupAssignments).filter(name => name === groupName).length;
+        Modal.confirm({
+            title: '删除分组',
+            content: affectedCount > 0
+                ? `该分组下有 ${affectedCount} 个项目，删除后将自动移动到“${DEFAULT_PROJECT_GROUP}”。是否继续？`
+                : '确定删除该分组吗？',
+            onOk: () => {
+                setProjectGroups(prev => prev.filter(name => name !== groupName));
+                setProjectGroupAssignments(prev => {
+                    const next = { ...prev };
+                    Object.keys(next).forEach(projectId => {
+                        if (next[projectId] === groupName) {
+                            delete next[projectId];
+                        }
+                    });
+                    return next;
+                });
+                setCollapsedProjectGroups(prev => {
+                    const next = new Set(prev);
+                    next.delete(groupName);
+                    return next;
+                });
+                message.success('分组已删除');
+            }
+        });
+    };
+
+    const handleGroupDragStart = (groupName: string, e: React.DragEvent) => {
+        if (groupName === DEFAULT_PROJECT_GROUP) return;
+        e.stopPropagation();
+        e.dataTransfer.effectAllowed = 'move';
+        setDraggingGroupName(groupName);
+    };
+
+    const handleGroupDragOver = (groupName: string, e: React.DragEvent) => {
+        if (!draggingGroupName) return;
+        if (groupName === DEFAULT_PROJECT_GROUP || groupName === draggingGroupName) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
+        setGroupSortDropTarget(groupName);
+    };
+
+    const handleGroupDrop = (groupName: string, e: React.DragEvent) => {
+        if (!draggingGroupName) return;
+        if (groupName === DEFAULT_PROJECT_GROUP || groupName === draggingGroupName) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setProjectGroups(prev => {
+            const sourceIndex = prev.indexOf(draggingGroupName);
+            const targetIndex = prev.indexOf(groupName);
+            if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return prev;
+            const next = [...prev];
+            next.splice(sourceIndex, 1);
+            const insertIndex = next.indexOf(groupName);
+            next.splice(insertIndex, 0, draggingGroupName);
+            return next;
+        });
+        setDraggingGroupName(null);
+        setGroupSortDropTarget(null);
     };
 
     const handleOpenProject = async (project: Project) => {
@@ -1222,6 +1447,29 @@ function App() {
 
     const currentProject = projectTabs.find(t => t.id === activeTab)?.project;
     const currentTree = currentProject ? projectTrees[currentProject.id] : null;
+    const normalizedProjectKeyword = projectSearchKeyword.trim().toLowerCase();
+    const filteredProjects = projects.filter(project => {
+        if (!normalizedProjectKeyword) return true;
+        return (project.name || '').toLowerCase().includes(normalizedProjectKeyword);
+    });
+    const groupedProjects = React.useMemo(() => {
+        const bucket: Record<string, Project[]> = {};
+        const orderedGroups = [...projectGroups, DEFAULT_PROJECT_GROUP];
+
+        filteredProjects.forEach(project => {
+            const assigned = projectGroupAssignments[project.id];
+            const groupName = assigned && projectGroups.includes(assigned) ? assigned : DEFAULT_PROJECT_GROUP;
+            if (!bucket[groupName]) bucket[groupName] = [];
+            bucket[groupName].push(project);
+        });
+
+        return orderedGroups
+            .map(groupName => ({
+                groupName,
+                projects: bucket[groupName] || [],
+            }))
+            .filter(group => group.projects.length > 0);
+    }, [filteredProjects, projectGroupAssignments, projectGroups]);
 
     const filteredTree = React.useMemo(() => {
         if (!currentTree) return null;
@@ -1267,11 +1515,22 @@ function App() {
                         <div className="home-header">
                             <h2>我的项目</h2>
                             <Space>
+                                <Input
+                                    allowClear
+                                    value={projectSearchKeyword}
+                                    onChange={(e) => setProjectSearchKeyword(e.target.value)}
+                                    prefix={<SearchOutlined style={{ color: '#8b8b9a' }} />}
+                                    placeholder="搜索项目..."
+                                    style={{ width: 260 }}
+                                />
                                 <Upload {...uploadProps}>
                                     <Button icon={<ImportOutlined />} loading={importing}>
                                         导入 Postman
                                     </Button>
                                 </Upload>
+                                <Button icon={<FolderOutlined />} onClick={() => setCreateGroupModal(true)}>
+                                    新建分组
+                                </Button>
                                 <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateProjectModal(true)}>
                                     新建项目
                                 </Button>
@@ -1287,27 +1546,136 @@ function App() {
                             </div>
                         )}
 
-                        {!loading && projects.length > 0 && (
-                            <Row gutter={[16, 16]} style={{ padding: '20px' }}>
-                                {projects.map(project => (
-                                    <Col xs={24} sm={12} md={8} lg={6} key={project.id}>
-                                        <Card
-                                            hoverable
-                                            className="project-card"
-                                            onClick={() => handleOpenProject(project)}
-                                            actions={[
-                                                <CloseOutlined key="delete" onClick={(e) => handleDeleteProject(project.id, e)} />,
-                                            ]}
+                        {!loading && projects.length > 0 && filteredProjects.length === 0 && (
+                            <div className="empty-state">
+                                <ApiOutlined className="empty-state-icon" />
+                                <div>没有匹配的项目</div>
+                            </div>
+                        )}
+
+                        {!loading && groupedProjects.length > 0 && (
+                            <div className="project-group-list">
+                                {groupedProjects.map(group => (
+                                    <div
+                                        className={`project-group-section${projectDropTargetGroup === group.groupName ? ' drag-over' : ''}`}
+                                        key={group.groupName}
+                                        onDragOver={(e) => {
+                                            if (!draggingProjectId) return;
+                                            e.preventDefault();
+                                            e.dataTransfer.dropEffect = 'move';
+                                            setProjectDropTargetGroup(group.groupName);
+                                        }}
+                                        onDragLeave={() => {
+                                            if (projectDropTargetGroup === group.groupName) {
+                                                setProjectDropTargetGroup(null);
+                                            }
+                                        }}
+                                        onDrop={(e) => {
+                                            e.preventDefault();
+                                            if (!draggingProjectId) return;
+                                            handleAssignProjectGroup(draggingProjectId, group.groupName);
+                                            setDraggingProjectId(null);
+                                            setProjectDropTargetGroup(null);
+                                            message.success(`已移动到分组：${group.groupName}`);
+                                        }}
+                                    >
+                                        <div
+                                            className={`project-group-header${groupSortDropTarget === group.groupName ? ' sort-drop-target' : ''}`}
+                                            draggable={group.groupName !== DEFAULT_PROJECT_GROUP}
+                                            onDragStart={(e) => handleGroupDragStart(group.groupName, e)}
+                                            onDragOver={(e) => handleGroupDragOver(group.groupName, e)}
+                                            onDrop={(e) => handleGroupDrop(group.groupName, e)}
+                                            onDragEnd={() => {
+                                                setDraggingGroupName(null);
+                                                setGroupSortDropTarget(null);
+                                            }}
+                                            onClick={() => toggleProjectGroupCollapse(group.groupName)}
                                         >
-                                            <Card.Meta
-                                                avatar={<ProjectOutlined style={{ fontSize: 32, color: '#1890ff' }} />}
-                                                title={project.name}
-                                                description="点击打开项目"
-                                            />
-                                        </Card>
-                                    </Col>
+                                            <div className="project-group-header-left">
+                                                <span className="project-group-toggle-icon">
+                                                    {collapsedProjectGroups.has(group.groupName) ? <RightOutlined /> : <DownOutlined />}
+                                                </span>
+                                                <span className="project-group-title">{group.groupName}</span>
+                                                <span className="project-group-count">{group.projects.length} 个</span>
+                                            </div>
+                                            {group.groupName !== DEFAULT_PROJECT_GROUP && (
+                                                <Dropdown
+                                                    trigger={['click']}
+                                                    menu={{
+                                                        items: [
+                                                            {
+                                                                key: 'rename',
+                                                                icon: <EditOutlined />,
+                                                                label: '重命名',
+                                                                onClick: () => openRenameProjectGroupModal(group.groupName),
+                                                            },
+                                                            {
+                                                                key: 'delete',
+                                                                icon: <CloseOutlined />,
+                                                                danger: true,
+                                                                label: '删除分组',
+                                                                onClick: () => handleDeleteProjectGroup(group.groupName),
+                                                            },
+                                                        ]
+                                                    }}
+                                                >
+                                                    <button
+                                                        className="project-group-action-btn"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <MoreOutlined />
+                                                    </button>
+                                                </Dropdown>
+                                            )}
+                                        </div>
+                                        {!collapsedProjectGroups.has(group.groupName) && (
+                                            <Row gutter={[16, 16]} style={{ padding: '12px 20px 20px' }}>
+                                                {group.projects.map(project => (
+                                                    <Col xs={24} sm={12} md={8} lg={6} key={project.id}>
+                                                        <Card
+                                                            hoverable
+                                                            draggable
+                                                            className="project-card"
+                                                            onDragStart={(e) => {
+                                                                e.stopPropagation();
+                                                                setDraggingProjectId(project.id);
+                                                                e.dataTransfer.effectAllowed = 'move';
+                                                            }}
+                                                            onDragEnd={() => {
+                                                                setDraggingProjectId(null);
+                                                                setProjectDropTargetGroup(null);
+                                                            }}
+                                                            onClick={() => handleOpenProject(project)}
+                                                            actions={[
+                                                                <CloseOutlined key="delete" onClick={(e) => handleDeleteProject(project.id, e)} />,
+                                                            ]}
+                                                        >
+                                                            <Card.Meta
+                                                                avatar={<ProjectOutlined style={{ fontSize: 32, color: '#1890ff' }} />}
+                                                                title={project.name}
+                                                                description="点击打开项目"
+                                                            />
+                                                            <div className="project-group-select-row" onClick={(e) => e.stopPropagation()}>
+                                                                <span className="project-group-select-label">分组</span>
+                                                                <Select
+                                                                    size="small"
+                                                                    value={projectGroupAssignments[project.id] || DEFAULT_PROJECT_GROUP}
+                                                                    onChange={(value) => handleAssignProjectGroup(project.id, value)}
+                                                                    options={[
+                                                                        { label: DEFAULT_PROJECT_GROUP, value: DEFAULT_PROJECT_GROUP },
+                                                                        ...projectGroups.map(groupName => ({ label: groupName, value: groupName })),
+                                                                    ]}
+                                                                    style={{ width: 140 }}
+                                                                />
+                                                            </div>
+                                                        </Card>
+                                                    </Col>
+                                                ))}
+                                            </Row>
+                                        )}
+                                    </div>
                                 ))}
-                            </Row>
+                            </div>
                         )}
                     </div>
                 ) : (
@@ -1341,7 +1709,6 @@ function App() {
                                     }}
                                     allowClear
                                     size="small"
-                                    style={{ backgroundColor: '#f5f7fa' }}
                                 />
                             </div>
 
@@ -1731,6 +2098,38 @@ function App() {
                     value={newProjectName}
                     onChange={(e) => setNewProjectName(e.target.value)}
                     onPressEnter={handleCreateProject}
+                />
+            </Modal>
+
+            <Modal
+                title="创建分组"
+                open={createGroupModal}
+                onOk={handleCreateProjectGroup}
+                onCancel={() => { setCreateGroupModal(false); setNewGroupName(''); }}
+            >
+                <Input
+                    placeholder="输入分组名称"
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    onPressEnter={handleCreateProjectGroup}
+                />
+            </Modal>
+
+            <Modal
+                title="重命名分组"
+                open={renameGroupModal}
+                onOk={handleRenameProjectGroup}
+                onCancel={() => {
+                    setRenameGroupModal(false);
+                    setEditingGroupName('');
+                    setRenameGroupValue('');
+                }}
+            >
+                <Input
+                    placeholder="输入新分组名称"
+                    value={renameGroupValue}
+                    onChange={(e) => setRenameGroupValue(e.target.value)}
+                    onPressEnter={handleRenameProjectGroup}
                 />
             </Modal>
 
