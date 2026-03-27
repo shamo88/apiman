@@ -2281,9 +2281,7 @@ function App() {
                                         <Button size="small" icon={<PlusOutlined />} />
                                     </Dropdown>
                                 ) : (
-                                    <Button size="small" icon={<PlusOutlined />} onClick={handleCreateEnvironmentClick}>
-                                        新建
-                                    </Button>
+                                    <Button size="small" icon={<PlusOutlined />} onClick={handleCreateEnvironmentClick} />
                                 )}
                             </div>
 
