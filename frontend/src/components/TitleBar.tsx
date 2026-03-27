@@ -124,6 +124,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
         { key: 'proxy', label: '网络代理', icon: <GlobalOutlined /> },
     ];
 
+    const homeTabItem = tabItems?.find((item: any) => item?.key === 'home');
+    const projectTabItems = (tabItems || []).filter((item: any) => item?.key !== 'home');
+    const projectTabsActiveKey = activeTab === 'home' ? '__home__' : activeTab;
+
     return (
         <>
             <div className="title-bar">
@@ -135,16 +139,27 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                     />
 
                     {tabItems && onTabChange && (
-                        <Tabs
-                            activeKey={activeTab}
-                            onChange={onTabChange}
-                            type="editable-card"
-                            hideAdd
-                            onEdit={onTabEdit}
-                            items={tabItems}
-                            size="small"
-                            className="title-bar-tabs"
-                        />
+                        <div className="title-bar-tabs-wrap">
+                            {homeTabItem && (
+                                <div
+                                    className={`title-bar-home-tab${activeTab === 'home' ? ' active' : ''}`}
+                                    onClick={() => onTabChange('home')}
+                                    style={{ '--wails-draggable': 'no-drag' } as React.CSSProperties}
+                                >
+                                    {homeTabItem.label}
+                                </div>
+                            )}
+                            <Tabs
+                                activeKey={projectTabsActiveKey}
+                                onChange={onTabChange}
+                                type="editable-card"
+                                hideAdd
+                                onEdit={onTabEdit}
+                                items={projectTabItems}
+                                size="small"
+                                className="title-bar-tabs"
+                            />
+                        </div>
                     )}
                 </div>
 
