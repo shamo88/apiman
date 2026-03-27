@@ -5,7 +5,7 @@ import type { DataNode } from 'antd/es/tree';
 import type { UploadProps } from 'antd';
 import './App.css';
 import { TitleBar } from './components/TitleBar';
-import { ListProjects, CreateProject, DeleteProject, RenameProject, GetProjectTree, CreateFolder, CreateRequest, CopyRequest, RenameRequest, RenameFolder, MoveRequest, MoveFolder, GetRequest, DeleteRequest, DeleteFolder, ExecuteCurl, UpdateRequest, ImportPostmanCollection, LoadAppConfig } from '../wailsjs/go/main/App';
+import { ListProjects, CreateProject, DeleteProject, RenameProject, GetProjectTree, CreateFolder, CreateRequest, CopyRequest, RenameRequest, RenameFolder, MoveRequest, MoveFolder, GetRequest, DeleteRequest, DeleteFolder, ExecuteCurl, UpdateRequest, ImportPostmanCollection, LoadAppConfig, LoadEnvironments, CreateEnvironment, UpdateEnvironment, DeleteEnvironment } from '../wailsjs/go/main/App';
 
 interface Project {
     id: string;
@@ -41,6 +41,27 @@ interface RequestTab {
     path: string;
 }
 
+interface Environment {
+    id: string;
+    name: string;
+    variables: Record<string, string>;
+    created_at: string;
+    updated_at: string;
+}
+
+interface EnvironmentVariableRow {
+    id: string;
+    key: string;
+    value: string;
+}
+
+interface EnvironmentEditorTab {
+    key: string;
+    title: string;
+    environmentId?: string;
+    isNew?: boolean;
+}
+
 interface ApiConfig {
     name: string;
     method: string;
@@ -61,6 +82,7 @@ interface ProjectWorkspaceState {
     response: any;
     selectedKeys: string[];
     apiConfig: ApiConfig;
+    selectedEnvironmentId: string;
 }
 
 interface ProjectGroupStore {
@@ -88,7 +110,14 @@ const createEmptyWorkspaceState = (): ProjectWorkspaceState => ({
     requestContent: '',
     response: null,
     selectedKeys: [],
-    apiConfig: createDefaultApiConfig()
+    apiConfig: createDefaultApiConfig(),
+    selectedEnvironmentId: ''
+});
+
+const createEnvironmentVariableRow = (key: string = '', value: string = ''): EnvironmentVariableRow => ({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    key,
+    value
 });
 
 const DEFAULT_PROJECT_GROUP = '未分组';
@@ -153,6 +182,16 @@ function App() {
     const [draggingGroupName, setDraggingGroupName] = useState<string | null>(null);
     const [groupSortDropTarget, setGroupSortDropTarget] = useState<string | null>(null);
     const [projectGroupsLoaded, setProjectGroupsLoaded] = useState(false);
+    const [sidebarMenu, setSidebarMenu] = useState<'apis' | 'environments'>('apis');
+    const [environments, setEnvironments] = useState<Environment[]>([]);
+    const [selectedEnvironmentId, setSelectedEnvironmentId] = useState<string>('');
+    const [editingEnvironmentId, setEditingEnvironmentId] = useState<string>('');
+    const [environmentFormName, setEnvironmentFormName] = useState('');
+    const [environmentFormVariables, setEnvironmentFormVariables] = useState<EnvironmentVariableRow[]>([createEnvironmentVariableRow()]);
+    const [envLoading, setEnvLoading] = useState(false);
+    const [envSaving, setEnvSaving] = useState(false);
+    const [environmentTabs, setEnvironmentTabs] = useState<EnvironmentEditorTab[]>([]);
+    const [activeEnvironmentTab, setActiveEnvironmentTab] = useState<string>('');
     const forceAnimationTimerRef = React.useRef<number | null>(null);
     const movedHighlightTimerRef = React.useRef<number | null>(null);
 
@@ -304,6 +343,7 @@ function App() {
         setResponse(emptyState.response);
         setSelectedKeys(emptyState.selectedKeys);
         setApiConfig(emptyState.apiConfig);
+        setSelectedEnvironmentId(emptyState.selectedEnvironmentId);
     };
 
     const captureCurrentWorkspaceState = (): ProjectWorkspaceState => ({
@@ -313,7 +353,8 @@ function App() {
         requestContent,
         response,
         selectedKeys,
-        apiConfig
+        apiConfig,
+        selectedEnvironmentId
     });
 
     const applyWorkspaceState = (state: ProjectWorkspaceState) => {
@@ -324,6 +365,75 @@ function App() {
         setResponse(state.response);
         setSelectedKeys(state.selectedKeys);
         setApiConfig(state.apiConfig);
+        setSelectedEnvironmentId(state.selectedEnvironmentId || '');
+    };
+
+    const environmentToRows = (variables: Record<string, string>): EnvironmentVariableRow[] => {
+        const rows = Object.entries(variables || {}).map(([key, value]) => createEnvironmentVariableRow(key, value));
+        return rows.length > 0 ? rows : [createEnvironmentVariableRow()];
+    };
+
+    const rowsToEnvironmentVariables = (rows: EnvironmentVariableRow[]): Record<string, string> => {
+        return rows.reduce((acc, item) => {
+            const key = item.key.trim();
+            if (!key) return acc;
+            acc[key] = item.value;
+            return acc;
+        }, {} as Record<string, string>);
+    };
+
+    const resetEnvironmentEditor = () => {
+        setEditingEnvironmentId('');
+        setEnvironmentFormName('');
+        setEnvironmentFormVariables([createEnvironmentVariableRow()]);
+    };
+
+    const loadEnvironmentsData = async () => {
+        setEnvLoading(true);
+        try {
+            const envs = await LoadEnvironments();
+            setEnvironments(envs || []);
+        } catch (error: any) {
+            console.error('Failed to load environments:', error);
+            message.error(`加载环境失败: ${error?.message || error}`);
+        } finally {
+            setEnvLoading(false);
+        }
+    };
+
+    const openEnvironmentEditor = (env: Environment) => {
+        const tabKey = `env-${env.id}`;
+        setEnvironmentTabs(prev => {
+            if (prev.some(tab => tab.key === tabKey)) return prev;
+            return [...prev, { key: tabKey, title: env.name, environmentId: env.id }];
+        });
+        setActiveEnvironmentTab(tabKey);
+        setEditingEnvironmentId(env.id);
+        setEnvironmentFormName(env.name);
+        setEnvironmentFormVariables(environmentToRows(env.variables));
+    };
+
+    const openCreateEnvironmentTab = () => {
+        const tabKey = `new-env-${Date.now()}`;
+        setEnvironmentTabs(prev => [...prev, { key: tabKey, title: '新建环境', isNew: true }]);
+        setActiveEnvironmentTab(tabKey);
+        setEditingEnvironmentId('');
+        setEnvironmentFormName(`环境${environments.length + 1}`);
+        setEnvironmentFormVariables([createEnvironmentVariableRow()]);
+        setSidebarMenu('environments');
+    };
+
+    const closeEnvironmentTab = (tabKey: string) => {
+        setEnvironmentTabs(prev => {
+            const next = prev.filter(tab => tab.key !== tabKey);
+            if (activeEnvironmentTab === tabKey) {
+                setActiveEnvironmentTab(next[0]?.key || '');
+                if (next.length === 0) {
+                    resetEnvironmentEditor();
+                }
+            }
+            return next;
+        });
     };
 
     const switchProjectTab = (targetTab: string, skipSaveCurrent: boolean = false) => {
@@ -566,7 +676,61 @@ function App() {
         loadProjects();
         loadUiConfig();
         loadProjectGroupsState();
+        loadEnvironmentsData();
     }, []);
+
+    useEffect(() => {
+        if (environments.length === 0) {
+            if (selectedEnvironmentId) {
+                setSelectedEnvironmentId('');
+            }
+            if (editingEnvironmentId) {
+                resetEnvironmentEditor();
+            }
+            return;
+        }
+
+        const hasSelected = environments.some(env => env.id === selectedEnvironmentId);
+        if (!hasSelected) {
+            setSelectedEnvironmentId(environments[0].id);
+        }
+
+        if (editingEnvironmentId && !environments.some(env => env.id === editingEnvironmentId)) {
+            resetEnvironmentEditor();
+        }
+    }, [environments, selectedEnvironmentId, editingEnvironmentId]);
+
+    useEffect(() => {
+        setEnvironmentTabs(prev => prev
+            .filter(tab => tab.isNew || (tab.environmentId && environments.some(env => env.id === tab.environmentId)))
+            .map(tab => {
+                if (tab.isNew || !tab.environmentId) return tab;
+                const env = environments.find(item => item.id === tab.environmentId);
+                return env ? { ...tab, title: env.name } : tab;
+            }));
+    }, [environments]);
+
+    useEffect(() => {
+        if (!activeEnvironmentTab) return;
+        const activeTab = environmentTabs.find(tab => tab.key === activeEnvironmentTab);
+        if (!activeTab) return;
+        if (activeTab.isNew) {
+            setEditingEnvironmentId('');
+            if (!environmentFormName) {
+                setEnvironmentFormName(`环境${environments.length + 1}`);
+            }
+            if (!environmentFormVariables.length) {
+                setEnvironmentFormVariables([createEnvironmentVariableRow()]);
+            }
+            return;
+        }
+        if (!activeTab.environmentId) return;
+        const env = environments.find(item => item.id === activeTab.environmentId);
+        if (!env) return;
+        setEditingEnvironmentId(env.id);
+        setEnvironmentFormName(env.name);
+        setEnvironmentFormVariables(environmentToRows(env.variables));
+    }, [activeEnvironmentTab, environmentTabs, environments]);
 
     useEffect(() => {
         const projectIds = new Set(projects.map(p => p.id));
@@ -1204,8 +1368,16 @@ function App() {
         return config;
     };
 
+    const applyEnvironmentVariables = (input: string, variables: Record<string, string>): string => {
+        if (!input) return input;
+        return input.replace(/\{\{(\w+)\}\}/g, (raw, varName: string) => {
+            return Object.prototype.hasOwnProperty.call(variables, varName) ? variables[varName] : raw;
+        });
+    };
+
     const configToCurl = (config: ApiConfig): string => {
         let curl = 'curl';
+        let requestURL = config.url || '';
 
         if (config.method !== 'GET') {
             curl += ` -X ${config.method}`;
@@ -1219,8 +1391,8 @@ function App() {
 
         for (const param of config.params) {
             if (param.enabled && param.key) {
-                const separator = config.url.includes('?') ? '&' : '?';
-                config.url += `${separator}${encodeURIComponent(param.key)}=${encodeURIComponent(param.value)}`;
+                const separator = requestURL.includes('?') ? '&' : '?';
+                requestURL += `${separator}${encodeURIComponent(param.key)}=${encodeURIComponent(param.value)}`;
             }
         }
 
@@ -1251,7 +1423,7 @@ function App() {
             // Binary 类型需要文件路径，暂时不支持
         }
 
-        curl += ` "${config.url}"`;
+        curl += ` "${requestURL}"`;
 
         return curl;
     };
@@ -1288,7 +1460,35 @@ function App() {
     };
 
     const handleExecuteCurl = async () => {
-        const curlCommand = configToCurl(apiConfig);
+        const selectedEnvironment = environments.find(env => env.id === selectedEnvironmentId);
+        const variables = selectedEnvironment?.variables || {};
+        const resolvedConfig: ApiConfig = {
+            ...apiConfig,
+            url: applyEnvironmentVariables(apiConfig.url, variables),
+            headers: apiConfig.headers.map(header => ({
+                ...header,
+                key: applyEnvironmentVariables(header.key, variables),
+                value: applyEnvironmentVariables(header.value, variables),
+            })),
+            params: apiConfig.params.map(param => ({
+                ...param,
+                key: applyEnvironmentVariables(param.key, variables),
+                value: applyEnvironmentVariables(param.value, variables),
+            })),
+            body: applyEnvironmentVariables(apiConfig.body, variables),
+            formData: apiConfig.formData.map(item => ({
+                ...item,
+                key: applyEnvironmentVariables(item.key, variables),
+                value: applyEnvironmentVariables(item.value, variables),
+            })),
+            urlencoded: apiConfig.urlencoded.map(item => ({
+                ...item,
+                key: applyEnvironmentVariables(item.key, variables),
+                value: applyEnvironmentVariables(item.value, variables),
+            })),
+        };
+
+        const curlCommand = configToCurl(resolvedConfig);
         if (!curlCommand || !apiConfig.url) {
             message.warning('请输入 URL');
             return;
@@ -1306,6 +1506,60 @@ function App() {
         } finally {
             setExecuting(false);
         }
+    };
+
+    const handleCreateEnvironmentClick = () => {
+        openCreateEnvironmentTab();
+    };
+
+    const handleSaveEnvironment = async () => {
+        const name = environmentFormName.trim();
+        if (!name) {
+            message.warning('请输入环境名称');
+            return;
+        }
+
+        const variables = rowsToEnvironmentVariables(environmentFormVariables);
+        setEnvSaving(true);
+        try {
+            if (editingEnvironmentId) {
+                await UpdateEnvironment(editingEnvironmentId, name, variables);
+                message.success('环境已更新');
+            } else {
+                const created = await CreateEnvironment(name, variables);
+                message.success('环境已创建');
+                setSelectedEnvironmentId(created.id);
+                setEnvironmentTabs(prev => prev.map(tab => tab.key === activeEnvironmentTab
+                    ? { key: `env-${created.id}`, title: created.name, environmentId: created.id }
+                    : tab));
+                setActiveEnvironmentTab(`env-${created.id}`);
+                setEditingEnvironmentId(created.id);
+            }
+            await loadEnvironmentsData();
+        } catch (error: any) {
+            message.error(`保存环境失败: ${error?.message || error}`);
+        } finally {
+            setEnvSaving(false);
+        }
+    };
+
+    const handleDeleteEnvironmentCurrent = async () => {
+        if (!editingEnvironmentId) return;
+        Modal.confirm({
+            title: '删除环境',
+            content: '确定删除当前环境吗？删除后无法恢复。',
+            onOk: async () => {
+                try {
+                    await DeleteEnvironment(editingEnvironmentId);
+                    message.success('环境已删除');
+                    await loadEnvironmentsData();
+                    setEnvironmentTabs(prev => prev.filter(tab => tab.environmentId !== editingEnvironmentId));
+                    resetEnvironmentEditor();
+                } catch (error: any) {
+                    message.error(`删除环境失败: ${error?.message || error}`);
+                }
+            }
+        });
     };
 
     const handleSaveRequest = async () => {
@@ -1755,127 +2009,267 @@ function App() {
                 ) : (
                     <div className="project-workspace">
                         <div className="project-sidebar">
-                            <div className="sidebar-header">
-                                <div className="sidebar-title">
-                                    <span>接口列表</span>
+                            <div className="sidebar-header sidebar-menu-header">
+                                <div className="sidebar-top-menu">
+                                    <button
+                                        className={`sidebar-menu-item ${sidebarMenu === 'apis' ? 'active' : ''}`}
+                                        onClick={() => setSidebarMenu('apis')}
+                                    >
+                                        接口列表
+                                    </button>
+                                    <button
+                                        className={`sidebar-menu-item ${sidebarMenu === 'environments' ? 'active' : ''}`}
+                                        onClick={() => setSidebarMenu('environments')}
+                                    >
+                                        环境变量
+                                    </button>
                                 </div>
-                                <Dropdown
-                                    menu={{
-                                        items: [
-                                            { key: 'folder', icon: <FolderOutlined />, label: '新建文件夹', onClick: () => setCreateFolderModal(true) },
-                                            { key: 'request', icon: <FileOutlined />, label: '新建请求', onClick: () => setCreateRequestModal(true) },
-                                        ]
-                                    }}
-                                    trigger={['click']}
-                                >
-                                    <Button size="small" icon={<PlusOutlined />} />
-                                </Dropdown>
-                            </div>
-
-                            <div className="sidebar-search">
-                                <Input
-                                    prefix={<SearchOutlined style={{ color: '#8b8b9a' }} />}
-                                    placeholder="搜索接口..."
-                                    value={searchKeyword}
-                                    onChange={(e) => {
-                                        setSearchKeyword(e.target.value);
-                                        setSearchVersion(v => v + 1);
-                                    }}
-                                    allowClear
-                                    size="small"
-                                />
-                            </div>
-
-                            <div className="sidebar-filters">
-                                <Select
-                                    value={filterMethod}
-                                    onChange={(value) => setFilterMethod(value)}
-                                    size="small"
-                                    style={{ width: '100%' }}
-                                    options={[
-                                        { value: 'ALL', label: '全部方法' },
-                                        { value: 'GET', label: 'GET' },
-                                        { value: 'POST', label: 'POST' },
-                                        { value: 'PUT', label: 'PUT' },
-                                        { value: 'DELETE', label: 'DELETE' },
-                                        { value: 'PATCH', label: 'PATCH' },
-                                    ]}
-                                />
-                            </div>
-
-                            <div
-                                className={`sidebar-content${(listAnimationEnabled || forceListAnimation) ? ' list-animations-enabled' : ''}${dropTargetFolderPath === currentProject?.path ? ' root-drop-target' : ''}`}
-                                onDragOver={(e) => {
-                                    if (!draggingNode || !currentProject?.path) return;
-                                    const check = checkDropValidity(draggingNode, currentProject.path);
-                                    if (!check.ok) {
-                                        e.dataTransfer.dropEffect = 'none';
-                                        setDropTargetFolderPath(null);
-                                        setInvalidDropHint({
-                                            message: getDropHintMessage(check.reason),
-                                            x: e.clientX + 14,
-                                            y: e.clientY + 14,
-                                        });
-                                        return;
-                                    }
-                                    e.preventDefault();
-                                    e.dataTransfer.dropEffect = 'move';
-                                    setDropTargetFolderPath(currentProject.path);
-                                    setInvalidDropHint(null);
-                                }}
-                                onDrop={async (e) => {
-                                    e.preventDefault();
-                                    if (!draggingNode || !currentProject?.path) return;
-                                    const check = checkDropValidity(draggingNode, currentProject.path);
-                                    if (!check.ok) {
-                                        clearDragState();
-                                        return;
-                                    }
-                                    if (draggingNode.type === 'request') {
-                                        await moveRequestNode(draggingNode.path, currentProject.path);
-                                    } else {
-                                        await moveFolderNode(draggingNode.path, currentProject.path);
-                                    }
-                                    clearDragState();
-                                }}
-                            >
-                                {loading && <Spin style={{ display: 'block', margin: '20px auto' }} />}
-                                {!loading && !currentTree && (
-                                    <div className="empty-sidebar">
-                                        <ApiOutlined style={{ fontSize: 32, color: '#d0d0db', marginBottom: 12 }} />
-                                        <div>暂无接口</div>
-                                    </div>
+                                {sidebarMenu === 'apis' ? (
+                                    <Dropdown
+                                        menu={{
+                                            items: [
+                                                { key: 'folder', icon: <FolderOutlined />, label: '新建文件夹', onClick: () => setCreateFolderModal(true) },
+                                                { key: 'request', icon: <FileOutlined />, label: '新建请求', onClick: () => setCreateRequestModal(true) },
+                                            ]
+                                        }}
+                                        trigger={['click']}
+                                    >
+                                        <Button size="small" icon={<PlusOutlined />} />
+                                    </Dropdown>
+                                ) : (
+                                    <Button size="small" icon={<PlusOutlined />} onClick={handleCreateEnvironmentClick}>
+                                        新建
+                                    </Button>
                                 )}
-                                {!loading && currentTree && renderApiList()}
                             </div>
+
+                            {sidebarMenu === 'apis' ? (
+                                <>
+                                    <div className="sidebar-search">
+                                        <Input
+                                            prefix={<SearchOutlined style={{ color: '#8b8b9a' }} />}
+                                            placeholder="搜索接口..."
+                                            value={searchKeyword}
+                                            onChange={(e) => {
+                                                setSearchKeyword(e.target.value);
+                                                setSearchVersion(v => v + 1);
+                                            }}
+                                            allowClear
+                                            size="small"
+                                        />
+                                    </div>
+
+                                    <div className="sidebar-filters">
+                                        <Select
+                                            value={filterMethod}
+                                            onChange={(value) => setFilterMethod(value)}
+                                            size="small"
+                                            style={{ width: '100%' }}
+                                            options={[
+                                                { value: 'ALL', label: '全部方法' },
+                                                { value: 'GET', label: 'GET' },
+                                                { value: 'POST', label: 'POST' },
+                                                { value: 'PUT', label: 'PUT' },
+                                                { value: 'DELETE', label: 'DELETE' },
+                                                { value: 'PATCH', label: 'PATCH' },
+                                            ]}
+                                        />
+                                    </div>
+
+                                    <div
+                                        className={`sidebar-content${(listAnimationEnabled || forceListAnimation) ? ' list-animations-enabled' : ''}${dropTargetFolderPath === currentProject?.path ? ' root-drop-target' : ''}`}
+                                        onDragOver={(e) => {
+                                            if (!draggingNode || !currentProject?.path) return;
+                                            const check = checkDropValidity(draggingNode, currentProject.path);
+                                            if (!check.ok) {
+                                                e.dataTransfer.dropEffect = 'none';
+                                                setDropTargetFolderPath(null);
+                                                setInvalidDropHint({
+                                                    message: getDropHintMessage(check.reason),
+                                                    x: e.clientX + 14,
+                                                    y: e.clientY + 14,
+                                                });
+                                                return;
+                                            }
+                                            e.preventDefault();
+                                            e.dataTransfer.dropEffect = 'move';
+                                            setDropTargetFolderPath(currentProject.path);
+                                            setInvalidDropHint(null);
+                                        }}
+                                        onDrop={async (e) => {
+                                            e.preventDefault();
+                                            if (!draggingNode || !currentProject?.path) return;
+                                            const check = checkDropValidity(draggingNode, currentProject.path);
+                                            if (!check.ok) {
+                                                clearDragState();
+                                                return;
+                                            }
+                                            if (draggingNode.type === 'request') {
+                                                await moveRequestNode(draggingNode.path, currentProject.path);
+                                            } else {
+                                                await moveFolderNode(draggingNode.path, currentProject.path);
+                                            }
+                                            clearDragState();
+                                        }}
+                                    >
+                                        {loading && <Spin style={{ display: 'block', margin: '20px auto' }} />}
+                                        {!loading && !currentTree && (
+                                            <div className="empty-sidebar">
+                                                <ApiOutlined style={{ fontSize: 32, color: '#d0d0db', marginBottom: 12 }} />
+                                                <div>暂无接口</div>
+                                            </div>
+                                        )}
+                                        {!loading && currentTree && renderApiList()}
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="sidebar-content environment-sidebar-content">
+                                    <Spin spinning={envLoading}>
+                                        <div className="environment-list">
+                                            {environments.map(env => (
+                                                <button
+                                                    key={env.id}
+                                                    className={`environment-list-item ${editingEnvironmentId === env.id ? 'active' : ''}`}
+                                                    onClick={() => openEnvironmentEditor(env)}
+                                                >
+                                                    <span className="environment-list-item-name">{env.name}</span>
+                                                </button>
+                                            ))}
+                                            {environments.length === 0 && (
+                                                <div className="empty-sidebar">暂无环境，点击右上角“新建”创建</div>
+                                            )}
+                                        </div>
+                                    </Spin>
+                                </div>
+                            )}
                         </div>
 
                         <div className="project-main">
-                            {requestTabs.length > 0 && (
-                                <Tabs
-                                    activeKey={activeRequestTab}
-                                    onChange={(key) => {
-                                        setActiveRequestTab(key);
-                                        const tab = requestTabs.find(t => t.id === key);
-                                        if (tab) loadRequestContent(tab.path);
-                                    }}
-                                    type="editable-card"
-                                    hideAdd
-                                    onEdit={(targetKey, action) => {
-                                        if (action === 'remove') {
-                                            handleCloseRequestTab(targetKey as string);
-                                        }
-                                    }}
-                                    items={requestTabs.map(tab => ({
-                                        key: tab.id,
-                                        label: tab.title,
-                                    }))}
-                                    size="small"
-                                    style={{ marginBottom: 0 }}
-                                />
+                            {sidebarMenu === 'apis' && requestTabs.length > 0 && (
+                                <div className="request-tabs-row">
+                                    <Tabs
+                                        activeKey={activeRequestTab}
+                                        onChange={(key) => {
+                                            setActiveRequestTab(key);
+                                            const tab = requestTabs.find(t => t.id === key);
+                                            if (tab) loadRequestContent(tab.path);
+                                        }}
+                                        type="editable-card"
+                                        hideAdd
+                                        onEdit={(targetKey, action) => {
+                                            if (action === 'remove') {
+                                                handleCloseRequestTab(targetKey as string);
+                                            }
+                                        }}
+                                        items={requestTabs.map(tab => ({
+                                            key: tab.id,
+                                            label: tab.title,
+                                        }))}
+                                        size="small"
+                                        style={{ marginBottom: 0, flex: 1 }}
+                                    />
+                                    <div className="request-tabs-environment-select">
+                                        <Select
+                                            size="small"
+                                            value={selectedEnvironmentId || '__none__'}
+                                            onChange={(value) => setSelectedEnvironmentId(value === '__none__' ? '' : value)}
+                                            options={[
+                                                { label: '不使用环境', value: '__none__' },
+                                                ...environments.map(env => ({ label: env.name, value: env.id }))
+                                            ]}
+                                            style={{ width: 200 }}
+                                        />
+                                    </div>
+                                </div>
                             )}
 
-                            {currentRequest ? (
+                            {sidebarMenu === 'environments' ? (
+                                <div className="request-panel">
+                                    {environmentTabs.length > 0 ? (
+                                        <>
+                                            <Tabs
+                                                activeKey={activeEnvironmentTab}
+                                                onChange={(key) => setActiveEnvironmentTab(key)}
+                                                type="editable-card"
+                                                hideAdd
+                                                onEdit={(targetKey, action) => {
+                                                    if (action === 'remove') {
+                                                        closeEnvironmentTab(targetKey as string);
+                                                    }
+                                                }}
+                                                items={environmentTabs.map(tab => ({
+                                                    key: tab.key,
+                                                    label: tab.title,
+                                                }))}
+                                                size="small"
+                                                style={{ marginBottom: 12 }}
+                                            />
+                                            <div className="environment-panel">
+                                                <Input
+                                                    placeholder="环境名称"
+                                                    value={environmentFormName}
+                                                    onChange={(e) => setEnvironmentFormName(e.target.value)}
+                                                    style={{ marginBottom: 10 }}
+                                                />
+                                                <div className="environment-vars-header">
+                                                    <span>变量</span>
+                                                    <Button
+                                                        size="small"
+                                                        type="link"
+                                                        icon={<PlusOutlined />}
+                                                        onClick={() => setEnvironmentFormVariables(prev => [...prev, createEnvironmentVariableRow()])}
+                                                    >
+                                                        添加
+                                                    </Button>
+                                                </div>
+                                                <div className="environment-vars-list">
+                                                    {environmentFormVariables.map((item) => (
+                                                        <div className="environment-var-row" key={item.id}>
+                                                            <Input
+                                                                placeholder="变量名"
+                                                                value={item.key}
+                                                                onChange={(e) => {
+                                                                    setEnvironmentFormVariables(prev => prev.map((row) => row.id === item.id ? { ...row, key: e.target.value } : row));
+                                                                }}
+                                                            />
+                                                            <Input
+                                                                placeholder="变量值"
+                                                                value={item.value}
+                                                                onChange={(e) => {
+                                                                    setEnvironmentFormVariables(prev => prev.map((row) => row.id === item.id ? { ...row, value: e.target.value } : row));
+                                                                }}
+                                                            />
+                                                            <Button
+                                                                type="text"
+                                                                danger
+                                                                onClick={() => {
+                                                                    setEnvironmentFormVariables(prev => {
+                                                                        const next = prev.filter((row) => row.id !== item.id);
+                                                                        return next.length > 0 ? next : [createEnvironmentVariableRow()];
+                                                                    });
+                                                                }}
+                                                            >
+                                                                ×
+                                                            </Button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <Space style={{ width: '100%', justifyContent: 'space-between', marginTop: 12 }}>
+                                                    <Button onClick={resetEnvironmentEditor}>清空</Button>
+                                                    <Space>
+                                                        {editingEnvironmentId && (
+                                                            <Button danger onClick={handleDeleteEnvironmentCurrent}>删除</Button>
+                                                        )}
+                                                        <Button type="primary" loading={envSaving} onClick={handleSaveEnvironment}>保存</Button>
+                                                    </Space>
+                                                </Space>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <Empty description="请先在左侧选择环境，或点击新建" />
+                                    )}
+                                </div>
+                            ) : currentRequest ? (
                                 <div className="request-panel">
                                     <div className="api-request-bar">
                                         <Select

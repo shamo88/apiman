@@ -3,14 +3,19 @@ package curl
 import (
 	"apiman/internal/models"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	xproxy "golang.org/x/net/proxy"
 )
 
 type CurlExecutor struct{}
@@ -19,7 +24,21 @@ func NewCurlExecutor() *CurlExecutor {
 	return &CurlExecutor{}
 }
 
+type ProxyOptions struct {
+	Enabled    bool
+	HTTPHost   string
+	HTTPPort   int
+	HTTPSHost  string
+	HTTPSPort  int
+	SOCKS5Host string
+	SOCKS5Port int
+}
+
 func (c *CurlExecutor) Execute(curlCommand string) (*models.CurlResponse, error) {
+	return c.ExecuteWithProxy(curlCommand, nil)
+}
+
+func (c *CurlExecutor) ExecuteWithProxy(curlCommand string, proxyOpts *ProxyOptions) (*models.CurlResponse, error) {
 	parts, err := c.parseCurlCommand(curlCommand)
 	if err != nil {
 		return &models.CurlResponse{
@@ -53,8 +72,9 @@ func (c *CurlExecutor) Execute(curlCommand string) (*models.CurlResponse, error)
 		req.Header.Set("Authorization", parts.Auth)
 	}
 
-	client := &http.Client{
-		Timeout: 30 * time.Second,
+	client := &http.Client{Timeout: 30 * time.Second}
+	if proxyOpts != nil && proxyOpts.Enabled {
+		client.Transport = buildTransportWithProxy(proxyOpts)
 	}
 
 	resp, err := client.Do(req)
@@ -83,6 +103,117 @@ func (c *CurlExecutor) Execute(curlCommand string) (*models.CurlResponse, error)
 		Body:       bodyStr,
 		Duration:   duration,
 	}, nil
+}
+
+func buildTransportWithProxy(proxyOpts *ProxyOptions) *http.Transport {
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout: 30 * time.Second,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
+	if proxyOpts.SOCKS5Host != "" && proxyOpts.SOCKS5Port > 0 {
+		normalizedSocksHost := normalizeProxyHost(proxyOpts.SOCKS5Host)
+		if normalizedSocksHost == "" {
+			return transport
+		}
+		socksAddr := net.JoinHostPort(normalizedSocksHost, strconv.Itoa(proxyOpts.SOCKS5Port))
+		dialer, err := xproxy.SOCKS5("tcp", socksAddr, nil, xproxy.Direct)
+		if err == nil {
+			transport.Proxy = nil
+			transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+				type dialResult struct {
+					conn net.Conn
+					err  error
+				}
+				ch := make(chan dialResult, 1)
+				go func() {
+					conn, dialErr := dialer.Dial(network, addr)
+					ch <- dialResult{conn: conn, err: dialErr}
+				}()
+
+				select {
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				case res := <-ch:
+					return res.conn, res.err
+				}
+			}
+		}
+		return transport
+	}
+
+	httpProxyURL := buildProxyURL("http", proxyOpts.HTTPHost, proxyOpts.HTTPPort)
+	httpsProxyURL := buildProxyURL("http", proxyOpts.HTTPSHost, proxyOpts.HTTPSPort)
+
+	if httpProxyURL == nil && httpsProxyURL == nil {
+		return transport
+	}
+
+	transport.Proxy = func(req *http.Request) (*url.URL, error) {
+		if req != nil && req.URL != nil && strings.EqualFold(req.URL.Scheme, "https") {
+			if httpsProxyURL != nil {
+				return httpsProxyURL, nil
+			}
+			return httpProxyURL, nil
+		}
+		if httpProxyURL != nil {
+			return httpProxyURL, nil
+		}
+		return httpsProxyURL, nil
+	}
+
+	return transport
+}
+
+func buildProxyURL(scheme, host string, port int) *url.URL {
+	normalizedHost := normalizeProxyHost(host)
+	if normalizedHost == "" || port <= 0 {
+		return nil
+	}
+	return &url.URL{
+		Scheme: scheme,
+		Host:   net.JoinHostPort(normalizedHost, strconv.Itoa(port)),
+	}
+}
+
+func normalizeProxyHost(raw string) string {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return ""
+	}
+
+	candidate := value
+	if !strings.Contains(candidate, "://") {
+		candidate = "http://" + candidate
+	}
+
+	parsed, err := url.Parse(candidate)
+	if err != nil {
+		return strings.Trim(value, "[]")
+	}
+
+	host := strings.TrimSpace(parsed.Host)
+	if host == "" {
+		host = strings.TrimSpace(parsed.Path)
+	}
+	if host == "" {
+		return ""
+	}
+
+	if strings.Contains(host, ":") {
+		if splitHost, _, splitErr := net.SplitHostPort(host); splitErr == nil {
+			return strings.Trim(splitHost, "[]")
+		}
+	}
+
+	return strings.Trim(host, "[]")
 }
 
 type ParsedCurl struct {

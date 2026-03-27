@@ -511,6 +511,38 @@ body,
     gap: 8px;
 }
 
+.sidebar-menu-header {
+    gap: 10px;
+}
+
+.sidebar-top-menu {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sidebar-menu-item {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.sidebar-menu-item:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.sidebar-menu-item.active {
+    background: rgba(79, 70, 229, 0.12);
+    color: var(--accent-primary);
+}
+
 .sidebar-header .ant-btn {
     background: var(--bg-tertiary) !important;
     border: 1px solid var(--border-subtle) !important;
@@ -586,6 +618,93 @@ body,
 .sidebar-filters .ant-select-selection-item {
     font-size: 12px;
     font-weight: 500;
+}
+
+.environment-sidebar-content {
+    padding: 10px 12px;
+}
+
+.environment-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+.environment-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.environment-list-item {
+    display: flex;
+    align-items: center;
+    padding: 5px 12px;
+    border: none;
+    border-left: 2px solid transparent;
+    background: transparent;
+    color: var(--text-secondary);
+    text-align: left;
+    border-radius: 0;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 13px;
+}
+
+.environment-list-item:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-left-color: var(--accent-primary);
+}
+
+.environment-list-item.active {
+    background: var(--bg-active);
+    color: var(--text-primary);
+    border-left-color: var(--accent-primary);
+}
+
+.environment-list-item-name {
+    font-size: 13px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.environment-vars-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.environment-vars-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.environment-var-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    align-items: center;
+    gap: 6px;
+}
+
+.request-tabs-row {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-secondary);
+}
+
+.request-tabs-row .ant-tabs {
+    border-bottom: none;
+}
+
+.request-tabs-environment-select {
+    padding-right: 16px;
 }
 
 .sidebar-content {

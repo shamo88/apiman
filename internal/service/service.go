@@ -126,7 +126,22 @@ func (s *Service) MoveFolder(folderPath, targetParentPath string) (string, error
 }
 
 func (s *Service) ExecuteCurl(command string) (*models.CurlResponse, error) {
-	return s.CurlExecutor.Execute(command)
+	appCfg, err := s.ConfigManager.LoadAppConfig()
+	if err != nil || appCfg == nil {
+		return s.CurlExecutor.Execute(command)
+	}
+
+	proxyOpts := &curl.ProxyOptions{
+		Enabled:    appCfg.Proxy.Enabled,
+		HTTPHost:   appCfg.Proxy.HTTPHost,
+		HTTPPort:   appCfg.Proxy.HTTPPort,
+		HTTPSHost:  appCfg.Proxy.HTTPSHost,
+		HTTPSPort:  appCfg.Proxy.HTTPSPort,
+		SOCKS5Host: appCfg.Proxy.SOCKS5Host,
+		SOCKS5Port: appCfg.Proxy.SOCKS5Port,
+	}
+
+	return s.CurlExecutor.ExecuteWithProxy(command, proxyOpts)
 }
 
 func (s *Service) ExtractVariables(text string) []string {
