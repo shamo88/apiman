@@ -1033,6 +1033,7 @@ body,
     display: flex;
     align-items: stretch;
     min-width: 0;
+    position: relative;
 }
 
 .title-bar-home-tab {
@@ -1043,20 +1044,25 @@ body,
     padding: 4px 24px;
     margin-top: auto;
     margin-bottom: 0;
-    border: 1px solid var(--border-subtle);
-    border-bottom: none;
+    border: 1px solid #d9d9d9;
+    border-bottom: 1px solid #f0f0f0;
     border-radius: 8px 8px 0 0;
-    background: var(--bg-tertiary);
-    color: var(--text-secondary);
+    background: #fafafa;
+    color: rgba(0, 0, 0, 0.88);
     font-size: 12px;
     cursor: pointer;
     user-select: none;
     -webkit-app-region: no-drag;
+    position: relative;
+    z-index: 1;
 }
 
 .title-bar-home-tab.active {
-    background: var(--bg-secondary);
-    color: var(--accent-primary);
+    background: #fff;
+    color: #1677ff;
+    border-color: #d9d9d9;
+    border-bottom-color: #fff;
+    z-index: 3;
 }
 
 .title-bar-home-tab .anticon {
@@ -1068,6 +1074,16 @@ body,
     overflow: hidden;
     min-width: 0;
     margin-left: 4px;
+}
+
+.title-bar-tabs-wrap::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-bottom: 1px solid #f0f0f0;
+    z-index: 0;
 }
 
 .title-bar-tabs .ant-tabs {
