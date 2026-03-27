@@ -178,6 +178,11 @@ type ProxyConfig struct {
 
 type AppConfig struct {
 	Proxy ProxyConfig `json:"proxy"`
+	UI    UIConfig    `json:"ui"`
+}
+
+type UIConfig struct {
+	EnableListAnimation bool `json:"enableListAnimation"`
 }
 
 func (c *ConfigManager) LoadAppConfig() (*AppConfig, error) {
@@ -188,7 +193,11 @@ func (c *ConfigManager) LoadAppConfig() (*AppConfig, error) {
 	data, err := os.ReadFile(configFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return &AppConfig{}, nil
+			return &AppConfig{
+				UI: UIConfig{
+					EnableListAnimation: false,
+				},
+			}, nil
 		}
 		return nil, err
 	}
@@ -196,6 +205,11 @@ func (c *ConfigManager) LoadAppConfig() (*AppConfig, error) {
 	var config AppConfig
 	if err := json.Unmarshal(data, &config); err != nil {
 		return nil, err
+	}
+
+	// Keep stable defaults for newly added fields.
+	if !config.UI.EnableListAnimation {
+		config.UI.EnableListAnimation = false
 	}
 
 	return &config, nil

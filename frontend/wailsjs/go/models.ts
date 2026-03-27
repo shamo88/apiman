@@ -1,5 +1,17 @@
 export namespace config {
 	
+	export class UIConfig {
+	    enableListAnimation: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new UIConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enableListAnimation = source["enableListAnimation"];
+	    }
+	}
 	export class ProxyConfig {
 	    enabled: boolean;
 	    httpHost?: string;
@@ -26,6 +38,7 @@ export namespace config {
 	}
 	export class AppConfig {
 	    proxy: ProxyConfig;
+	    ui: UIConfig;
 	
 	    static createFrom(source: any = {}) {
 	        return new AppConfig(source);
@@ -34,6 +47,7 @@ export namespace config {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.proxy = this.convertValues(source["proxy"], ProxyConfig);
+	        this.ui = this.convertValues(source["ui"], UIConfig);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -54,6 +68,7 @@ export namespace config {
 		    return a;
 		}
 	}
+	
 
 }
 

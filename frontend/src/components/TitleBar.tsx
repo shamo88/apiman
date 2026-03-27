@@ -11,6 +11,7 @@ interface TitleBarProps {
     onTabChange?: (key: string) => void;
     onTabEdit?: (targetKey: React.MouseEvent | React.KeyboardEvent | string, action: 'add' | 'remove') => void;
     tabItems?: any[];
+    onListAnimationChange?: (enabled: boolean) => void;
 }
 
 const parsePort = (value: unknown): number | undefined => {
@@ -36,10 +37,11 @@ export const TitleBar: React.FC<TitleBarProps> = ({
     activeTab,
     onTabChange,
     onTabEdit,
-    tabItems
+    tabItems,
+    onListAnimationChange
 }) => {
     const [settingsVisible, setSettingsVisible] = React.useState(false);
-    const [activeSettingsTab, setActiveSettingsTab] = React.useState('proxy');
+    const [activeSettingsTab, setActiveSettingsTab] = React.useState('general');
     const [form] = Form.useForm();
 
     const handleMinimize = async () => {
@@ -78,7 +80,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                     httpsPort: config.proxy?.httpsPort || undefined,
                     socks5Host: config.proxy?.socks5Host || '',
                     socks5Port: config.proxy?.socks5Port || undefined,
-                }
+                },
+                ui: {
+                    enableListAnimation: config.ui?.enableListAnimation ?? false,
+                },
             });
             setSettingsVisible(true);
         } catch (error) {
@@ -98,10 +103,14 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                     httpsPort: parsePort(values?.proxy?.httpsPort),
                     socks5Host: values?.proxy?.socks5Host || '',
                     socks5Port: parsePort(values?.proxy?.socks5Port),
-                }
+                },
+                ui: {
+                    enableListAnimation: Boolean(values?.ui?.enableListAnimation),
+                },
             });
 
             await SaveAppConfig(configToSave);
+            onListAnimationChange?.(Boolean(values?.ui?.enableListAnimation));
             console.log('Config saved successfully');
             setSettingsVisible(false);
         } catch (error) {
@@ -111,6 +120,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
     };
 
     const settingsMenuItems = [
+        { key: 'general', label: '通用', icon: <SettingOutlined /> },
         { key: 'proxy', label: '网络代理', icon: <GlobalOutlined /> },
     ];
 
@@ -226,6 +236,49 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                     </Col>
 
                     <Col span={18} style={{ paddingLeft: 24 }}>
+                        {activeSettingsTab === 'general' && (
+                            <div>
+                                <Form
+                                    form={form}
+                                    layout="vertical"
+                                    initialValues={{
+                                        proxy: {
+                                            enabled: false,
+                                            httpHost: '',
+                                            httpPort: undefined,
+                                            httpsHost: '',
+                                            httpsPort: undefined,
+                                            socks5Host: '',
+                                            socks5Port: undefined,
+                                        },
+                                        ui: {
+                                            enableListAnimation: false,
+                                        }
+                                    }}
+                                >
+                                    <Form.Item
+                                        name={['ui', 'enableListAnimation']}
+                                        valuePropName="checked"
+                                        label="接口列表动画"
+                                        style={{ marginTop: '16px' }}
+                                    >
+                                        <Switch />
+                                    </Form.Item>
+
+                                    <Divider style={{ marginTop: 24 }} />
+
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                                        <Button onClick={() => setSettingsVisible(false)}>
+                                            取消
+                                        </Button>
+                                        <Button type="primary" onClick={handleSaveSettings}>
+                                            保存
+                                        </Button>
+                                    </div>
+                                </Form>
+                            </div>
+                        )}
+
                         {activeSettingsTab === 'proxy' && (
                             <div>
                                 <Form
@@ -240,6 +293,9 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                                             httpsPort: undefined,
                                             socks5Host: '',
                                             socks5Port: undefined,
+                                        },
+                                        ui: {
+                                            enableListAnimation: false,
                                         }
                                     }}
                                 >

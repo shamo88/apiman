@@ -5,7 +5,7 @@ import type { DataNode } from 'antd/es/tree';
 import type { UploadProps } from 'antd';
 import './App.css';
 import { TitleBar } from './components/TitleBar';
-import { ListProjects, CreateProject, DeleteProject, GetProjectTree, CreateFolder, CreateRequest, CopyRequest, RenameRequest, RenameFolder, GetRequest, DeleteRequest, DeleteFolder, ExecuteCurl, UpdateRequest, ImportPostmanCollection } from '../wailsjs/go/main/App';
+import { ListProjects, CreateProject, DeleteProject, GetProjectTree, CreateFolder, CreateRequest, CopyRequest, RenameRequest, RenameFolder, GetRequest, DeleteRequest, DeleteFolder, ExecuteCurl, UpdateRequest, ImportPostmanCollection, LoadAppConfig } from '../wailsjs/go/main/App';
 
 interface Project {
     id: string;
@@ -122,6 +122,9 @@ function App() {
     const [importing, setImporting] = useState(false);
     const [searchVersion, setSearchVersion] = useState(0);
     const [projectWorkspaceStates, setProjectWorkspaceStates] = useState<Record<string, ProjectWorkspaceState>>({});
+    const [listAnimationEnabled, setListAnimationEnabled] = useState(false);
+    const [forceListAnimation, setForceListAnimation] = useState(false);
+    const forceAnimationTimerRef = React.useRef<number | null>(null);
 
     const trimRightSpaces = (value: string) => value.replace(/\s+$/g, '');
     const getPrimaryName = (value: string) => value.replace(/-副本\d*$/u, '');
@@ -373,7 +376,36 @@ function App() {
 
     useEffect(() => {
         loadProjects();
+        loadUiConfig();
     }, []);
+
+    useEffect(() => {
+        return () => {
+            if (forceAnimationTimerRef.current) {
+                window.clearTimeout(forceAnimationTimerRef.current);
+            }
+        };
+    }, []);
+
+    const loadUiConfig = async () => {
+        try {
+            const cfg = await LoadAppConfig() as any;
+            setListAnimationEnabled(Boolean(cfg?.ui?.enableListAnimation));
+        } catch (error) {
+            console.error('Failed to load UI config:', error);
+        }
+    };
+
+    const triggerOpenTabAnimation = () => {
+        if (forceAnimationTimerRef.current) {
+            window.clearTimeout(forceAnimationTimerRef.current);
+        }
+        setForceListAnimation(true);
+        forceAnimationTimerRef.current = window.setTimeout(() => {
+            setForceListAnimation(false);
+            forceAnimationTimerRef.current = null;
+        }, 400);
+    };
 
     const loadProjects = async () => {
         setLoading(true);
@@ -470,6 +502,7 @@ function App() {
             setProjectWorkspaceStates(prev => ({ ...prev, [newTab.id]: createEmptyWorkspaceState() }));
             setActiveTab(newTab.id);
             resetWorkspaceState();
+            triggerOpenTabAnimation();
 
             setLoading(true);
             try {
@@ -998,6 +1031,7 @@ function App() {
         <div className="app-container">
             <TitleBar
                 activeTab={activeTab}
+                onListAnimationChange={setListAnimationEnabled}
                 onTabChange={(key) => {
                     switchProjectTab(key);
                 }}
@@ -1110,7 +1144,7 @@ function App() {
                                 />
                             </div>
 
-                            <div className="sidebar-content">
+                            <div className={`sidebar-content${(listAnimationEnabled || forceListAnimation) ? ' list-animations-enabled' : ''}`}>
                                 {loading && <Spin style={{ display: 'block', margin: '20px auto' }} />}
                                 {!loading && !currentTree && (
                                     <div className="empty-sidebar">
