@@ -433,6 +433,7 @@ body,
     color: var(--text-secondary);
     font-size: 13px;
     font-weight: 500;
+    text-align: left;
 }
 
 .api-folder-header:hover {
@@ -487,6 +488,7 @@ body,
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-align: left;
 }
 
 .folder-count {
@@ -536,6 +538,7 @@ body,
     border-left: 2px solid transparent;
     font-size: 13px;
     color: var(--text-secondary);
+    text-align: left;
 }
 
 .api-item:hover {
@@ -575,6 +578,7 @@ body,
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-align: left;
 }
 
 .api-action-btn {
