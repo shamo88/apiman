@@ -440,6 +440,31 @@ body,
     color: var(--text-primary);
 }
 
+.api-folder-header.drop-target {
+    background: rgba(79, 70, 229, 0.12);
+    outline: 1px dashed var(--accent-primary);
+}
+
+.drop-hint-floating {
+    position: fixed;
+    z-index: 3000;
+    pointer-events: none;
+    padding: 4px 8px;
+    font-size: 12px;
+    line-height: 1.2;
+    color: #d4380d;
+    background: rgba(255, 241, 240, 0.95);
+    border: 1px solid rgba(244, 67, 54, 0.35);
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    white-space: nowrap;
+}
+
+.api-folder-header.moved-highlight,
+.api-item.moved-highlight {
+    background: rgba(79, 70, 229, 0.18);
+}
+
 .folder-toggle-icon {
     display: flex;
     align-items: center;
@@ -517,6 +542,15 @@ body,
     background: var(--bg-hover);
     color: var(--text-primary);
     border-left-color: var(--accent-primary);
+}
+
+.api-item[draggable="true"],
+.api-folder-header[draggable="true"] {
+    cursor: grab;
+}
+
+.sidebar-content.root-drop-target {
+    background: rgba(79, 70, 229, 0.06);
 }
 
 .api-item.active {

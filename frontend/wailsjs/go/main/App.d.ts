@@ -44,6 +44,10 @@ export function LoadAppConfig():Promise<config.AppConfig>;
 
 export function LoadEnvironments():Promise<Array<models.Environment>>;
 
+export function MoveFolder(arg1:string,arg2:string):Promise<string>;
+
+export function MoveRequest(arg1:string,arg2:string):Promise<string>;
+
 export function RenameFolder(arg1:string,arg2:string):Promise<models.Folder>;
 
 export function RenameRequest(arg1:string,arg2:string):Promise<models.CurlRequest>;

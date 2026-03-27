@@ -5,7 +5,7 @@ import type { DataNode } from 'antd/es/tree';
 import type { UploadProps } from 'antd';
 import './App.css';
 import { TitleBar } from './components/TitleBar';
-import { ListProjects, CreateProject, DeleteProject, GetProjectTree, CreateFolder, CreateRequest, CopyRequest, RenameRequest, RenameFolder, GetRequest, DeleteRequest, DeleteFolder, ExecuteCurl, UpdateRequest, ImportPostmanCollection, LoadAppConfig } from '../wailsjs/go/main/App';
+import { ListProjects, CreateProject, DeleteProject, GetProjectTree, CreateFolder, CreateRequest, CopyRequest, RenameRequest, RenameFolder, MoveRequest, MoveFolder, GetRequest, DeleteRequest, DeleteFolder, ExecuteCurl, UpdateRequest, ImportPostmanCollection, LoadAppConfig } from '../wailsjs/go/main/App';
 
 interface Project {
     id: string;
@@ -116,6 +116,10 @@ function App() {
     const [filterMethod, setFilterMethod] = useState<string>('ALL');
     const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+    const [draggingNode, setDraggingNode] = useState<{ type: 'request' | 'folder'; path: string } | null>(null);
+    const [dropTargetFolderPath, setDropTargetFolderPath] = useState<string | null>(null);
+    const [invalidDropHint, setInvalidDropHint] = useState<{ message: string; x: number; y: number } | null>(null);
+    const [movedHighlightPath, setMovedHighlightPath] = useState<string | null>(null);
     const searchInputRef = React.useRef<InputRef>(null);
     const renameInputRef = React.useRef<InputRef>(null);
     const renameSelectionEndRef = React.useRef<number>(0);
@@ -125,6 +129,7 @@ function App() {
     const [listAnimationEnabled, setListAnimationEnabled] = useState(false);
     const [forceListAnimation, setForceListAnimation] = useState(false);
     const forceAnimationTimerRef = React.useRef<number | null>(null);
+    const movedHighlightTimerRef = React.useRef<number | null>(null);
 
     const trimRightSpaces = (value: string) => value.replace(/\s+$/g, '');
     const getPrimaryName = (value: string) => value.replace(/-副本\d*$/u, '');
@@ -156,6 +161,113 @@ function App() {
             }
             return newSet;
         });
+    };
+
+    const clearDragState = () => {
+        setDraggingNode(null);
+        setDropTargetFolderPath(null);
+        setInvalidDropHint(null);
+    };
+
+    const replacePathPrefix = (path: string, fromPrefix: string, toPrefix: string) => {
+        if (path === fromPrefix) return toPrefix;
+        const normalizedFrom = fromPrefix.endsWith('/') || fromPrefix.endsWith('\\') ? fromPrefix : fromPrefix + '/';
+        if (path.startsWith(normalizedFrom)) {
+            return toPrefix + path.slice(fromPrefix.length);
+        }
+        return path;
+    };
+
+    const getChildrenByFolderPath = (folderPath: string): ProjectTree[] => {
+        if (!currentTree || !currentProject?.path) return [];
+        if (folderPath === currentProject.path) {
+            return currentTree.children || [];
+        }
+        const node = findTreeNode(currentTree, folderPath);
+        if (!node || node.type !== 'folder') return [];
+        return node.children || [];
+    };
+
+    const getNodeByPath = (path: string): ProjectTree | null => {
+        if (!currentTree) return null;
+        return findTreeNode(currentTree, path);
+    };
+
+    const getParentFolderPath = (path: string): string | null => {
+        if (!currentTree || !currentProject?.path) return null;
+
+        let foundParent: string | null = null;
+        const walk = (node: ProjectTree, parentPath: string) => {
+            const nodePath = node.path || node.id;
+            if (nodePath === path) {
+                foundParent = parentPath;
+                return;
+            }
+            if (!node.children || foundParent) return;
+
+            const nextParent = node.type === 'folder' ? nodePath : parentPath;
+            for (const child of node.children) {
+                walk(child, nextParent);
+                if (foundParent) return;
+            }
+        };
+
+        walk(currentTree, currentProject.path);
+        return foundParent;
+    };
+
+    const checkDropValidity = (dragNode: { type: 'request' | 'folder'; path: string }, targetFolderPath: string): { ok: boolean; reason?: string } => {
+        if (!currentProject?.path) return { ok: false, reason: 'invalid-target' };
+        if (dragNode.path === targetFolderPath) return { ok: false, reason: 'self' };
+
+        const sourceParent = getParentFolderPath(dragNode.path);
+        if (!sourceParent) return { ok: false, reason: 'missing-source' };
+        if (sourceParent === targetFolderPath) return { ok: false, reason: 'same-parent' };
+
+        if (dragNode.type === 'folder') {
+            if (targetFolderPath.startsWith(dragNode.path + '\\') || targetFolderPath.startsWith(dragNode.path + '/')) {
+                return { ok: false, reason: 'child' };
+            }
+        }
+
+        const draggingTreeNode = getNodeByPath(dragNode.path);
+        if (!draggingTreeNode) return { ok: false, reason: 'missing-source' };
+
+        const targetChildren = getChildrenByFolderPath(targetFolderPath);
+        if (dragNode.type === 'request') {
+            const conflict = targetChildren.some(child => child.type === 'request' && child.name === draggingTreeNode.name);
+            if (conflict) return { ok: false, reason: 'duplicate-request-name' };
+        } else {
+            const conflict = targetChildren.some(child => child.type === 'folder' && child.name === draggingTreeNode.name && child.path !== dragNode.path);
+            if (conflict) return { ok: false, reason: 'duplicate-folder-name' };
+        }
+
+        return { ok: true };
+    };
+
+    const getDropHintMessage = (reason?: string) => {
+        const map: Record<string, string> = {
+            'self': '不能拖到自己',
+            'same-parent': '已在该目录',
+            'child': '不能移动到子目录',
+            'duplicate-request-name': '同名接口冲突',
+            'duplicate-folder-name': '同名文件夹冲突',
+            'invalid-target': '目标无效',
+            'missing-source': '源节点不存在',
+        };
+        if (!reason) return '不可放置';
+        return map[reason] || '不可放置';
+    };
+
+    const markMovedNode = (path: string) => {
+        if (movedHighlightTimerRef.current) {
+            window.clearTimeout(movedHighlightTimerRef.current);
+        }
+        setMovedHighlightPath(path);
+        movedHighlightTimerRef.current = window.setTimeout(() => {
+            setMovedHighlightPath(null);
+            movedHighlightTimerRef.current = null;
+        }, 2000);
     };
 
     const resetWorkspaceState = () => {
@@ -278,8 +390,15 @@ function App() {
         const renderRequestItem = (api: any) => (
             <div
                 key={api.path}
-                className={`api-item ${currentRequest?.path === api.path ? 'active' : ''}`}
+                className={`api-item ${currentRequest?.path === api.path ? 'active' : ''} ${movedHighlightPath === api.path ? 'moved-highlight' : ''}`}
+                draggable
                 onClick={() => handleTreeItemClick(api)}
+                onDragStart={(e) => {
+                    e.stopPropagation();
+                    setDraggingNode({ type: 'request', path: api.path! });
+                    e.dataTransfer.effectAllowed = 'move';
+                }}
+                onDragEnd={clearDragState}
                 onMouseEnter={() => setHoveredItem(api.path || '')}
                 onMouseLeave={() => setHoveredItem(null)}
             >
@@ -320,8 +439,52 @@ function App() {
             return (
                 <div key={folder.path || folder.id} className="api-folder">
                     <div
-                        className="api-folder-header"
+                        className={`api-folder-header ${dropTargetFolderPath === (folder.path || folder.id) ? 'drop-target' : ''} ${movedHighlightPath === (folder.path || folder.id) ? 'moved-highlight' : ''}`}
+                        draggable
                         onClick={() => toggleFolderCollapse(folder.path || folder.id)}
+                        onDragStart={(e) => {
+                            e.stopPropagation();
+                            setDraggingNode({ type: 'folder', path: folder.path! });
+                            e.dataTransfer.effectAllowed = 'move';
+                        }}
+                        onDragEnd={clearDragState}
+                        onDragOver={(e) => {
+                            e.stopPropagation();
+                            if (!draggingNode) return;
+                            const targetPath = folder.path || folder.id;
+                            const check = checkDropValidity(draggingNode, targetPath);
+                            if (!check.ok) {
+                                e.dataTransfer.dropEffect = 'none';
+                                setDropTargetFolderPath(null);
+                                setInvalidDropHint({
+                                    message: getDropHintMessage(check.reason),
+                                    x: e.clientX + 14,
+                                    y: e.clientY + 14,
+                                });
+                                return;
+                            }
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'move';
+                            setDropTargetFolderPath(targetPath);
+                            setInvalidDropHint(null);
+                        }}
+                        onDrop={async (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (!draggingNode) return;
+                            const targetPath = folder.path || folder.id;
+                            const check = checkDropValidity(draggingNode, targetPath);
+                            if (!check.ok) {
+                                clearDragState();
+                                return;
+                            }
+                            if (draggingNode.type === 'request') {
+                                await moveRequestNode(draggingNode.path, targetPath);
+                            } else {
+                                await moveFolderNode(draggingNode.path, targetPath);
+                            }
+                            clearDragState();
+                        }}
                     >
                         <span className="folder-toggle-icon">
                             {isCollapsed ? <RightOutlined /> : <DownOutlined />}
@@ -383,6 +546,9 @@ function App() {
         return () => {
             if (forceAnimationTimerRef.current) {
                 window.clearTimeout(forceAnimationTimerRef.current);
+            }
+            if (movedHighlightTimerRef.current) {
+                window.clearTimeout(movedHighlightTimerRef.current);
             }
         };
     }, []);
@@ -585,16 +751,62 @@ function App() {
         return null;
     };
 
-    const moveRequest = async (dragPath: string, targetFolderPath: string) => {
+    const moveRequestNode = async (requestPath: string, targetFolderPath: string) => {
+        const currentProject = projectTabs.find(t => t.id === activeTab)?.project;
         if (!currentProject) return;
+
         try {
-            const request = await GetRequest(dragPath);
-            const fileName = dragPath.split(/[/\\]/).pop();
-            await CreateRequest(currentProject.id, targetFolderPath, request.name, request.content);
-            await DeleteRequest(dragPath);
+            const newRequestPath = await MoveRequest(requestPath, targetFolderPath);
+
+            setRequestTabs(prev => prev.map(tab =>
+                tab.path === requestPath ? { ...tab, path: newRequestPath } : tab
+            ));
+            if (currentRequest?.path === requestPath) {
+                setCurrentRequest({ ...currentRequest, path: newRequestPath });
+            }
+
             const tree = await GetProjectTree(currentProject.id);
             setProjectTrees(prev => ({ ...prev, [currentProject.id]: tree }));
+            setCollapsedFolders(prev => {
+                const next = new Set(prev);
+                next.delete(targetFolderPath);
+                return next;
+            });
+            markMovedNode(newRequestPath);
             message.success('接口移动成功');
+        } catch (error: any) {
+            message.error(`移动失败: ${error?.message || error}`);
+        }
+    };
+
+    const moveFolderNode = async (folderPath: string, targetFolderPath: string) => {
+        const currentProject = projectTabs.find(t => t.id === activeTab)?.project;
+        if (!currentProject) return;
+
+        try {
+            const newFolderPath = await MoveFolder(folderPath, targetFolderPath);
+
+            setRequestTabs(prev => prev.map(tab => ({
+                ...tab,
+                path: replacePathPrefix(tab.path, folderPath, newFolderPath)
+            })));
+
+            if (currentRequest?.path) {
+                const nextPath = replacePathPrefix(currentRequest.path, folderPath, newFolderPath);
+                if (nextPath !== currentRequest.path) {
+                    setCurrentRequest({ ...currentRequest, path: nextPath });
+                }
+            }
+
+            const tree = await GetProjectTree(currentProject.id);
+            setProjectTrees(prev => ({ ...prev, [currentProject.id]: tree }));
+            setCollapsedFolders(prev => {
+                const next = new Set(prev);
+                next.delete(targetFolderPath);
+                return next;
+            });
+            markMovedNode(newFolderPath);
+            message.success('文件夹移动成功');
         } catch (error: any) {
             message.error(`移动失败: ${error?.message || error}`);
         }
@@ -1144,7 +1356,42 @@ function App() {
                                 />
                             </div>
 
-                            <div className={`sidebar-content${(listAnimationEnabled || forceListAnimation) ? ' list-animations-enabled' : ''}`}>
+                            <div
+                                className={`sidebar-content${(listAnimationEnabled || forceListAnimation) ? ' list-animations-enabled' : ''}${dropTargetFolderPath === currentProject?.path ? ' root-drop-target' : ''}`}
+                                onDragOver={(e) => {
+                                    if (!draggingNode || !currentProject?.path) return;
+                                    const check = checkDropValidity(draggingNode, currentProject.path);
+                                    if (!check.ok) {
+                                        e.dataTransfer.dropEffect = 'none';
+                                        setDropTargetFolderPath(null);
+                                        setInvalidDropHint({
+                                            message: getDropHintMessage(check.reason),
+                                            x: e.clientX + 14,
+                                            y: e.clientY + 14,
+                                        });
+                                        return;
+                                    }
+                                    e.preventDefault();
+                                    e.dataTransfer.dropEffect = 'move';
+                                    setDropTargetFolderPath(currentProject.path);
+                                    setInvalidDropHint(null);
+                                }}
+                                onDrop={async (e) => {
+                                    e.preventDefault();
+                                    if (!draggingNode || !currentProject?.path) return;
+                                    const check = checkDropValidity(draggingNode, currentProject.path);
+                                    if (!check.ok) {
+                                        clearDragState();
+                                        return;
+                                    }
+                                    if (draggingNode.type === 'request') {
+                                        await moveRequestNode(draggingNode.path, currentProject.path);
+                                    } else {
+                                        await moveFolderNode(draggingNode.path, currentProject.path);
+                                    }
+                                    clearDragState();
+                                }}
+                            >
                                 {loading && <Spin style={{ display: 'block', margin: '20px auto' }} />}
                                 {!loading && !currentTree && (
                                     <div className="empty-sidebar">
@@ -1454,6 +1701,18 @@ function App() {
                     </div>
                 )}
             </div>
+
+            {invalidDropHint && (
+                <div
+                    className="drop-hint-floating"
+                    style={{
+                        left: invalidDropHint.x,
+                        top: invalidDropHint.y,
+                    }}
+                >
+                    {invalidDropHint.message}
+                </div>
+            )}
 
             <Modal
                 title="创建新项目"

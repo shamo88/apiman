@@ -742,6 +742,117 @@ func (pm *ProjectManager) requestNameExists(folderPath, name, excludePath string
 	return req.Name != name, nil
 }
 
+func (pm *ProjectManager) MoveRequest(requestPath, targetFolderPath string) (string, error) {
+	requestPath = filepath.Clean(requestPath)
+	targetFolderPath = filepath.Clean(targetFolderPath)
+
+	if requestPath == "" || targetFolderPath == "" {
+		return "", os.ErrInvalid
+	}
+
+	targetInfo, err := os.Stat(targetFolderPath)
+	if err != nil {
+		return "", err
+	}
+	if !targetInfo.IsDir() {
+		return "", errors.New("目标路径不是文件夹")
+	}
+
+	currentFolderPath := filepath.Dir(requestPath)
+	if currentFolderPath == targetFolderPath {
+		return requestPath, nil
+	}
+
+	req, err := pm.GetRequest(requestPath)
+	if err != nil {
+		return "", err
+	}
+	if exists, err := pm.requestNameExists(targetFolderPath, req.Name, ""); err != nil {
+		return "", err
+	} else if exists {
+		return "", errors.New("目标文件夹中已存在同名接口")
+	}
+
+	newRequestPath := filepath.Join(targetFolderPath, filepath.Base(requestPath))
+	if _, err := os.Stat(newRequestPath); err == nil {
+		return "", errors.New("目标文件夹中已存在同名接口文件")
+	}
+
+	if err := os.Rename(requestPath, newRequestPath); err != nil {
+		return "", err
+	}
+
+	requestNameKey := strings.TrimSuffix(filepath.Base(requestPath), ".curl")
+	requestID := extractTrailingUUID(requestNameKey)
+	if requestID == "" {
+		requestID = requestNameKey
+	}
+
+	oldMetaPath := filepath.Join(currentFolderPath, requestID+".meta")
+	newMetaPath := filepath.Join(targetFolderPath, requestID+".meta")
+	if _, err := os.Stat(oldMetaPath); err == nil {
+		if err := os.Rename(oldMetaPath, newMetaPath); err != nil {
+			return "", err
+		}
+	}
+
+	return newRequestPath, nil
+}
+
+func (pm *ProjectManager) MoveFolder(folderPath, targetParentPath string) (string, error) {
+	folderPath = filepath.Clean(folderPath)
+	targetParentPath = filepath.Clean(targetParentPath)
+
+	if folderPath == "" || targetParentPath == "" {
+		return "", os.ErrInvalid
+	}
+
+	targetInfo, err := os.Stat(targetParentPath)
+	if err != nil {
+		return "", err
+	}
+	if !targetInfo.IsDir() {
+		return "", errors.New("目标路径不是文件夹")
+	}
+
+	currentParent := filepath.Dir(folderPath)
+	if currentParent == targetParentPath {
+		return folderPath, nil
+	}
+
+	folderName := pm.getFolderDisplayName(folderPath)
+	if exists, err := pm.folderNameExists(targetParentPath, folderName, folderPath); err != nil {
+		return "", err
+	} else if exists {
+		return "", errors.New("目标位置已存在同名文件夹")
+	}
+
+	normalizedFolder := folderPath + string(os.PathSeparator)
+	normalizedTarget := targetParentPath + string(os.PathSeparator)
+	if strings.HasPrefix(normalizedTarget, normalizedFolder) {
+		return "", errors.New("不能移动到自身或子文件夹中")
+	}
+
+	newFolderPath := filepath.Join(targetParentPath, filepath.Base(folderPath))
+	if _, err := os.Stat(newFolderPath); err == nil {
+		return "", errors.New("目标位置已存在同名文件夹")
+	}
+
+	if err := os.Rename(folderPath, newFolderPath); err != nil {
+		return "", err
+	}
+
+	return newFolderPath, nil
+}
+
+func (pm *ProjectManager) getFolderDisplayName(folderPath string) string {
+	displayName := stripUUIDSuffix(filepath.Base(folderPath))
+	if meta, err := loadFolderMeta(folderPath); err == nil && meta.Name != "" {
+		displayName = meta.Name
+	}
+	return displayName
+}
+
 func (pm *ProjectManager) folderNameExists(parentPath, name, excludePath string) (bool, error) {
 	entries, err := os.ReadDir(parentPath)
 	if err != nil {

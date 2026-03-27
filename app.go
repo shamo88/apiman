@@ -107,6 +107,14 @@ func (a *App) RenameFolder(folderPath, newName string) (*models.Folder, error) {
 	return a.service.RenameFolder(folderPath, newName)
 }
 
+func (a *App) MoveRequest(requestPath, targetFolderPath string) (string, error) {
+	return a.service.MoveRequest(requestPath, targetFolderPath)
+}
+
+func (a *App) MoveFolder(folderPath, targetParentPath string) (string, error) {
+	return a.service.MoveFolder(folderPath, targetParentPath)
+}
+
 func (a *App) ExecuteCurl(command string) (*models.CurlResponse, error) {
 	return a.service.ExecuteCurl(command)
 }

@@ -113,6 +113,14 @@ func (s *Service) RenameFolder(folderPath, newName string) (*models.Folder, erro
 	return s.ProjectMgr.RenameFolder(folderPath, newName)
 }
 
+func (s *Service) MoveRequest(requestPath, targetFolderPath string) (string, error) {
+	return s.ProjectMgr.MoveRequest(requestPath, targetFolderPath)
+}
+
+func (s *Service) MoveFolder(folderPath, targetParentPath string) (string, error) {
+	return s.ProjectMgr.MoveFolder(folderPath, targetParentPath)
+}
+
 func (s *Service) ExecuteCurl(command string) (*models.CurlResponse, error) {
 	return s.CurlExecutor.Execute(command)
 }

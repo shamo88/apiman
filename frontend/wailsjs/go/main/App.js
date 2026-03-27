@@ -82,6 +82,14 @@ export function LoadEnvironments() {
   return window['go']['main']['App']['LoadEnvironments']();
 }
 
+export function MoveFolder(arg1, arg2) {
+  return window['go']['main']['App']['MoveFolder'](arg1, arg2);
+}
+
+export function MoveRequest(arg1, arg2) {
+  return window['go']['main']['App']['MoveRequest'](arg1, arg2);
+}
+
 export function RenameFolder(arg1, arg2) {
   return window['go']['main']['App']['RenameFolder'](arg1, arg2);
 }
