@@ -1231,7 +1231,13 @@ function App() {
     const tabItems = [
         {
             key: 'home',
-            label: '首页',
+            label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+                    <HomeOutlined style={{ marginRight: 0 }} />
+                    <span>主页</span>
+                </span>
+            ),
+            closable: false,
         },
         ...projectTabs.map(tab => ({
             key: tab.id,
