@@ -828,9 +828,10 @@ function App() {
         }
 
         if (tree.type === 'folder') {
-            const filteredChildren = tree.children
-                ?.map(child => filterTreeNodes(child, keyword, method))
-                .filter(child => child !== null) as ProjectTree[];
+            const children = tree.children ?? [];
+            const filteredChildren = children
+                .map(child => filterTreeNodes(child, keyword, method))
+                .filter((child): child is ProjectTree => child !== null);
 
             if (filteredChildren.length > 0) {
                 return { ...tree, children: filteredChildren };
@@ -839,13 +840,14 @@ function App() {
         }
 
         if (tree.type === 'project') {
-            const filteredChildren = tree.children
-                ?.map(child => filterTreeNodes(child, keyword, method))
-                .filter(child => child !== null) as ProjectTree[];
+            const children = tree.children ?? [];
+            const filteredChildren = children
+                .map(child => filterTreeNodes(child, keyword, method))
+                .filter((child): child is ProjectTree => child !== null);
 
             return {
                 ...tree,
-                children: filteredChildren || []
+                children: filteredChildren
             };
         }
 
