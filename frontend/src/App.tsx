@@ -53,6 +53,38 @@ interface ApiConfig {
     urlencoded: { key: string; value: string }[];
 }
 
+interface ProjectWorkspaceState {
+    requestTabs: RequestTab[];
+    activeRequestTab: string;
+    currentRequest: CurlRequest | null;
+    requestContent: string;
+    response: any;
+    selectedKeys: string[];
+    apiConfig: ApiConfig;
+}
+
+const createDefaultApiConfig = (): ApiConfig => ({
+    name: '',
+    method: 'GET',
+    url: '',
+    headers: [],
+    params: [],
+    body: '',
+    bodyType: 'none',
+    formData: [],
+    urlencoded: []
+});
+
+const createEmptyWorkspaceState = (): ProjectWorkspaceState => ({
+    requestTabs: [],
+    activeRequestTab: '',
+    currentRequest: null,
+    requestContent: '',
+    response: null,
+    selectedKeys: [],
+    apiConfig: createDefaultApiConfig()
+});
+
 function App() {
     const [status, setStatus] = useState('初始化中...');
     const [projects, setProjects] = useState<Project[]>([]);
@@ -79,17 +111,7 @@ function App() {
     const [renameValue, setRenameValue] = useState('');
     const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
     const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
-    const [apiConfig, setApiConfig] = useState<ApiConfig>({
-        name: '',
-        method: 'GET',
-        url: '',
-        headers: [],
-        params: [],
-        body: '',
-        bodyType: 'none',
-        formData: [],
-        urlencoded: []
-    });
+    const [apiConfig, setApiConfig] = useState<ApiConfig>(createDefaultApiConfig());
     const [searchKeyword, setSearchKeyword] = useState('');
     const [filterMethod, setFilterMethod] = useState<string>('ALL');
     const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
@@ -99,6 +121,7 @@ function App() {
     const renameSelectionEndRef = React.useRef<number>(0);
     const [importing, setImporting] = useState(false);
     const [searchVersion, setSearchVersion] = useState(0);
+    const [projectWorkspaceStates, setProjectWorkspaceStates] = useState<Record<string, ProjectWorkspaceState>>({});
 
     const trimRightSpaces = (value: string) => value.replace(/\s+$/g, '');
     const getPrimaryName = (value: string) => value.replace(/-副本\d*$/u, '');
@@ -130,6 +153,57 @@ function App() {
             }
             return newSet;
         });
+    };
+
+    const resetWorkspaceState = () => {
+        const emptyState = createEmptyWorkspaceState();
+        setRequestTabs(emptyState.requestTabs);
+        setActiveRequestTab(emptyState.activeRequestTab);
+        setCurrentRequest(emptyState.currentRequest);
+        setRequestContent(emptyState.requestContent);
+        setResponse(emptyState.response);
+        setSelectedKeys(emptyState.selectedKeys);
+        setApiConfig(emptyState.apiConfig);
+    };
+
+    const captureCurrentWorkspaceState = (): ProjectWorkspaceState => ({
+        requestTabs,
+        activeRequestTab,
+        currentRequest,
+        requestContent,
+        response,
+        selectedKeys,
+        apiConfig
+    });
+
+    const applyWorkspaceState = (state: ProjectWorkspaceState) => {
+        setRequestTabs(state.requestTabs);
+        setActiveRequestTab(state.activeRequestTab);
+        setCurrentRequest(state.currentRequest);
+        setRequestContent(state.requestContent);
+        setResponse(state.response);
+        setSelectedKeys(state.selectedKeys);
+        setApiConfig(state.apiConfig);
+    };
+
+    const switchProjectTab = (targetTab: string, skipSaveCurrent: boolean = false) => {
+        if (targetTab === activeTab) {
+            return;
+        }
+
+        if (!skipSaveCurrent && activeTab !== 'home') {
+            const currentState = captureCurrentWorkspaceState();
+            setProjectWorkspaceStates(prev => ({ ...prev, [activeTab]: currentState }));
+        }
+
+        setActiveTab(targetTab);
+        if (targetTab === 'home') {
+            resetWorkspaceState();
+            return;
+        }
+
+        const targetState = projectWorkspaceStates[targetTab] || createEmptyWorkspaceState();
+        applyWorkspaceState(targetState);
     };
 
     const getMethodColor = (method: string) => {
@@ -381,15 +455,21 @@ function App() {
     const handleOpenProject = async (project: Project) => {
         const existingTab = projectTabs.find(t => t.project.id === project.id);
         if (existingTab) {
-            setActiveTab(existingTab.id);
+            switchProjectTab(existingTab.id);
         } else {
             const newTab: ProjectTab = {
                 id: project.id,
                 title: project.name,
                 project: project,
             };
+            if (activeTab !== 'home') {
+                const currentState = captureCurrentWorkspaceState();
+                setProjectWorkspaceStates(prev => ({ ...prev, [activeTab]: currentState }));
+            }
             setProjectTabs([...projectTabs, newTab]);
+            setProjectWorkspaceStates(prev => ({ ...prev, [newTab.id]: createEmptyWorkspaceState() }));
             setActiveTab(newTab.id);
+            resetWorkspaceState();
 
             setLoading(true);
             try {
@@ -412,12 +492,17 @@ function App() {
 
     const handleCloseProjectTab = (tabId: string) => {
         setProjectTabs(projectTabs.filter(t => t.id !== tabId));
+        setProjectWorkspaceStates(prev => {
+            const next = { ...prev };
+            delete next[tabId];
+            return next;
+        });
         if (activeTab === tabId) {
             const remaining = projectTabs.filter(t => t.id !== tabId);
             if (remaining.length > 0) {
-                setActiveTab(remaining[0].id);
+                switchProjectTab(remaining[0].id, true);
             } else {
-                setActiveTab('home');
+                switchProjectTab('home', true);
             }
         }
     };
@@ -914,14 +999,7 @@ function App() {
             <TitleBar
                 activeTab={activeTab}
                 onTabChange={(key) => {
-                    setActiveTab(key);
-                    if (key === 'home') {
-                        setCurrentRequest(null);
-                        setRequestContent('');
-                        setResponse(null);
-                        setRequestTabs([]);
-                        setActiveRequestTab('');
-                    }
+                    switchProjectTab(key);
                 }}
                 onTabEdit={(targetKey, action) => {
                     if (action === 'remove' && targetKey !== 'home') {
