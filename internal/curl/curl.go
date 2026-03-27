@@ -235,7 +235,6 @@ func (c *CurlExecutor) parseCurlCommand(command string) (*ParsedCurl, error) {
 	patterns := map[string]*regexp.Regexp{
 		"method": regexp.MustCompile(`-X\s+(\S+)`),
 		"header": regexp.MustCompile(`-H\s+['"]([^'"]+)['"]`),
-		"data":   regexp.MustCompile(`-d\s+['"]([^'"]+)['"]`),
 		"user":   regexp.MustCompile(`-u\s+['"]([^'"]+)['"]`),
 		"url":    regexp.MustCompile(`['"]?(https?://[^\s'"]+)['"]?`),
 	}
@@ -255,9 +254,7 @@ func (c *CurlExecutor) parseCurlCommand(command string) (*ParsedCurl, error) {
 		}
 	}
 
-	if matches := patterns["data"].FindStringSubmatch(command); len(matches) > 1 {
-		parts.Data = matches[1]
-	}
+	parts.Data = extractDataArgument(command)
 
 	if matches := patterns["user"].FindStringSubmatch(command); len(matches) > 1 {
 		auth := matches[1]
@@ -277,6 +274,33 @@ func (c *CurlExecutor) parseCurlCommand(command string) (*ParsedCurl, error) {
 	}
 
 	return parts, nil
+}
+
+func extractDataArgument(command string) string {
+	// Prefer single-quoted payload first, as JSON bodies are usually wrapped by single quotes.
+	// Example: -d '{"test":1}'
+	singleQuoted := regexp.MustCompile(`(?:^|\s)-d\s+'([^']*)'`)
+	if matches := singleQuoted.FindStringSubmatch(command); len(matches) > 1 {
+		return matches[1]
+	}
+
+	// Handle double-quoted payload with possible escaped quotes.
+	// Example: -d "{\"test\":1}"
+	doubleQuoted := regexp.MustCompile(`(?:^|\s)-d\s+"((?:[^"\\]|\\.)*)"`)
+	if matches := doubleQuoted.FindStringSubmatch(command); len(matches) > 1 {
+		value := matches[1]
+		value = strings.ReplaceAll(value, `\"`, `"`)
+		value = strings.ReplaceAll(value, `\\`, `\`)
+		return value
+	}
+
+	// Fallback for unquoted payload.
+	unquoted := regexp.MustCompile(`(?:^|\s)-d\s+([^\s]+)`)
+	if matches := unquoted.FindStringSubmatch(command); len(matches) > 1 {
+		return matches[1]
+	}
+
+	return ""
 }
 
 func base64Encode(input string) string {

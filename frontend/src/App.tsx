@@ -1320,6 +1320,27 @@ function App() {
         const lines = curlCommand.split('\n');
         let urlFound = false;
 
+        const extractDataArgumentFromLine = (line: string): string => {
+            const singleQuoted = line.match(/(?:^|\s)-d\s+'([^']*)'/i);
+            if (singleQuoted && singleQuoted[1] !== undefined) {
+                return singleQuoted[1];
+            }
+
+            const doubleQuoted = line.match(/(?:^|\s)-d\s+"((?:[^"\\]|\\.)*)"/i);
+            if (doubleQuoted && doubleQuoted[1] !== undefined) {
+                return doubleQuoted[1]
+                    .replace(/\\"/g, '"')
+                    .replace(/\\\\/g, '\\');
+            }
+
+            const unquoted = line.match(/(?:^|\s)-d\s+([^\s]+)/i);
+            if (unquoted && unquoted[1] !== undefined) {
+                return unquoted[1];
+            }
+
+            return '';
+        };
+
         for (const line of lines) {
             const trimmedLine = line.trim();
             if (trimmedLine.startsWith('#')) continue;
@@ -1339,9 +1360,9 @@ function App() {
                 });
             }
 
-            const dataMatch = trimmedLine.match(/-d\s+['"]([^'"]+)['"]/i);
-            if (dataMatch) {
-                config.body = dataMatch[1];
+            const dataValue = extractDataArgumentFromLine(trimmedLine);
+            if (dataValue) {
+                config.body = dataValue;
             }
 
             const urlMatch = trimmedLine.match(/['"]?(https?:\/\/[^\s'"]+)['"]?/i);
