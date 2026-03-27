@@ -44,6 +44,8 @@ export function LoadAppConfig():Promise<config.AppConfig>;
 
 export function LoadEnvironments():Promise<Array<models.Environment>>;
 
+export function LoadProjectGroupsState():Promise<project.ProjectGroupsState>;
+
 export function MoveFolder(arg1:string,arg2:string):Promise<string>;
 
 export function MoveRequest(arg1:string,arg2:string):Promise<string>;
@@ -57,6 +59,8 @@ export function ReplaceVariables(arg1:string,arg2:Record<string, string>):Promis
 export function SaveAppConfig(arg1:config.AppConfig):Promise<void>;
 
 export function SaveGlobalVariables(arg1:Record<string, string>):Promise<void>;
+
+export function SaveProjectGroupsState(arg1:project.ProjectGroupsState):Promise<void>;
 
 export function UpdateEnvironment(arg1:string,arg2:string,arg3:Record<string, string>):Promise<void>;
 

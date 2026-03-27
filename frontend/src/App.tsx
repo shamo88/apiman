@@ -91,7 +91,6 @@ const createEmptyWorkspaceState = (): ProjectWorkspaceState => ({
     apiConfig: createDefaultApiConfig()
 });
 
-const PROJECT_GROUP_STORAGE_KEY = 'apiman.projectGroups.v1';
 const DEFAULT_PROJECT_GROUP = '未分组';
 
 function App() {
@@ -150,6 +149,7 @@ function App() {
     const [editingGroupName, setEditingGroupName] = useState('');
     const [draggingGroupName, setDraggingGroupName] = useState<string | null>(null);
     const [groupSortDropTarget, setGroupSortDropTarget] = useState<string | null>(null);
+    const [projectGroupsLoaded, setProjectGroupsLoaded] = useState(false);
     const forceAnimationTimerRef = React.useRef<number | null>(null);
     const movedHighlightTimerRef = React.useRef<number | null>(null);
 
@@ -562,33 +562,8 @@ function App() {
     useEffect(() => {
         loadProjects();
         loadUiConfig();
+        loadProjectGroupsState();
     }, []);
-
-    useEffect(() => {
-        try {
-            const raw = window.localStorage.getItem(PROJECT_GROUP_STORAGE_KEY);
-            if (!raw) return;
-            const parsed = JSON.parse(raw) as ProjectGroupStore;
-            setProjectGroups(Array.isArray(parsed?.groups) ? parsed.groups.filter(Boolean) : []);
-            setProjectGroupAssignments(parsed?.assignments || {});
-            setCollapsedProjectGroups(new Set(Array.isArray(parsed?.collapsedGroups) ? parsed.collapsedGroups : []));
-        } catch (error) {
-            console.error('Failed to load project groups from localStorage:', error);
-        }
-    }, []);
-
-    useEffect(() => {
-        try {
-            const payload: ProjectGroupStore = {
-                groups: projectGroups,
-                assignments: projectGroupAssignments,
-                collapsedGroups: Array.from(collapsedProjectGroups),
-            };
-            window.localStorage.setItem(PROJECT_GROUP_STORAGE_KEY, JSON.stringify(payload));
-        } catch (error) {
-            console.error('Failed to save project groups to localStorage:', error);
-        }
-    }, [projectGroups, projectGroupAssignments, collapsedProjectGroups]);
 
     useEffect(() => {
         const projectIds = new Set(projects.map(p => p.id));
@@ -625,6 +600,35 @@ function App() {
             console.error('Failed to load UI config:', error);
         }
     };
+
+    const loadProjectGroupsState = async () => {
+        try {
+            const state = await (window as any).go.main.App.LoadProjectGroupsState() as ProjectGroupStore;
+            setProjectGroups(Array.isArray(state?.groups) ? state.groups.filter(Boolean) : []);
+            setProjectGroupAssignments(state?.assignments || {});
+            setCollapsedProjectGroups(new Set(Array.isArray(state?.collapsedGroups) ? state.collapsedGroups : []));
+        } catch (error) {
+            console.error('Failed to load project groups state:', error);
+        } finally {
+            setProjectGroupsLoaded(true);
+        }
+    };
+
+    useEffect(() => {
+        if (!projectGroupsLoaded) return;
+        const persist = async () => {
+            try {
+                await (window as any).go.main.App.SaveProjectGroupsState({
+                    groups: projectGroups,
+                    assignments: projectGroupAssignments,
+                    collapsedGroups: Array.from(collapsedProjectGroups),
+                });
+            } catch (error) {
+                console.error('Failed to save project groups state:', error);
+            }
+        };
+        persist();
+    }, [projectGroups, projectGroupAssignments, collapsedProjectGroups, projectGroupsLoaded]);
 
     const triggerOpenTabAnimation = () => {
         if (forceAnimationTimerRef.current) {
@@ -1467,8 +1471,7 @@ function App() {
             .map(groupName => ({
                 groupName,
                 projects: bucket[groupName] || [],
-            }))
-            .filter(group => group.projects.length > 0);
+            }));
     }, [filteredProjects, projectGroupAssignments, projectGroups]);
 
     const filteredTree = React.useMemo(() => {
@@ -1628,7 +1631,7 @@ function App() {
                                                 </Dropdown>
                                             )}
                                         </div>
-                                        {!collapsedProjectGroups.has(group.groupName) && (
+                                        {!collapsedProjectGroups.has(group.groupName) && group.projects.length > 0 && (
                                             <Row gutter={[16, 16]} style={{ padding: '12px 20px 20px' }}>
                                                 {group.projects.map(project => (
                                                     <Col xs={24} sm={12} md={8} lg={6} key={project.id}>
@@ -1672,6 +1675,11 @@ function App() {
                                                     </Col>
                                                 ))}
                                             </Row>
+                                        )}
+                                        {!collapsedProjectGroups.has(group.groupName) && group.projects.length === 0 && (
+                                            <div className="project-group-empty-drop-zone">
+                                                暂无项目，可将项目卡片拖拽到此分组
+                                            </div>
                                         )}
                                     </div>
                                 ))}

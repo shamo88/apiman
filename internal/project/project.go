@@ -46,6 +46,66 @@ type folderMeta struct {
 	Name string `json:"name"`
 }
 
+type ProjectGroupsState struct {
+	Groups          []string          `json:"groups"`
+	Assignments     map[string]string `json:"assignments"`
+	CollapsedGroups []string          `json:"collapsedGroups,omitempty"`
+}
+
+func (pm *ProjectManager) groupsStateFilePath() string {
+	return filepath.Join(pm.configManager.GetProjectsDir(), "projects.json")
+}
+
+func (pm *ProjectManager) LoadProjectGroupsState() (*ProjectGroupsState, error) {
+	filePath := pm.groupsStateFilePath()
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &ProjectGroupsState{
+				Groups:      []string{},
+				Assignments: map[string]string{},
+			}, nil
+		}
+		return nil, err
+	}
+
+	var state ProjectGroupsState
+	if err := json.Unmarshal(data, &state); err != nil {
+		return nil, err
+	}
+	if state.Groups == nil {
+		state.Groups = []string{}
+	}
+	if state.Assignments == nil {
+		state.Assignments = map[string]string{}
+	}
+	if state.CollapsedGroups == nil {
+		state.CollapsedGroups = []string{}
+	}
+	return &state, nil
+}
+
+func (pm *ProjectManager) SaveProjectGroupsState(state *ProjectGroupsState) error {
+	if state == nil {
+		return os.ErrInvalid
+	}
+	if state.Groups == nil {
+		state.Groups = []string{}
+	}
+	if state.Assignments == nil {
+		state.Assignments = map[string]string{}
+	}
+	if state.CollapsedGroups == nil {
+		state.CollapsedGroups = []string{}
+	}
+
+	data, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(pm.groupsStateFilePath(), data, 0644)
+}
+
 func (pm *ProjectManager) ListProjects() ([]models.Project, error) {
 	projectsDir := pm.configManager.GetProjectsDir()
 	entries, err := os.ReadDir(projectsDir)
@@ -118,7 +178,17 @@ func (pm *ProjectManager) DeleteProject(id string) error {
 			continue
 		}
 		if strings.HasSuffix(entry.Name(), "__"+id) || entry.Name() == id {
-			return os.RemoveAll(filepath.Join(projectsDir, entry.Name()))
+			if err := os.RemoveAll(filepath.Join(projectsDir, entry.Name())); err != nil {
+				return err
+			}
+			state, loadErr := pm.LoadProjectGroupsState()
+			if loadErr == nil {
+				if _, exists := state.Assignments[id]; exists {
+					delete(state.Assignments, id)
+					_ = pm.SaveProjectGroupsState(state)
+				}
+			}
+			return nil
 		}
 	}
 

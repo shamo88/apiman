@@ -82,6 +82,10 @@ export function LoadEnvironments() {
   return window['go']['main']['App']['LoadEnvironments']();
 }
 
+export function LoadProjectGroupsState() {
+  return window['go']['main']['App']['LoadProjectGroupsState']();
+}
+
 export function MoveFolder(arg1, arg2) {
   return window['go']['main']['App']['MoveFolder'](arg1, arg2);
 }
@@ -108,6 +112,10 @@ export function SaveAppConfig(arg1) {
 
 export function SaveGlobalVariables(arg1) {
   return window['go']['main']['App']['SaveGlobalVariables'](arg1);
+}
+
+export function SaveProjectGroupsState(arg1) {
+  return window['go']['main']['App']['SaveProjectGroupsState'](arg1);
 }
 
 export function UpdateEnvironment(arg1, arg2, arg3) {

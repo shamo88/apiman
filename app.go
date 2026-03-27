@@ -138,3 +138,11 @@ func (a *App) SaveAppConfig(config *config.AppConfig) error {
 func (a *App) ImportPostmanCollection(jsonData string) (*models.Project, error) {
 	return a.service.ImportPostmanCollection(jsonData)
 }
+
+func (a *App) LoadProjectGroupsState() (*project.ProjectGroupsState, error) {
+	return a.service.LoadProjectGroupsState()
+}
+
+func (a *App) SaveProjectGroupsState(state *project.ProjectGroupsState) error {
+	return a.service.SaveProjectGroupsState(state)
+}

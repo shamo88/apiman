@@ -266,6 +266,22 @@ export namespace models {
 
 export namespace project {
 	
+	export class ProjectGroupsState {
+	    groups: string[];
+	    assignments: Record<string, string>;
+	    collapsedGroups?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ProjectGroupsState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.groups = source["groups"];
+	        this.assignments = source["assignments"];
+	        this.collapsedGroups = source["collapsedGroups"];
+	    }
+	}
 	export class ProjectTree {
 	    id: string;
 	    name: string;
