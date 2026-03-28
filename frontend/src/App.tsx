@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { Button, Space, Modal, Input, message, Spin, Tree, Dropdown, Tabs, Card, Col, Row, Select, Collapse, Empty, Radio, InputRef, Upload, Tooltip, Checkbox } from 'antd';
-import { PlusOutlined, ApiOutlined, ProjectOutlined, FolderOutlined, FileOutlined, CopyOutlined, EditOutlined, CloseOutlined, HomeOutlined, DragOutlined, SearchOutlined, RightOutlined, DownOutlined, MoreOutlined, ImportOutlined, QuestionCircleOutlined, ExperimentOutlined } from '@ant-design/icons';
-import type { DataNode } from 'antd/es/tree';
-import type { UploadProps } from 'antd';
-import CodeMirror from '@uiw/react-codemirror';
+import { ApiOutlined, CloseOutlined, CopyOutlined, DownOutlined, EditOutlined, ExperimentOutlined, FileOutlined, FolderOutlined, HomeOutlined, ImportOutlined, MoreOutlined, PlusOutlined, ProjectOutlined, QuestionCircleOutlined, RightOutlined, SearchOutlined } from '@ant-design/icons';
 import { javascript } from '@codemirror/lang-javascript';
+import CodeMirror from '@uiw/react-codemirror';
+import type { UploadProps } from 'antd';
+import { Button, Card, Checkbox, Col, Dropdown, Empty, Input, InputRef, message, Modal, Radio, Row, Select, Space, Spin, Tabs, Tooltip, Upload } from 'antd';
+import type { DataNode } from 'antd/es/tree';
+import React, { useEffect, useState } from 'react';
+import { AddRequestCase, CopyRequest, CreateEnvironment, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteEnvironment, DeleteFolder, DeleteProject, DeleteProjectScript, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts, GetProjectTree, GetRequest, ImportPostmanCollection, ListProjects, ListProjectScripts, LoadAppConfig, LoadEnvironments, MoveFolder, MoveRequest, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, UpdateEnvironment, UpdateProjectScript, UpdateRequest, UpdateRequestScripts } from '../wailsjs/go/main/App';
+import { models } from '../wailsjs/go/models';
 import './App.css';
 import { TitleBar } from './components/TitleBar';
-import { ListProjects, CreateProject, DeleteProject, RenameProject, GetProjectTree, CreateFolder, CreateRequest, CopyRequest, RenameRequest, RenameFolder, MoveRequest, MoveFolder, GetRequest, DeleteRequest, DeleteFolder, ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts, UpdateRequest, ImportPostmanCollection, LoadAppConfig, LoadEnvironments, CreateEnvironment, UpdateEnvironment, DeleteEnvironment, ListProjectScripts, CreateProjectScript, UpdateProjectScript, DeleteProjectScript, UpdateRequestScripts, AddRequestCase, DuplicateRequestCase, DeleteRequestCase, RenameRequestCase } from '../wailsjs/go/main/App';
-import { models } from '../wailsjs/go/models';
 
 interface Project {
     id: string;
@@ -3304,7 +3304,7 @@ function App() {
                                     {requestCases.length > 0 && (
                                         <div className="request-active-case-hint">
                                             {requestEditorSurface === 'interface'
-                                                ? '当前编辑：接口（与下方用例配置相互独立）'
+                                                ? ''
                                                 : `当前用例：${requestCases.find((c) => c.id === activeCaseId)?.name ?? '—'}`}
                                         </div>
                                     )}
