@@ -9,6 +9,7 @@ import { AddRequestCase, CopyRequest, CreateEnvironment, CreateFolder, CreatePro
 import { models } from '../wailsjs/go/models';
 import './App.css';
 import { TitleBar } from './components/TitleBar';
+import { ScriptHelpWindow } from './components/ScriptHelpWindow';
 
 interface Project {
     id: string;
@@ -3859,86 +3860,10 @@ function App() {
                 />
             </Modal>
 
-            <Modal
-                title="脚本开发指南"
-                open={scriptHelpVisible}
-                onCancel={() => setScriptHelpVisible(false)}
-                footer={null}
-                width={850}
-                getContainer={false}
-                styles={{ body: { maxHeight: '70vh', overflow: 'auto' } }}
-            >
-                <div className="script-help-content">
-                    <h3>一、存储位置</h3>
-                    <ul>
-                        <li>每个项目的脚本都保存在项目目录下：<code>scripts/</code></li>
-                        <li>脚本源码文件：<code>{'{slug}__{uuid}.js'}</code></li>
-                        <li>脚本元数据文件：<code>{'{uuid}.meta'}</code></li>
-                    </ul>
-
-                    <h3>二、使用流程</h3>
-                    <ul>
-                        <li>先在左侧「脚本」菜单中创建并保存脚本</li>
-                        <li>再到请求页，在「前置脚本 / 后置脚本」标签中绑定脚本</li>
-                        <li>请求点击“保存”后，接口与脚本的绑定关系会落盘到请求 meta</li>
-                    </ul>
-
-                    <p><strong>3. 脚本职责建议</strong></p>
-                    <ul>
-                        <li><strong>前置脚本</strong>：生成时间戳、nonce、签名、动态 header、变量拼装</li>
-                        <li><strong>后置脚本</strong>：校验响应、抽取关键字段、记录调试日志</li>
-                    </ul>
-
-                    <p><strong>4. 当前可用方法 / 函数（本版本）</strong></p>
-                    <ul>
-                        <li><code>console.log(...args)</code>：输出调试日志，日志会显示在脚本执行日志区域（后续运行时接入）。</li>
-                        <li><code>Date.now()</code>：获取毫秒时间戳，常用于签名时间参数。</li>
-                        <li><code>Math.random()</code>：生成随机数，可用于 nonce。</li>
-                        <li><code>JSON.parse(text)</code> / <code>JSON.stringify(obj)</code>：JSON 解析与序列化。</li>
-                        <li><code>String(value)</code> / <code>Number(value)</code> / <code>Boolean(value)</code>：基础类型转换。</li>
-                        <li><code>encodeURIComponent(value)</code> / <code>decodeURIComponent(value)</code>：URL 编解码。</li>
-                    </ul>
-                    <p>
-                        说明：当前版本先完成了「脚本管理 + 请求绑定 + 持久化」链路，上述为推荐使用的 JS 基础能力。
-                        运行时专用 API（如 <code>pm.environment.get/set</code>、<code>pm.response.json()</code>）将在后续脚本执行引擎版本中补齐。
-                    </p>
-
-                    <p><strong>5. 前置脚本示例（签名/动态头）</strong></p>
-                    <pre>{`// 示例：生成时间戳并打印，后续可用于签名
-const timestamp = Date.now().toString();
-const nonce = Math.random().toString(36).slice(2, 10);
-console.log("timestamp =", timestamp);
-console.log("nonce =", nonce);
-
-// 你可以在这里编写签名逻辑，比如：
-// const sign = sha256(appKey + timestamp + nonce + body);
-// console.log("sign =", sign);`}</pre>
-
-                    <p><strong>6. 后置脚本示例（响应校验）</strong></p>
-                    <pre>{`// 伪代码示例（按你的运行时能力替换）
-// const ok = response.status === 200;
-// if (!ok) {
-//   throw new Error("状态码不是 200");
-// }
-// const data = JSON.parse(response.body || "{}");
-// console.log("userId =", data?.data?.id);`}</pre>
-
-                    <p><strong>7. 编写建议</strong></p>
-                    <ul>
-                        <li>脚本尽量保持纯函数化，避免写太多临时状态</li>
-                        <li>敏感信息（token、secret）建议只打印前后几位，避免完整输出</li>
-                        <li>脚本里优先做“请求相关逻辑”，不要放过重计算</li>
-                        <li>一个脚本只做一类事情，便于复用与排障</li>
-                    </ul>
-
-                    <p><strong>8. 常见问题排查</strong></p>
-                    <ul>
-                        <li>绑定后不生效：确认请求已点击“保存”</li>
-                        <li>脚本列表为空：确认当前项目下已创建脚本</li>
-                        <li>删除脚本后请求失效：请求绑定会自动清空，需要重新选择脚本</li>
-                    </ul>
-                </div>
-            </Modal>
+            <ScriptHelpWindow
+                visible={scriptHelpVisible}
+                onClose={() => setScriptHelpVisible(false)}
+            />
 
         </div>
     );
