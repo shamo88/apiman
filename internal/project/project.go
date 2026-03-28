@@ -625,7 +625,7 @@ func (pm *ProjectManager) UpdateRequest(requestPath string, spec models.HttpRequ
 	if item == nil || item.Request == nil {
 		return os.ErrNotExist
 	}
-	if len(cases) == 0 {
+	if cases == nil || len(cases) == 0 {
 		pre, post := item.PreScriptID, item.PostScriptID
 		item.ApimanCases = nil
 		item.ApimanActiveCaseID = ""
@@ -634,23 +634,11 @@ func (pm *ProjectManager) UpdateRequest(requestPath string, spec models.HttpRequ
 		return postman.SaveCollection(projectPath, coll)
 	}
 	activeCaseID = strings.TrimSpace(activeCaseID)
-	activeIdx := -1
-	for i := range cases {
-		if cases[i].ID == activeCaseID {
-			activeIdx = i
-			break
-		}
-	}
-	if activeIdx < 0 {
-		activeIdx = 0
-		activeCaseID = cases[0].ID
-	}
-	cases[activeIdx].Spec = spec
 
 	pre, post := item.PreScriptID, item.PostScriptID
+	postman.ApplyHTTPRequestSpecToItem(item, &spec)
 	item.ApimanCases = postman.CloneHttpRequestCases(cases)
 	item.ApimanActiveCaseID = activeCaseID
-	postman.ApplyHTTPRequestSpecToItem(item, &spec)
 	item.PreScriptID, item.PostScriptID = pre, post
 	return postman.SaveCollection(projectPath, coll)
 }
@@ -694,8 +682,6 @@ func (pm *ProjectManager) AddRequestCase(requestPath, caseName string) (*models.
 	}
 	item.ApimanCases = cases
 	item.ApimanActiveCaseID = newActive
-	last := len(cases) - 1
-	postman.ApplyHTTPRequestSpecToItem(item, &cases[last].Spec)
 	item.PreScriptID, item.PostScriptID = pre, postScr
 	if err := postman.SaveCollection(projectPath, coll); err != nil {
 		return nil, err
@@ -742,8 +728,6 @@ func (pm *ProjectManager) DuplicateRequestCase(requestPath, caseID string) (*mod
 	})
 	item.ApimanCases = cases
 	item.ApimanActiveCaseID = newID
-	last := len(cases) - 1
-	postman.ApplyHTTPRequestSpecToItem(item, &cases[last].Spec)
 	item.PreScriptID, item.PostScriptID = pre, postScr
 	if err := postman.SaveCollection(projectPath, coll); err != nil {
 		return nil, err
@@ -785,8 +769,6 @@ func (pm *ProjectManager) DeleteRequestCase(requestPath, caseID string) (*models
 		if item.ApimanActiveCaseID == caseID || findCaseIndex(cases, item.ApimanActiveCaseID) < 0 {
 			item.ApimanActiveCaseID = cases[0].ID
 		}
-		activeIdx := findCaseIndex(cases, item.ApimanActiveCaseID)
-		postman.ApplyHTTPRequestSpecToItem(item, &cases[activeIdx].Spec)
 	}
 	item.PreScriptID, item.PostScriptID = pre, postScr
 	if err := postman.SaveCollection(projectPath, coll); err != nil {

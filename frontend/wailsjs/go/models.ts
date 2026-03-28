@@ -207,6 +207,7 @@ export namespace models {
 	    url_encoded?: RequestPair[];
 	    cases?: HttpRequestCase[];
 	    active_case_id?: string;
+	    interface_spec?: HttpRequestSpec;
 	
 	    static createFrom(source: any = {}) {
 	        return new CurlRequest(source);
@@ -234,6 +235,7 @@ export namespace models {
 	        this.url_encoded = this.convertValues(source["url_encoded"], RequestPair);
 	        this.cases = this.convertValues(source["cases"], HttpRequestCase);
 	        this.active_case_id = source["active_case_id"];
+	        this.interface_spec = this.convertValues(source["interface_spec"], HttpRequestSpec);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

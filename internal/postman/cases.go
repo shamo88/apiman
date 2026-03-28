@@ -9,9 +9,14 @@ import (
 // CurlRequestFromCollectionItem maps an item to CurlRequest including 用例 (cases).
 func CurlRequestFromCollectionItem(projectID string, item *CollectionItem) *models.CurlRequest {
 	cr := ItemToCurlRequestModel(projectID, item)
-	if cr != nil {
-		AttachCasesToCurlRequest(cr, item)
+	if cr == nil {
+		return nil
 	}
+	if len(item.ApimanCases) > 0 {
+		is := models.SpecFromCurlRequest(cr)
+		cr.InterfaceSpec = &is
+	}
+	AttachCasesToCurlRequest(cr, item)
 	return cr
 }
 
@@ -87,6 +92,21 @@ func CloneHttpRequestCases(c []models.HttpRequestCase) []models.HttpRequestCase 
 		out2 := make([]models.HttpRequestCase, len(c))
 		copy(out2, c)
 		return out2
+	}
+	return out
+}
+
+func CloneHttpRequestSpec(s *models.HttpRequestSpec) models.HttpRequestSpec {
+	if s == nil {
+		return models.HttpRequestSpec{}
+	}
+	b, err := json.Marshal(s)
+	if err != nil {
+		return *s
+	}
+	var out models.HttpRequestSpec
+	if err := json.Unmarshal(b, &out); err != nil {
+		return *s
 	}
 	return out
 }

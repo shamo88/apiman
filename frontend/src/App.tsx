@@ -35,6 +35,9 @@ const parseRequestCaseRef = (path: string): { projectId: string; requestId: stri
 
 const requestRefFromIds = (projectId: string, requestId: string) => `request|${projectId}|${requestId}`;
 
+/** plain：无子用例；interface：编辑集合根请求；case：编辑某一用例 */
+type RequestEditorSurface = 'plain' | 'interface' | 'case';
+
 interface CurlRequest {
     path: string;
     name: string;
@@ -51,6 +54,7 @@ interface CurlRequest {
     url_encoded?: { key: string; value: string; enabled?: boolean }[];
     cases?: models.HttpRequestCase[];
     active_case_id?: string;
+    interface_spec?: models.HttpRequestSpec;
 }
 
 interface RequestCaseState {
@@ -124,6 +128,8 @@ interface ProjectWorkspaceState {
     selectedEnvironmentId: string;
     requestCases: RequestCaseState[];
     activeCaseId: string;
+    interfaceApiConfig: ApiConfig;
+    requestEditorSurface: RequestEditorSurface;
     /** 侧栏用例高亮：仅用户点击用例行时设置；点击接口行或切换请求标签时清空 */
     sidebarHighlightedCasePath: string;
 }
@@ -158,6 +164,8 @@ const createEmptyWorkspaceState = (): ProjectWorkspaceState => ({
     selectedEnvironmentId: '',
     requestCases: [],
     activeCaseId: '',
+    interfaceApiConfig: createDefaultApiConfig(),
+    requestEditorSurface: 'plain',
     sidebarHighlightedCasePath: ''
 });
 
@@ -519,6 +527,8 @@ function App() {
     const [apiConfig, setApiConfig] = useState<ApiConfig>(createDefaultApiConfig());
     const [requestCases, setRequestCases] = useState<RequestCaseState[]>([]);
     const [activeCaseId, setActiveCaseId] = useState<string>('');
+    const [interfaceApiConfig, setInterfaceApiConfig] = useState<ApiConfig>(createDefaultApiConfig());
+    const [requestEditorSurface, setRequestEditorSurface] = useState<RequestEditorSurface>('plain');
     const [sidebarHighlightedCasePath, setSidebarHighlightedCasePath] = useState<string>('');
     const [expandedRequestPaths, setExpandedRequestPaths] = useState<Set<string>>(() => new Set());
     const [caseRenameModalOpen, setCaseRenameModalOpen] = useState(false);
@@ -783,6 +793,8 @@ function App() {
         setSelectedEnvironmentId(emptyState.selectedEnvironmentId);
         setRequestCases(emptyState.requestCases);
         setActiveCaseId(emptyState.activeCaseId);
+        setInterfaceApiConfig(emptyState.interfaceApiConfig);
+        setRequestEditorSurface(emptyState.requestEditorSurface);
         setSidebarHighlightedCasePath(emptyState.sidebarHighlightedCasePath);
         setExpandedRequestPaths(new Set());
     };
@@ -797,6 +809,8 @@ function App() {
         selectedEnvironmentId,
         requestCases,
         activeCaseId,
+        interfaceApiConfig,
+        requestEditorSurface,
         sidebarHighlightedCasePath
     });
 
@@ -810,6 +824,8 @@ function App() {
         setSelectedEnvironmentId(state.selectedEnvironmentId || '');
         setRequestCases(state.requestCases || []);
         setActiveCaseId(state.activeCaseId || '');
+        setInterfaceApiConfig(state.interfaceApiConfig || createDefaultApiConfig());
+        setRequestEditorSurface(state.requestEditorSurface || 'plain');
         setSidebarHighlightedCasePath(state.sidebarHighlightedCasePath || '');
     };
 
@@ -924,7 +940,12 @@ function App() {
                     await DeleteProjectScript(currentProject.id, editingScriptId);
                     message.success('脚本已删除');
                     await loadProjectScriptsData(currentProject.id);
-                    setApiConfig(prev => ({
+                    setApiConfig((prev) => ({
+                        ...prev,
+                        preScriptId: prev.preScriptId === editingScriptId ? '' : prev.preScriptId,
+                        postScriptId: prev.postScriptId === editingScriptId ? '' : prev.postScriptId,
+                    }));
+                    setInterfaceApiConfig((prev) => ({
                         ...prev,
                         preScriptId: prev.preScriptId === editingScriptId ? '' : prev.preScriptId,
                         postScriptId: prev.postScriptId === editingScriptId ? '' : prev.postScriptId,
@@ -2123,27 +2144,46 @@ function App() {
         const scriptPost = request.post_script_id || '';
         setCurrentRequest(request as CurlRequest);
         const reqCases = request.cases as models.HttpRequestCase[] | undefined;
+        const attachScripts = (cfg: ApiConfig): ApiConfig => ({
+            ...cfg,
+            preScriptId: scriptPre,
+            postScriptId: scriptPost,
+        });
         if (reqCases && reqCases.length > 0) {
             const rows: RequestCaseState[] = reqCases.map((c) => ({
                 id: c.id,
                 name: (c.name || '').trim() || '未命名',
-                config: {
+                config: attachScripts({
                     ...apiConfigFromHttpSpec(c.spec, name),
-                    preScriptId: scriptPre,
-                    postScriptId: scriptPost,
-                },
+                }),
             }));
-            const want = preferredCaseId || (request.active_case_id as string) || rows[0].id;
-            const resolved = rows.some((r) => r.id === want) ? want : rows[0].id;
+            const cr = request as CurlRequest;
+            const ifaceSpec = cr.interface_spec;
+            const ifaceCfg: ApiConfig = ifaceSpec
+                ? attachScripts({ ...apiConfigFromHttpSpec(ifaceSpec, name) })
+                : attachScripts(apiConfigFromRequest(cr, name));
+            setInterfaceApiConfig(ifaceCfg);
             setRequestCases(rows);
-            setActiveCaseId(resolved);
-            const activeRow = rows.find((r) => r.id === resolved) || rows[0];
-            setApiConfig({ ...cloneApiConfig(activeRow.config), name });
+            const want = typeof preferredCaseId === 'string' ? preferredCaseId.trim() : '';
+            const openAsCase = want !== '' && rows.some((r) => r.id === want);
+            if (openAsCase) {
+                setActiveCaseId(want);
+                const activeRow = rows.find((r) => r.id === want)!;
+                setApiConfig({ ...cloneApiConfig(activeRow.config), name });
+                setRequestEditorSurface('case');
+            } else {
+                const resolvedActive = (request.active_case_id as string) || rows[0].id;
+                setActiveCaseId(resolvedActive);
+                setApiConfig({ ...cloneApiConfig(ifaceCfg), name });
+                setRequestEditorSurface('interface');
+            }
         } else {
-            const cfg = apiConfigFromRequest(request as CurlRequest, name);
+            const cfg = attachScripts(apiConfigFromRequest(request as CurlRequest, name));
+            setInterfaceApiConfig(createDefaultApiConfig());
             setRequestCases([]);
             setActiveCaseId('');
             setApiConfig(cfg);
+            setRequestEditorSurface('plain');
         }
         setResponse(null);
     };
@@ -2220,7 +2260,8 @@ function App() {
             await refreshProjectTree();
             if (currentRequest?.path === targetPath) {
                 const r = await GetRequest(targetPath);
-                hydrateRequestEditor(r);
+                const aid = (r as CurlRequest).active_case_id;
+                hydrateRequestEditor(r, typeof aid === 'string' ? aid : undefined);
             }
         } catch (error: any) {
             message.error(`新增用例失败: ${error?.message || error}`);
@@ -2239,7 +2280,8 @@ function App() {
             await refreshProjectTree();
             if (currentRequest?.path === reqPath) {
                 const r = await GetRequest(reqPath);
-                hydrateRequestEditor(r);
+                const aid = (r as CurlRequest).active_case_id;
+                hydrateRequestEditor(r, typeof aid === 'string' ? aid : undefined);
             }
         } catch (error: any) {
             message.error(`复制失败: ${error?.message || error}`);
@@ -2310,6 +2352,8 @@ function App() {
                 setResponse(null);
                 setRequestCases([]);
                 setActiveCaseId('');
+                setInterfaceApiConfig(createDefaultApiConfig());
+                setRequestEditorSurface('plain');
                 setSidebarHighlightedCasePath('');
                 setApiConfig(createDefaultApiConfig());
             }
@@ -2454,21 +2498,38 @@ function App() {
         if (!currentRequest?.path) return;
 
         try {
-            const committed = commitActiveCaseIntoList();
-            setRequestCases(committed);
-            const wailsCases = committed.map((c) =>
-                models.HttpRequestCase.createFrom({
-                    id: c.id,
-                    name: (c.name || '').trim() || '未命名',
-                    spec: models.HttpRequestSpec.createFrom(apiConfigToSpec({ ...c.config, name: currentRequest.name })),
-                })
-            );
-            await UpdateRequest(
-                currentRequest.path,
-                toWailsHttpSpec({ ...apiConfig, name: currentRequest.name }),
-                wailsCases,
-                requestCases.length > 0 ? activeCaseId : ''
-            );
+            if (requestCases.length === 0) {
+                await UpdateRequest(
+                    currentRequest.path,
+                    toWailsHttpSpec({ ...apiConfig, name: currentRequest.name }),
+                    null as any,
+                    ''
+                );
+            } else {
+                const committed =
+                    requestEditorSurface === 'case' ? commitActiveCaseIntoList() : requestCases;
+                setRequestCases(committed);
+                const ifaceSource =
+                    requestEditorSurface === 'interface' ? apiConfig : interfaceApiConfig;
+                const wailsCases = committed.map((c) =>
+                    models.HttpRequestCase.createFrom({
+                        id: c.id,
+                        name: (c.name || '').trim() || '未命名',
+                        spec: models.HttpRequestSpec.createFrom(
+                            apiConfigToSpec({ ...c.config, name: currentRequest.name })
+                        ),
+                    })
+                );
+                await UpdateRequest(
+                    currentRequest.path,
+                    toWailsHttpSpec({ ...ifaceSource, name: currentRequest.name }),
+                    wailsCases,
+                    activeCaseId
+                );
+                if (requestEditorSurface === 'interface') {
+                    setInterfaceApiConfig(cloneApiConfig({ ...apiConfig, name: currentRequest.name }));
+                }
+            }
             await UpdateRequestScripts(currentRequest.path, apiConfig.preScriptId || '', apiConfig.postScriptId || '');
             message.success('请求已保存');
             setStatus('请求已保存');
@@ -2547,6 +2608,7 @@ function App() {
                 if (currentRequest?.path === renamePath) {
                     setCurrentRequest({ ...currentRequest, path: renamed.path, name: renamed.name });
                     setApiConfig({ ...apiConfig, name: renamed.name });
+                    setInterfaceApiConfig((prev) => ({ ...prev, name: renamed.name }));
                     setRequestCases((prev) =>
                         prev.map((c) => ({ ...c, config: { ...c.config, name: renamed.name } }))
                     );
@@ -3241,8 +3303,9 @@ function App() {
                                 <div className="request-panel">
                                     {requestCases.length > 0 && (
                                         <div className="request-active-case-hint">
-                                            当前用例：
-                                            {requestCases.find((c) => c.id === activeCaseId)?.name ?? '—'}
+                                            {requestEditorSurface === 'interface'
+                                                ? '当前编辑：接口（与下方用例配置相互独立）'
+                                                : `当前用例：${requestCases.find((c) => c.id === activeCaseId)?.name ?? '—'}`}
                                         </div>
                                     )}
                                     <div className="api-request-bar">
@@ -3801,17 +3864,19 @@ function App() {
                 open={scriptHelpVisible}
                 onCancel={() => setScriptHelpVisible(false)}
                 footer={null}
-                width={760}
+                width={850}
+                getContainer={false}
+                styles={{ body: { maxHeight: '70vh', overflow: 'auto' } }}
             >
                 <div className="script-help-content">
-                    <p><strong>1. 存储位置</strong></p>
+                    <h3>一、存储位置</h3>
                     <ul>
                         <li>每个项目的脚本都保存在项目目录下：<code>scripts/</code></li>
-                        <li>脚本源码文件：<code>{'{script-slug}__{script-uuid}.js'}</code></li>
-                        <li>脚本元数据文件：<code>{'{script-uuid}.meta'}</code>（保存名称/时间等配置）</li>
+                        <li>脚本源码文件：<code>{'{slug}__{uuid}.js'}</code></li>
+                        <li>脚本元数据文件：<code>{'{uuid}.meta'}</code></li>
                     </ul>
 
-                    <p><strong>2. 使用流程</strong></p>
+                    <h3>二、使用流程</h3>
                     <ul>
                         <li>先在左侧「脚本」菜单中创建并保存脚本</li>
                         <li>再到请求页，在「前置脚本 / 后置脚本」标签中绑定脚本</li>

@@ -106,6 +106,9 @@ type CurlRequest struct {
 
 	Cases        []HttpRequestCase `json:"cases,omitempty"`
 	ActiveCaseID string            `json:"active_case_id,omitempty"`
+	// InterfaceSpec is the collection item's root request (item.Request) when the item has cases.
+	// It is independent from per-case specs; the flattened Method/URL/Body fields still reflect the active case for convenience.
+	InterfaceSpec *HttpRequestSpec `json:"interface_spec,omitempty"`
 }
 
 // SpecFromCurlRequest builds HttpRequestSpec from flattened CurlRequest fields.
