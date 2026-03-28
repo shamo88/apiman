@@ -7,7 +7,7 @@ import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import './App.css';
 import { TitleBar } from './components/TitleBar';
-import { ListProjects, CreateProject, DeleteProject, RenameProject, GetProjectTree, CreateFolder, CreateRequest, CopyRequest, RenameRequest, RenameFolder, MoveRequest, MoveFolder, GetRequest, DeleteRequest, DeleteFolder, ExecuteHTTPRequest, UpdateRequest, ImportPostmanCollection, LoadAppConfig, LoadEnvironments, CreateEnvironment, UpdateEnvironment, DeleteEnvironment, ListProjectScripts, CreateProjectScript, UpdateProjectScript, DeleteProjectScript, UpdateRequestScripts, AddRequestCase, DuplicateRequestCase, DeleteRequestCase, RenameRequestCase } from '../wailsjs/go/main/App';
+import { ListProjects, CreateProject, DeleteProject, RenameProject, GetProjectTree, CreateFolder, CreateRequest, CopyRequest, RenameRequest, RenameFolder, MoveRequest, MoveFolder, GetRequest, DeleteRequest, DeleteFolder, ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts, UpdateRequest, ImportPostmanCollection, LoadAppConfig, LoadEnvironments, CreateEnvironment, UpdateEnvironment, DeleteEnvironment, ListProjectScripts, CreateProjectScript, UpdateProjectScript, DeleteProjectScript, UpdateRequestScripts, AddRequestCase, DuplicateRequestCase, DeleteRequestCase, RenameRequestCase } from '../wailsjs/go/main/App';
 import { models } from '../wailsjs/go/models';
 
 interface Project {
@@ -2363,10 +2363,23 @@ function App() {
             return;
         }
 
+        const projectId = projectTabs.find(t => t.id === activeTab)?.project?.id;
+
         setExecuting(true);
         setResponse(null);
         try {
-            const result = await ExecuteHTTPRequest(toWailsHttpSpec(resolvedConfig));
+            let result;
+            if (projectId && (apiConfig.preScriptId || apiConfig.postScriptId)) {
+                result = await ExecuteHTTPRequestWithScripts(
+                    projectId,
+                    selectedEnvironmentId,
+                    toWailsHttpSpec(resolvedConfig),
+                    apiConfig.preScriptId || '',
+                    apiConfig.postScriptId || ''
+                );
+            } else {
+                result = await ExecuteHTTPRequest(toWailsHttpSpec(resolvedConfig));
+            }
             setResponse(result);
             setStatus(`请求完成 - ${result.status_code}`);
         } catch (error: any) {
@@ -3557,11 +3570,63 @@ function App() {
                                                 </span>
                                                 <span className="duration">{response.duration}ms</span>
                                             </div>
-                                            <div className="response-body">
-                                                <pre className="response-content">
-                                                    {response.body || response.error || 'No response body'}
-                                                </pre>
-                                            </div>
+                                            <Tabs
+                                                defaultActiveKey="body"
+                                                items={[
+                                                    {
+                                                        key: 'body',
+                                                        label: 'Body',
+                                                        children: (
+                                                            <div className="response-body">
+                                                                <pre className="response-content">
+                                                                    {response.body || response.error || 'No response body'}
+                                                                </pre>
+                                                            </div>
+                                                        ),
+                                                    },
+                                                    ...(response.script_logs?.length || response.tests?.length ? [{
+                                                        key: 'scripts',
+                                                        label: '脚本结果',
+                                                        children: (
+                                                            <div className="script-results-panel">
+                                                                {response.script_logs && response.script_logs.length > 0 && (
+                                                                    <div className="script-logs-section">
+                                                                        <div className="script-logs-title">Console Logs</div>
+                                                                        <div className="script-logs-content">
+                                                                            {response.script_logs.map((log: string, index: number) => (
+                                                                                <div key={index} className="script-log-entry">
+                                                                                    {log}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                {response.tests && response.tests.length > 0 && (
+                                                                    <div className="test-results-section">
+                                                                        <div className="test-results-title">
+                                                                            Test Results
+                                                                            <span className="test-summary">
+                                                                                ({response.tests.filter((t: any) => t.passed).length}/{response.tests.length} passed)
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="test-results-list">
+                                                                            {response.tests.map((test: any, index: number) => (
+                                                                                <div key={index} className={`test-result-item ${test.passed ? 'passed' : 'failed'}`}>
+                                                                                    <span className="test-status-icon">{test.passed ? '✓' : '✗'}</span>
+                                                                                    <span className="test-name">{test.name}</span>
+                                                                                    {!test.passed && test.message && (
+                                                                                        <span className="test-message">{test.message}</span>
+                                                                                    )}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ),
+                                                    }] : []),
+                                                ]}
+                                            />
                                         </div>
                                     )}
                                 </div>

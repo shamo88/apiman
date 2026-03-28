@@ -15,6 +15,8 @@
 - 🔍 **智能搜索**：支持按名称和 HTTP 方法快速筛选 API
 - ↕️ **拖拽增强**：支持接口/文件夹拖拽移动，含冲突校验与可视化提示
 - 🏷️ **HTTP 方法标签**：彩色标签标识不同的 HTTP 方法
+- 📑 **请求用例**：单接口下可维护多条命名用例（不同 Params/Headers/Body 等），树形展开查看与编辑
+- 📦 **Postman Collection 存储**：项目以 `collection.postman.json` 持久化（与 Postman 集合结构对齐），支持导入 Postman Collection
 - 💾 **持久化存储**：所有数据存储在本地文件系统，跨会话保持
 - ⚡ **热重载开发**：支持前后端代码修改后自动热更新
 - 🔄 **变量替换**：支持 `{{variable}}` 语法进行动态变量替换
@@ -59,7 +61,13 @@ apiman/
 │   │   └── curl.go          # HTTP 请求执行、响应格式化
 │   │
 │   ├── models/               # 数据模型定义
-│   │   └── models.go        # 数据结构（Project、Folder、Request、CurlResponse）
+│   │   └── models.go        # 数据结构（Project、Folder、Request、HttpRequestCase、CurlResponse 等）
+│   │
+│   ├── postman/              # Postman 集合模型与读写
+│   │   ├── collection.go    # collection.postman.json 加载/保存、集合树结构
+│   │   ├── cases.go         # 请求用例 CRUD 与树路径
+│   │   ├── postman.go       # 导入/转换工具
+│   │   └── request_spec.go  # 请求规格与模型映射
 │   │
 │   └── service/              # 服务层
 │       └── service.go        # 业务逻辑编排
@@ -139,9 +147,9 @@ SaveGlobalVariables() // 保存全局变量
 负责项目的创建、删除和树形结构管理。
 
 **核心概念**：
-- **Project**：顶级容器，包含多个文件夹和 API 请求
-- **Folder**：用于组织 API 的目录结构，支持多级嵌套
-- **Request**：单个 API 请求，存储为 `.curl` 文件
+- **Project**：顶级容器，磁盘上以项目目录存在；集合数据保存在该目录下的 **`collection.postman.json`**
+- **Folder / Request**：集合中的文件夹与请求项（与 Postman `item` 树一致）
+- **Request Case（用例）**：同一请求下的多条场景配置（独立 `spec`），在侧栏作为子节点展示
 - **ProjectGroupsState**：项目分组状态（分组顺序、项目归属、折叠状态）
 
 **数据结构**：
@@ -168,10 +176,12 @@ type CurlRequest struct {
     ProjectID string    `json:"project_id"`
     FolderID  string    `json:"folder_id"`
     Path      string    `json:"path"`
-    Content   string    `json:"content"`
+    Content   string    `json:"content,omitempty"`
     CreatedAt time.Time `json:"created_at"`
 }
 ```
+
+> 运行时已扩展扁平化 HTTP 字段及 `cases` / `active_case_id`（用例）等，完整定义见 `internal/models/models.go`。
 
 **文件存储格式（当前实现）**：
 ```
@@ -179,14 +189,12 @@ type CurlRequest struct {
 ├── projects.json                        # 项目分组状态（排序/归属/折叠）
 ├── {project-slug}__{project-uuid}/
 │   ├── meta.json                        # 项目元数据（展示名、路径等）
-│   ├── {folder-slug}__{folder-uuid}/
-│   │   ├── .folder.meta                 # 文件夹展示名元数据
-│   │   ├── {request-slug}__{req-uuid}.curl
-│   │   ├── {req-uuid}.meta              # 请求展示名元数据
-│   │   └── {subfolder-slug}__{sub-uuid}/
-│   │       └── ...
-│   └── ...
+│   ├── collection.postman.json          # 项目 API 集合（文件夹、请求、用例；Postman v2.1 兼容形态）
+│   └── scripts/                         # 项目级脚本（若已创建）
+│       └── ...
 ```
+
+> 历史版本曾按「每请求一个 `.curl` 文件」组织；当前以 **`collection.postman.json`** 为单一事实来源，由 `internal/postman` 读写。
 
 ### 3. **Curl 执行引擎** (`internal/curl`)
 
@@ -290,10 +298,13 @@ await Quit();
 采用 **Apifox/Postman** 混合风格：
 
 #### 左侧边栏（Apifox 风格）
-- 🔍 **搜索框**：快速搜索接口名称
+- 🔍 **搜索框**：快速搜索接口名称（及用例名等）
 - 🎯 **方法过滤器**：按 HTTP 方法筛选
-- 📁 **文件夹树**：可折叠的多级目录结构
-- 🏷️ **HTTP 标签**：彩色标签标识方法
+- 📁 **文件夹树**：可折叠的多级目录结构；文件夹与同级接口的**展开箭头左缘对齐**（行首预留与接口行一致的左边框占位）
+- 🏷️ **HTTP 标签**：彩色标签标识方法；侧栏文案缩写 **`DELETE`→`DEL`**、**`PATCH`→`PAT`**，其余方法名最长 7 字符
+- 📐 **类型与名称**：方法标签置于固定 **42px** 宽列，列与接口名之间 **无额外 margin**（名称紧随列后；视觉间隙来自「列宽 − 标签实际宽度」）
+- 📂 **请求用例**：有子用例的请求可展开；子行左侧为 **用例图标**（`ExperimentOutlined`），与接口名**左缘对齐**（与同宽列布局）；图标在列内**靠右**以贴近名称，与文字**垂直居中**
+- ✅ **选中态**：仅当点击**用例行**时高亮该用例；点击**接口行**不高亮子用例。选中行样式统一为**左侧主题色竖条** + **整行背景与 hover 相同**（`--bg-hover`）。选中用例时**父级接口行**不再显示「当前打开接口」的左侧强调条，避免父子同时抢焦点
 
 #### HTTP 方法颜色规范
 - **GET** → 蓝色 `#61affe`
@@ -491,26 +502,28 @@ wails build
 - **窗口控制按钮**：最小化、最大化、关闭
 
 #### 侧边栏
-- **标题栏**：包含「接口列表 / 环境变量」同级入口
-- **搜索区**：关键词搜索接口（名称 + URL）
+- **一级入口**：「接口列表」「环境变量」「**脚本**」同级切换
+- **搜索区**：关键词搜索接口（名称、URL 等；可匹配用例名）
 - **过滤器**：按 HTTP 方法筛选
 - **文件夹树**：
   - 可折叠展开
   - 支持多级嵌套
-  - 显示接口数量
-  - 右键菜单操作
+  - 显示子项数量
   - 支持拖拽移动接口/文件夹
   - 移动前校验重名冲突
   - 禁止移动到自身/子目录并显示禁止放置提示
   - 移动后自动展开目标并高亮已移动项
 - **接口列表**：
-  - 方法标签（彩色）
-  - 接口名称
-  - 支持复制、重命名、删除
+  - 方法彩色标签；侧栏显示 **`DEL` / `PAT`** 等缩写规则见上文「左侧边栏」
+  - 接口名称与类型列布局见上文（42px 方法列、类型与名称无额外 margin）
+  - 有子用例时可展开；用例行带用例图标，选中态与接口行一致（左条 + 灰底）；**仅点用例行高亮用例**
+  - 支持复制、重命名、删除；用例支持复制、重命名、删除
 - **环境变量**：
   - 支持环境创建/编辑/删除
   - 左侧环境列表 + 右侧标签页管理
   - 每个环境维护独立变量集合
+- **脚本**：
+  - 项目级脚本列表与编辑（存储于项目目录 `scripts/`）
 
 #### 主工作区
 - **请求标签栏**：支持多标签切换
@@ -639,27 +652,112 @@ type ScriptExecutionContext struct {
 }
 ```
 
-### **`am` API（首版建议子集）**
+### **`am` API（已实现完整列表）**
 
-为兼容常见使用习惯，首版提供受控最小集：
+#### **变量 API**
 
-- `am.environment.get(key)`（只读，不提供 set/unset）
-- `am.globals.get(key) / set(key, value) / unset(key)`
-- `am.locals.get(key) / set(key, value) / unset(key)`（仅当前脚本运行期有效）
-- `am.request.method / url`
-- `am.request.headers.all() / get(key) / set(key, value) / unset(key)`
-- `am.request.params.all() / get(key) / set(key, value) / unset(key)`
-- `am.request.body.type / raw`
-- `am.request.body.update(raw)`
-- `am.request.body.formData.all() / get(key) / set(key, value) / unset(key)`
-- `am.request.body.urlencoded.all() / get(key) / set(key, value) / unset(key)`
-- `am.response.code`
-- `am.response.headers.all()`
-- `am.response.text()`
-- `am.response.json()`
-- `am.test(name, fn)`
-- `am.expect(actual)`（仅实现常用断言：`to.eql`、`to.include`、`to.be.true/false`）
-- `console.log(...)`（写入脚本日志面板）
+| API | 说明 |
+|-----|------|
+| `am.globals.get(key)` | 获取全局变量 |
+| `am.globals.set(key, value)` | 设置全局变量（持久化） |
+| `am.globals.unset(key)` | 删除全局变量 |
+| `am.environment.get(key)` | 获取环境变量（只读） |
+| `am.locals.get(key)` | 获取本地变量 |
+| `am.locals.set(key, value)` | 设置本地变量（仅脚本运行期有效） |
+| `am.locals.unset(key)` | 删除本地变量 |
+
+#### **请求对象 API**
+
+| API | 说明 |
+|-----|------|
+| `am.request.method` | 获取/设置请求方法 |
+| `am.request.url` | 获取/设置请求 URL |
+| `am.request.headers.all()` | 获取所有请求头 |
+| `am.request.headers.get(key)` | 获取指定请求头 |
+| `am.request.headers.set(key, value)` | 设置请求头 |
+| `am.request.headers.unset(key)` | 删除请求头 |
+| `am.request.params.all()` | 获取所有查询参数 |
+| `am.request.params.get(key)` | 获取指定参数 |
+| `am.request.params.set(key, value)` | 设置参数 |
+| `am.request.params.unset(key)` | 删除参数 |
+| `am.request.body.type` | 获取请求体类型 |
+| `am.request.body.raw` | 获取请求体内容 |
+| `am.request.body.update(raw)` | 更新请求体 |
+
+#### **响应对象 API**
+
+| API | 说明 |
+|-----|------|
+| `am.response.code` | 获取响应状态码 |
+| `am.response.headers.all()` | 获取所有响应头 |
+| `am.response.text` | 获取响应文本 |
+| `am.response.json()` | 解析响应 JSON |
+
+#### **测试 API**
+
+| API | 说明 |
+|-----|------|
+| `am.test(name, fn)` | 定义测试用例 |
+| `am.expect(actual)` | 创建断言，支持链式调用 |
+
+**断言方法**：
+- `.toBe(expected)` - 相等断言
+- `.eql(expected)` - 深度相等
+- `.include(expected)` - 包含子串
+- `.beTrue()` - 为 true
+- `.beFalse()` - 为 false
+- `.haveProperty(key)` - 拥有属性
+
+#### **Console API**
+
+| API | 说明 |
+|-----|------|
+| `console.log(...)` | 普通日志 |
+| `console.info(...)` | 信息日志 |
+| `console.warn(...)` | 警告日志 |
+| `console.error(...)` | 错误日志 |
+
+#### **加密工具 API (am.crypto)**
+
+| API | 说明 | 示例 |
+|-----|------|------|
+| `am.crypto.md5(str)` | MD5 哈希 | `am.crypto.md5("hello")` |
+| `am.crypto.sha1(str)` | SHA1 哈希 | `am.crypto.sha1("hello")` |
+| `am.crypto.sha256(str)` | SHA256 哈希 | `am.crypto.sha256("hello")` |
+| `am.crypto.sha512(str)` | SHA512 哈希 | `am.crypto.sha512("hello")` |
+| `am.crypto.base64Encode(str)` | Base64 编码 | `am.crypto.base64Encode("hello")` |
+| `am.crypto.base64Decode(str)` | Base64 解码 | `am.crypto.base64Decode("aGVsbG8=")` |
+| `am.crypto.base64URLEncode(str)` | URL 安全 Base64 | `am.crypto.base64URLEncode("hello world")` |
+| `am.crypto.hmacSHA256(msg, key)` | HMAC-SHA256 签名 | `am.crypto.hmacSHA256("msg", "key")` |
+| `am.crypto.aesEncrypt(str, key)` | AES 加密（密钥 16/24/32 字节） | `am.crypto.aesEncrypt("data", "1234567890123456")` |
+| `am.crypto.aesDecrypt(str, key)` | AES 解密 | `am.crypto.aesDecrypt(encrypted, "1234567890123456")` |
+| `am.crypto.rsaEncrypt(str, pubKey)` | RSA 公钥加密 | `am.crypto.rsaEncrypt("data", pemPublicKey)` |
+| `am.crypto.rsaDecrypt(str, privKey)` | RSA 私钥解密 | `am.crypto.rsaDecrypt(encrypted, pemPrivateKey)` |
+| `am.crypto.rsaSign(msg, privKey)` | RSA 签名 | `am.crypto.rsaSign("message", pemPrivateKey)` |
+| `am.crypto.rsaVerify(msg, sig, pubKey)` | RSA 验签 | `am.crypto.rsaVerify("msg", signature, pemPublicKey)` |
+| `am.crypto.generateKeyPair(bits)` | 生成 RSA 密钥对 | `am.crypto.generateKeyPair(2048)` |
+| `am.crypto.randomString(len)` | 生成随机字符串 | `am.crypto.randomString(16)` |
+| `am.crypto.formatJSON(str)` | 格式化 JSON | `am.crypto.formatJSON('{"a":1}')` |
+
+#### **脚本测试用例**
+
+项目目录下 `scripts/` 文件夹包含完整的脚本测试用例：
+
+| 文件 | 功能覆盖 |
+|------|---------|
+| `01-console测试.js` | console.log/info/warn/error |
+| `02-globals测试.js` | am.globals.get/set/unset |
+| `03-environment测试.js` | am.environment.get |
+| `04-request测试.js` | am.request.* |
+| `05-response测试.js` | am.response.* |
+| `06-assert测试.js` | am.expect().toBe/eql/include/beTrue/beFalse |
+| `07-test测试.js` | am.test(name, fn) |
+| `08-variable测试.js` | 变量组合使用场景 |
+| `09-pre-script测试.js` | 前置脚本场景 |
+| `10-post-script测试.js` | 后置脚本场景 |
+| `11-comprehensive测试.js` | 综合测试 |
+| `12-snippets测试.js` | 常用代码片段 |
+| `13-crypto测试.js` | am.crypto 加密函数 |
 
 > 首版不开放 `am.sendRequest`，避免引入嵌套请求、并发与安全复杂度。
 
@@ -785,11 +883,8 @@ Linux:   ~/.config/apiman/
 │   ├── projects.json         # 分组状态（groups/assignments/collapsedGroups）
 │   ├── {project-slug}__{uuid}/
 │   │   ├── meta.json
-│   │   ├── {folder-slug}__{uuid}/
-│   │   │   ├── .folder.meta
-│   │   │   ├── {request-slug}__{uuid}.curl
-│   │   │   └── {uuid}.meta
-│   │   └── ...
+│   │   ├── collection.postman.json   # API 集合（含文件夹、请求、用例）
+│   │   └── scripts/                  # 项目脚本（.js + .meta）
 │   └── ...
 │
 ├── environments.json        # 环境变量配置
@@ -838,7 +933,7 @@ Linux:   ~/.config/apiman/
 ## 🚧 未来规划
 
 - [ ] 环境切换功能（开发/测试/生产）
-- [ ] API 导入/导出（Postman、Swagger）
+- [ ] API 导出与更多格式（Swagger 等；Postman 导入已具备基础能力）
 - [ ] 请求历史记录
 - [ ] 响应对比功能
 - [ ] 批量执行测试
@@ -932,6 +1027,24 @@ Linux:   ~/.config/apiman/
 - ✅ 项目/文件夹/请求采用 `slug__uuid` 存储命名
 - ✅ 展示名与存储名解耦（展示名来自元数据）
 - ✅ 项目分组状态后端持久化到 `projects/projects.json`
+
+### v1.3（集合与侧栏规范）
+
+#### 数据与模型
+- ✅ 项目 API 以 **`collection.postman.json`** 为单一集合文件（`internal/postman` 读写）
+- ✅ 请求支持多 **用例**（`HttpRequestCase` / 树节点 `requestCase|...`）
+- ✅ Postman Collection 导入与集合字段对齐（持续迭代中）
+
+#### 侧栏交互与样式（`App.tsx` / `App.css`）
+- ✅ 选中接口不自动高亮子用例；仅选中用例行时高亮用例（`sidebarHighlightedCasePath` 等工作区状态）
+- ✅ 接口行与用例行选中样式统一：左侧主题色条 + `--bg-hover` 行背景
+- ✅ 选中用例时父级接口行不再使用「打开」左侧条，避免双重高亮
+- ✅ 侧栏方法缩写：`DELETE`→`DEL`，`PATCH`→`PAT`
+- ✅ 方法列固定 42px，与接口名无额外 margin；文件夹头与接口行同左边框占位，展开箭头左对齐
+- ✅ 用例行：用例图标 + 与接口名左缘对齐；图标列内靠右贴近名称；图标与名称垂直居中
+
+#### 项目工作区
+- ✅ 侧栏增加 **脚本** 入口，与接口列表、环境变量并列
 
 ### v1.2 (当前增强)
 

@@ -1260,16 +1260,13 @@ func (pm *ProjectManager) ListProjectScripts(projectID string) ([]models.Project
 			continue
 		}
 		scriptPath := filepath.Join(scriptsDir, buildSlugUUIDName(meta.Name, meta.ID)+".js")
-		if _, statErr := os.Stat(scriptPath); statErr != nil {
-			scriptPath = filepath.Join(scriptsDir, meta.ID+".js")
-		}
-		content, _ := os.ReadFile(scriptPath)
+		scriptContent, _ := os.ReadFile(scriptPath)
 		scripts = append(scripts, models.ProjectScript{
 			ID:        meta.ID,
 			ProjectID: projectID,
 			Name:      meta.Name,
 			Path:      scriptPath,
-			Content:   string(content),
+			Content:   string(scriptContent),
 			CreatedAt: meta.CreatedAt,
 			UpdatedAt: meta.UpdatedAt,
 		})

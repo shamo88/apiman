@@ -190,3 +190,23 @@ func (a *App) UpdateProjectScript(projectID, scriptID, name, content string) (*m
 func (a *App) DeleteProjectScript(projectID, scriptID string) error {
 	return a.service.DeleteProjectScript(projectID, scriptID)
 }
+
+func (a *App) ExecuteHTTPRequestWithScripts(
+	projectID string,
+	environmentID string,
+	spec models.HttpRequestSpec,
+	preScriptID string,
+	postScriptID string,
+) (*models.CurlResponse, error) {
+	return a.service.ExecuteHTTPRequestWithScripts(projectID, environmentID, spec, preScriptID, postScriptID)
+}
+
+func (a *App) ExecuteHTTPRequestWithScriptsInline(
+	projectID string,
+	environmentID string,
+	spec models.HttpRequestSpec,
+	preScript string,
+	postScript string,
+) (*models.CurlResponse, error) {
+	return a.service.ExecuteHTTPRequestWithScriptsInline(projectID, environmentID, spec, preScript, postScript)
+}

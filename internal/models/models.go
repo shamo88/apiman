@@ -141,4 +141,13 @@ type CurlResponse struct {
 	Body       string            `json:"body"`
 	Duration   int64             `json:"duration"`
 	Error      string            `json:"error"`
+	ScriptLogs []string          `json:"script_logs,omitempty"`
+	Tests      []TestResult      `json:"tests,omitempty"`
+}
+
+type TestResult struct {
+	Name     string `json:"name"`
+	Passed   bool   `json:"passed"`
+	Message  string `json:"message,omitempty"`
+	Duration int64  `json:"duration"`
 }

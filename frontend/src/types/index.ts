@@ -61,6 +61,15 @@ export interface CurlResponse {
     body: string;
     duration: number;
     error?: string;
+    script_logs?: string[];
+    tests?: TestResult[];
+}
+
+export interface TestResult {
+    name: string;
+    passed: boolean;
+    message?: string;
+    duration: number;
 }
 
 export interface TabItem {

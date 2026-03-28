@@ -644,9 +644,10 @@ body,
 .script-editor-wrapper {
     flex: 1;
     min-height: 420px;
+    max-height: calc(100vh - 300px);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-sm);
-    overflow: hidden;
+    overflow: auto;
     background: #fff;
 }
 
@@ -660,6 +661,30 @@ body,
 .script-editor-wrapper .cm-line,
 .script-editor-wrapper .cm-scroller {
     text-align: left !important;
+    overflow: visible;
+}
+
+.script-editor-wrapper .cm-scroller {
+    overflow: auto !important;
+}
+
+.script-editor-wrapper::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.script-editor-wrapper::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+}
+
+.script-editor-wrapper::-webkit-scrollbar-thumb {
+    background: var(--border-subtle);
+    border-radius: 4px;
+}
+
+.script-editor-wrapper::-webkit-scrollbar-thumb:hover {
+    background: var(--border-medium);
 }
 
 .environment-list {
@@ -980,7 +1005,8 @@ body,
     justify-content: flex-end;
     align-items: center;
     align-self: center;
-    padding-right: 8px; /* 原 2px + 再加 3px */
+    padding-right: 8px;
+    /* 原 2px + 再加 3px */
 }
 
 .api-case-type-icon {
@@ -1647,6 +1673,114 @@ body,
     border: 1px solid var(--border-subtle) !important;
     border-radius: var(--radius-md) !important;
     padding: 8px !important;
+}
+
+.script-results-panel {
+    padding: 12px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.script-logs-section {
+    margin-bottom: 16px;
+}
+
+.script-logs-title,
+.test-results-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.test-results-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.test-summary {
+    font-weight: 400;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.script-logs-content {
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.script-log-entry {
+    padding: 2px 0;
+    color: var(--text-secondary);
+    word-break: break-all;
+}
+
+.test-results-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.test-result-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+}
+
+.test-result-item.passed {
+    background: rgba(34, 197, 94, 0.1);
+    color: #166534;
+}
+
+.test-result-item.failed {
+    background: rgba(239, 68, 68, 0.1);
+    color: #991b1b;
+}
+
+.test-status-icon {
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.test-name {
+    flex: 1;
+}
+
+.test-message {
+    display: block;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+    font-family: var(--font-mono);
+}
+
+.script-binding-panel {
+    padding: 12px;
+}
+
+.script-binding-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.script-binding-row span {
+    font-size: 13px;
+    color: var(--text-secondary);
+    min-width: 100px;
+}
+
+.box-shadow-card {
     box-shadow: var(--shadow-card);
 }
 
@@ -1729,17 +1863,32 @@ body,
     animation-fill-mode: both;
 }
 
-.list-animations-enabled .api-item:nth-child(1) { animation-delay: 0.02s; }
-.list-animations-enabled .api-item:nth-child(2) { animation-delay: 0.04s; }
-.list-animations-enabled .api-item:nth-child(3) { animation-delay: 0.06s; }
-.list-animations-enabled .api-item:nth-child(4) { animation-delay: 0.08s; }
-.list-animations-enabled .api-item:nth-child(5) { animation-delay: 0.1s; }
+.list-animations-enabled .api-item:nth-child(1) {
+    animation-delay: 0.02s;
+}
+
+.list-animations-enabled .api-item:nth-child(2) {
+    animation-delay: 0.04s;
+}
+
+.list-animations-enabled .api-item:nth-child(3) {
+    animation-delay: 0.06s;
+}
+
+.list-animations-enabled .api-item:nth-child(4) {
+    animation-delay: 0.08s;
+}
+
+.list-animations-enabled .api-item:nth-child(5) {
+    animation-delay: 0.1s;
+}
 
 @keyframes listSlideIn {
     from {
         opacity: 0;
         transform: translateX(-8px);
     }
+
     to {
         opacity: 1;
         transform: translateX(0);

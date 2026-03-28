@@ -6,13 +6,16 @@ import (
 	"apiman/internal/models"
 	"apiman/internal/postman"
 	"apiman/internal/project"
+	"apiman/internal/script"
 )
 
 type Service struct {
-	ConfigManager   *config.ConfigManager
-	ProjectMgr      *project.ProjectManager
-	CurlExecutor    *curl.CurlExecutor
-	PostmanImporter *postman.PostmanImporter
+	ConfigManager       *config.ConfigManager
+	ProjectMgr          *project.ProjectManager
+	CurlExecutor        *curl.CurlExecutor
+	PostmanImporter     *postman.PostmanImporter
+	ScriptableExecutor  *curl.ScriptableExecutor
+	GlobalVarStore      *script.GlobalVariableStore
 }
 
 func NewService() *Service {
@@ -20,12 +23,18 @@ func NewService() *Service {
 	projectMgr := project.NewProjectManager(cfgMgr)
 	curlExec := curl.NewCurlExecutor()
 	postmanImp := postman.NewPostmanImporter(cfgMgr)
+	scriptExec := curl.NewScriptableExecutor()
+
+	globals, _ := cfgMgr.GetGlobalVariables()
+	globalVarStore := script.NewGlobalVariableStore(globals)
 
 	return &Service{
-		ConfigManager:   cfgMgr,
-		ProjectMgr:      projectMgr,
-		CurlExecutor:    curlExec,
-		PostmanImporter: postmanImp,
+		ConfigManager:      cfgMgr,
+		ProjectMgr:         projectMgr,
+		CurlExecutor:       curlExec,
+		PostmanImporter:    postmanImp,
+		ScriptableExecutor: scriptExec,
+		GlobalVarStore:     globalVarStore,
 	}
 }
 
@@ -239,4 +248,154 @@ func (s *Service) UpdateProjectScript(projectID, scriptID, name, content string)
 
 func (s *Service) DeleteProjectScript(projectID, scriptID string) error {
 	return s.ProjectMgr.DeleteProjectScript(projectID, scriptID)
+}
+
+func (s *Service) ExecuteHTTPRequestWithScripts(
+	projectID string,
+	environmentID string,
+	spec models.HttpRequestSpec,
+	preScriptID string,
+	postScriptID string,
+) (*models.CurlResponse, error) {
+	var preScriptContent, postScriptContent string
+
+	if preScriptID != "" {
+		scripts, err := s.ProjectMgr.ListProjectScripts(projectID)
+		if err == nil {
+			for _, scr := range scripts {
+				if scr.ID == preScriptID {
+					preScriptContent = scr.Content
+					break
+				}
+			}
+		}
+	}
+
+	if postScriptID != "" {
+		scripts, err := s.ProjectMgr.ListProjectScripts(projectID)
+		if err == nil {
+			for _, scr := range scripts {
+				if scr.ID == postScriptID {
+					postScriptContent = scr.Content
+					break
+				}
+			}
+		}
+	}
+
+	globals := s.GlobalVarStore.GetAll()
+
+	var environment map[string]string
+	if environmentID != "" {
+		envs, err := s.LoadEnvironments(projectID)
+		if err == nil {
+			for _, env := range envs {
+				if env.ID == environmentID {
+					environment = env.Variables
+					break
+				}
+			}
+		}
+	}
+	if environment == nil {
+		environment = make(map[string]string)
+	}
+
+	appCfg, err := s.ConfigManager.LoadAppConfig()
+	proxyOpts := &curl.ProxyOptions{}
+	if err == nil && appCfg != nil {
+		proxyOpts.Enabled = appCfg.Proxy.Enabled
+		proxyOpts.HTTPHost = appCfg.Proxy.HTTPHost
+		proxyOpts.HTTPPort = appCfg.Proxy.HTTPPort
+		proxyOpts.HTTPSHost = appCfg.Proxy.HTTPSHost
+		proxyOpts.HTTPSPort = appCfg.Proxy.HTTPSPort
+		proxyOpts.SOCKS5Host = appCfg.Proxy.SOCKS5Host
+		proxyOpts.SOCKS5Port = appCfg.Proxy.SOCKS5Port
+	}
+
+	globalSetter := func(key, value string) {
+		s.GlobalVarStore.Set(key, value)
+		allVars := s.GlobalVarStore.GetAll()
+		_ = s.ConfigManager.SaveGlobalVariables(allVars)
+	}
+
+	resp, err := s.ScriptableExecutor.ExecuteWithScripts(
+		&spec,
+		proxyOpts,
+		preScriptContent,
+		postScriptContent,
+		globals,
+		environment,
+		globalSetter,
+	)
+
+	if err != nil {
+		return &models.CurlResponse{
+			Error: err.Error(),
+		}, err
+	}
+
+	return resp, nil
+}
+
+func (s *Service) ExecuteHTTPRequestWithScriptsInline(
+	projectID string,
+	environmentID string,
+	spec models.HttpRequestSpec,
+	preScript string,
+	postScript string,
+) (*models.CurlResponse, error) {
+	globals := s.GlobalVarStore.GetAll()
+
+	var environment map[string]string
+	if environmentID != "" {
+		envs, err := s.LoadEnvironments(projectID)
+		if err == nil {
+			for _, env := range envs {
+				if env.ID == environmentID {
+					environment = env.Variables
+					break
+				}
+			}
+		}
+	}
+	if environment == nil {
+		environment = make(map[string]string)
+	}
+
+	appCfg, err := s.ConfigManager.LoadAppConfig()
+	proxyOpts := &curl.ProxyOptions{}
+	if err == nil && appCfg != nil {
+		proxyOpts.Enabled = appCfg.Proxy.Enabled
+		proxyOpts.HTTPHost = appCfg.Proxy.HTTPHost
+		proxyOpts.HTTPPort = appCfg.Proxy.HTTPPort
+		proxyOpts.HTTPSHost = appCfg.Proxy.HTTPSHost
+		proxyOpts.HTTPSPort = appCfg.Proxy.HTTPSPort
+		proxyOpts.SOCKS5Host = appCfg.Proxy.SOCKS5Host
+		proxyOpts.SOCKS5Port = appCfg.Proxy.SOCKS5Port
+	}
+
+	globalSetter := func(key, value string) {
+		s.GlobalVarStore.Set(key, value)
+		allVars := s.GlobalVarStore.GetAll()
+		_ = s.ConfigManager.SaveGlobalVariables(allVars)
+	}
+
+	resp, err := s.ScriptableExecutor.ExecuteWithScripts(
+		&spec,
+		proxyOpts,
+		preScript,
+		postScript,
+		globals,
+		environment,
+		globalSetter,
+	)
+
+	if err != nil {
+		return &models.CurlResponse{
+			Error: err.Error(),
+		}, err
+	}
+
+	return resp, nil
 }

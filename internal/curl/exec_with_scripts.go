@@ -1,0 +1,264 @@
+package curl
+
+import (
+	"apiman/internal/models"
+	"apiman/internal/script"
+	"context"
+	"strings"
+)
+
+type ScriptableExecutor struct {
+	*CurlExecutor
+	scriptExecutor *script.ScriptExecutor
+}
+
+func NewScriptableExecutor() *ScriptableExecutor {
+	return &ScriptableExecutor{
+		CurlExecutor:   NewCurlExecutor(),
+		scriptExecutor: script.NewScriptExecutor(),
+	}
+}
+
+func (se *ScriptableExecutor) ExecuteWithScripts(
+	spec *models.HttpRequestSpec,
+	proxyOpts *ProxyOptions,
+	preScriptContent string,
+	postScriptContent string,
+	globals map[string]string,
+	environment map[string]string,
+	globalSetter func(key, value string),
+) (*models.CurlResponse, error) {
+	ctx := context.Background()
+	return se.ExecuteWithScriptsContext(ctx, spec, proxyOpts, preScriptContent, postScriptContent, globals, environment, globalSetter)
+}
+
+func (se *ScriptableExecutor) ExecuteWithScriptsContext(
+	ctx context.Context,
+	spec *models.HttpRequestSpec,
+	proxyOpts *ProxyOptions,
+	preScriptContent string,
+	postScriptContent string,
+	globals map[string]string,
+	environment map[string]string,
+	globalSetter func(key, value string),
+) (*models.CurlResponse, error) {
+	if spec == nil {
+		return &models.CurlResponse{Error: "request is nil"}, nil
+	}
+
+	specCopy := &models.HttpRequestSpec{
+		Method:     spec.Method,
+		HttpURL:    spec.HttpURL,
+		Headers:    copyKeyValSlice(spec.Headers),
+		Params:     copyKeyValSlice(spec.Params),
+		Body:       spec.Body,
+		BodyType:   spec.BodyType,
+		FormData:   copyPairSlice(spec.FormData),
+		UrlEncoded: copyPairSlice(spec.UrlEncoded),
+	}
+
+	var preResult *script.ScriptResult
+	var allLogs []string
+	if preScriptContent != "" {
+		execCtx := se.buildExecutionContext(specCopy, globals, environment)
+		preResult = se.scriptExecutor.RunPreRequestScript(ctx, preScriptContent, execCtx, globalSetter)
+
+		allLogs = append(allLogs, preResult.Logs...)
+
+		if !preResult.Success {
+			resp := &models.CurlResponse{
+				Error:      "Pre-request script failed: " + preResult.Error,
+				ScriptLogs: allLogs,
+				Tests:      []models.TestResult{},
+			}
+			for _, t := range preResult.Tests {
+				resp.Tests = append(resp.Tests, models.TestResult{
+					Name:     t.Name,
+					Passed:   t.Passed,
+					Message:  t.Message,
+					Duration: t.Duration,
+				})
+			}
+			return resp, nil
+		}
+
+		if preResult.ModifiedSpec != nil {
+			se.applyScriptModifications(specCopy, preResult.ModifiedSpec)
+		}
+	}
+
+	curlResp, err := se.CurlExecutor.ExecuteHTTPRequestWithProxy(specCopy, proxyOpts)
+	if err != nil {
+		return &models.CurlResponse{Error: err.Error()}, err
+	}
+
+	if curlResp.Error != "" {
+		if len(allLogs) > 0 {
+			curlResp.ScriptLogs = allLogs
+		}
+		return curlResp, nil
+	}
+
+	curlResp.ScriptLogs = allLogs
+
+	if postScriptContent != "" {
+		execCtx := se.buildPostExecutionContext(specCopy, curlResp, globals, environment)
+		postResult := se.scriptExecutor.RunTestScript(ctx, postScriptContent, execCtx, globalSetter)
+
+		curlResp.ScriptLogs = append(curlResp.ScriptLogs, postResult.Logs...)
+		for _, t := range postResult.Tests {
+			curlResp.Tests = append(curlResp.Tests, models.TestResult{
+				Name:     t.Name,
+				Passed:   t.Passed,
+				Message:  t.Message,
+				Duration: t.Duration,
+			})
+		}
+	}
+
+	return curlResp, nil
+}
+
+func (se *ScriptableExecutor) buildExecutionContext(spec *models.HttpRequestSpec, globals, environment map[string]string) *script.ExecutionContext {
+	headers := make(map[string]string)
+	for _, h := range spec.Headers {
+		if h.Enabled && strings.TrimSpace(h.Key) != "" {
+			headers[h.Key] = h.Value
+		}
+	}
+
+	params := make(map[string]string)
+	for _, p := range spec.Params {
+		if p.Enabled && strings.TrimSpace(p.Key) != "" {
+			params[p.Key] = p.Value
+		}
+	}
+
+	if globals == nil {
+		globals = make(map[string]string)
+	}
+	if environment == nil {
+		environment = make(map[string]string)
+	}
+
+	return &script.ExecutionContext{
+		Request: &script.RequestSnapshot{
+			Method:   spec.Method,
+			URL:      spec.HttpURL,
+			Headers:  headers,
+			Params:   params,
+			Body:     spec.Body,
+			BodyType: spec.BodyType,
+		},
+		Globals:     globals,
+		Environment: environment,
+		Locals:      make(map[string]string),
+	}
+}
+
+func (se *ScriptableExecutor) buildPostExecutionContext(spec *models.HttpRequestSpec, resp *models.CurlResponse, globals, environment map[string]string) *script.ExecutionContext {
+	execCtx := se.buildExecutionContext(spec, globals, environment)
+	if resp != nil {
+		execCtx.Response = &script.ResponseSnapshot{
+			StatusCode: resp.StatusCode,
+			Headers:    resp.Headers,
+			Body:       resp.Body,
+			Duration:   resp.Duration,
+		}
+	}
+	return execCtx
+}
+
+func (se *ScriptableExecutor) applyScriptModifications(spec *models.HttpRequestSpec, modified *script.ModifiedSpec) {
+	if modified.Method != "" {
+		spec.Method = modified.Method
+	}
+	if modified.URL != "" {
+		spec.HttpURL = modified.URL
+	}
+	if modified.Headers != nil {
+		for _, h := range spec.Headers {
+			if val, ok := modified.Headers[h.Key]; ok {
+				if val == "" {
+					h.Enabled = false
+				} else {
+					h.Value = val
+				}
+			}
+		}
+		for k, v := range modified.Headers {
+			if v == "" {
+				continue
+			}
+			found := false
+			for i := range spec.Headers {
+				if spec.Headers[i].Key == k {
+					spec.Headers[i].Value = v
+					spec.Headers[i].Enabled = true
+					found = true
+					break
+				}
+			}
+			if !found {
+				spec.Headers = append(spec.Headers, models.RequestKeyVal{
+					Key:     k,
+					Value:   v,
+					Enabled: true,
+				})
+			}
+		}
+	}
+	if modified.Params != nil {
+		for _, p := range spec.Params {
+			if val, ok := modified.Params[p.Key]; ok {
+				if val == "" {
+					p.Enabled = false
+				} else {
+					p.Value = val
+				}
+			}
+		}
+		for k, v := range modified.Params {
+			if v == "" {
+				continue
+			}
+			found := false
+			for i := range spec.Params {
+				if spec.Params[i].Key == k {
+					spec.Params[i].Value = v
+					spec.Params[i].Enabled = true
+					found = true
+					break
+				}
+			}
+			if !found {
+				spec.Params = append(spec.Params, models.RequestKeyVal{
+					Key:     k,
+					Value:   v,
+					Enabled: true,
+				})
+			}
+		}
+	}
+	if modified.Body != "" {
+		spec.Body = modified.Body
+	}
+}
+
+func copyKeyValSlice(src []models.RequestKeyVal) []models.RequestKeyVal {
+	if src == nil {
+		return nil
+	}
+	dst := make([]models.RequestKeyVal, len(src))
+	copy(dst, src)
+	return dst
+}
+
+func copyPairSlice(src []models.RequestPair) []models.RequestPair {
+	if src == nil {
+		return nil
+	}
+	dst := make([]models.RequestPair, len(src))
+	copy(dst, src)
+	return dst
+}

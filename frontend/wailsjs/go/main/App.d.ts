@@ -36,6 +36,10 @@ export function ExecuteCurl(arg1:string):Promise<models.CurlResponse>;
 
 export function ExecuteHTTPRequest(arg1:models.HttpRequestSpec):Promise<models.CurlResponse>;
 
+export function ExecuteHTTPRequestWithScripts(arg1:string,arg2:string,arg3:models.HttpRequestSpec,arg4:string,arg5:string):Promise<models.CurlResponse>;
+
+export function ExecuteHTTPRequestWithScriptsInline(arg1:string,arg2:string,arg3:models.HttpRequestSpec,arg4:string,arg5:string):Promise<models.CurlResponse>;
+
 export function ExtractVariables(arg1:string):Promise<Array<string>>;
 
 export function GetConfigDir():Promise<string>;
