@@ -25,24 +25,26 @@
 - 🔌 **网络代理**：支持 HTTP/HTTPS/SOCKS5 代理配置并在请求执行时生效
 - 📊 **响应展示**：支持状态码、响应时间、格式化响应体展示
 
----
+***
 
 ## 🏗️ 技术栈
 
 ### 后端 (Go)
+
 - **框架**：Wails v2.11.0 - 使用 Go 和 Web 技术构建桌面应用
 - **UUID**：github.com/google/uuid v1.6.0 - 生成唯一标识符
 - **并发安全**：使用 Go 标准库的 sync.RWMutex 保证线程安全
 - **版本**：Go 1.23+
 
 ### 前端 (React + TypeScript)
+
 - **框架**：React 18.2 + TypeScript 4.6
 - **UI 组件**：Ant Design 6.3.4 - 企业级 React 组件库
 - **构建工具**：Vite 3.2.11 - 下一代前端构建工具
 - **图标库**：@ant-design/icons 6.1.0
 - **字体**：Outfit (正文) + JetBrains Mono (代码)
 
----
+***
 
 ## 📂 项目结构
 
@@ -58,7 +60,8 @@ apiman/
 │   │   └── config.go        # 配置文件读写（环境变量、全局变量）
 │   │
 │   ├── curl/                 # Curl 执行引擎
-│   │   └── curl.go          # HTTP 请求执行、响应格式化
+│   │   ├── curl.go          # HTTP 请求执行、响应格式化
+│   │   └── exec_with_scripts.go  # 脚本增强的请求执行
 │   │
 │   ├── models/               # 数据模型定义
 │   │   └── models.go        # 数据结构（Project、Folder、Request、HttpRequestCase、CurlResponse 等）
@@ -68,6 +71,11 @@ apiman/
 │   │   ├── cases.go         # 请求用例 CRUD 与树路径
 │   │   ├── postman.go       # 导入/转换工具
 │   │   └── request_spec.go  # 请求规格与模型映射
+│   │
+│   ├── script/                # JavaScript 脚本引擎
+│   │   ├── runtime.go       # goja VM 运行时与 am API
+│   │   ├── executor.go      # 脚本执行器
+│   │   └── crypto.go        # 加密工具（MD5/SHA/AES/RSA 等）
 │   │
 │   └── service/              # 服务层
 │       └── service.go        # 业务逻辑编排
@@ -118,7 +126,7 @@ apiman/
         └── apiman.exe       # Windows 可执行文件
 ```
 
----
+***
 
 ## 🧩 核心模块设计
 
@@ -129,12 +137,14 @@ apiman/
 **存储位置**：`~/.apiman/`
 
 **核心功能**：
+
 - 📁 管理项目目录结构
 - 🌐 管理环境变量（`environments.json`）
 - 🔧 管理全局变量（`variables.json`）
 - 🔒 线程安全的读写操作（RWMutex）
 
 **关键方法**：
+
 ```go
 GetConfigDir()      // 获取配置目录
 GetProjectsDir()    // 获取项目存储目录
@@ -147,12 +157,14 @@ SaveGlobalVariables() // 保存全局变量
 负责项目的创建、删除和树形结构管理。
 
 **核心概念**：
+
 - **Project**：顶级容器，磁盘上以项目目录存在；集合数据保存在该目录下的 **`collection.postman.json`**
 - **Folder / Request**：集合中的文件夹与请求项（与 Postman `item` 树一致）
 - **Request Case（用例）**：同一请求下的多条场景配置（独立 `spec`），在侧栏作为子节点展示
 - **ProjectGroupsState**：项目分组状态（分组顺序、项目归属、折叠状态）
 
 **数据结构**：
+
 ```go
 type Project struct {
     ID        string    `json:"id"`
@@ -184,6 +196,7 @@ type CurlRequest struct {
 > 运行时已扩展扁平化 HTTP 字段及 `cases` / `active_case_id`（用例）等，完整定义见 `internal/models/models.go`。
 
 **文件存储格式（当前实现）**：
+
 ```
 ~/.apiman/projects/
 ├── projects.json                        # 项目分组状态（排序/归属/折叠）
@@ -201,13 +214,13 @@ type CurlRequest struct {
 将 curl 命令解析并执行为真实的 HTTP 请求。
 
 **核心能力**：
+
 - 🔄 **命令解析**：支持解析 curl 命令的所有常用参数
   - `-X`：HTTP 方法
   - `-H`：请求头
   - `-d`：请求体
   - `-F`：表单字段（multipart/form-data）
   - `-u`：Basic 认证
-
 - 📤 **请求执行**：使用 Go 标准库 `net/http` 执行请求
 - 📥 **响应处理**：返回状态码、响应头、响应体、执行时间
 - 🖨️ **格式化**：支持 JSON 响应格式化（缩进对齐）
@@ -216,6 +229,7 @@ type CurlRequest struct {
 - 🔌 **代理支持**：支持 HTTP/HTTPS/SOCKS5 代理
 
 **响应格式**：
+
 ```go
 type CurlResponse struct {
     StatusCode int               `json:"status_code"`  // HTTP 状态码
@@ -230,13 +244,14 @@ type CurlResponse struct {
 
 业务逻辑编排层，协调各模块工作。
 
----
+***
 
 ## 🎨 前端架构
 
 ### **窗口系统**
 
 #### 无边框窗口配置
+
 ```go
 // main.go
 err := wails.Run(&options.App{
@@ -252,6 +267,7 @@ err := wails.Run(&options.App{
 #### 自定义标题栏组件 (`TitleBar.tsx`)
 
 **布局结构**：
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │ [Logo] │ [Tab1] [Tab2] [Tab3] ...        │ ─ □ ✕ │
@@ -261,6 +277,7 @@ err := wails.Run(&options.App{
 ```
 
 **核心功能**：
+
 - 🎨 Logo 显示在左侧
 - 📑 标签页与 Logo 并排显示
 - 🖱️ 整个标题栏（除控制按钮外）可拖动窗口
@@ -268,6 +285,7 @@ err := wails.Run(&options.App{
 - 🔄 使用 Wails runtime API 控制窗口
 
 **拖拽实现**：
+
 ```typescript
 // 使用 Wails 官方的拖拽属性
 .title-bar {
@@ -280,6 +298,7 @@ err := wails.Run(&options.App{
 ```
 
 **窗口控制方法**：
+
 ```typescript
 import { WindowMinimise, WindowToggleMaximise, Quit } from '../../wailsjs/runtime/runtime';
 
@@ -298,6 +317,7 @@ await Quit();
 采用 **Apifox/Postman** 混合风格：
 
 #### 左侧边栏（Apifox 风格）
+
 - 🔍 **搜索框**：快速搜索接口名称（及用例名等）
 - 🎯 **方法过滤器**：按 HTTP 方法筛选
 - 📁 **文件夹树**：可折叠的多级目录结构；文件夹与同级接口的**展开箭头左缘对齐**（行首预留与接口行一致的左边框占位）
@@ -307,6 +327,7 @@ await Quit();
 - ✅ **选中态**：仅当点击**用例行**时高亮该用例；点击**接口行**不高亮子用例。选中行样式统一为**左侧主题色竖条** + **整行背景与 hover 相同**（`--bg-hover`）。选中用例时**父级接口行**不再显示「当前打开接口」的左侧强调条，避免父子同时抢焦点
 
 #### HTTP 方法颜色规范
+
 - **GET** → 蓝色 `#61affe`
 - **POST** → 绿色 `#49cc90`
 - **PUT** → 橙色 `#fca130`
@@ -316,6 +337,7 @@ await Quit();
 - **HEAD** → 紫色 `#9012fe`
 
 #### 右侧主区域（Postman 风格）
+
 - 📋 **请求标签栏**：多标签支持
 - 📝 **请求配置区**：
   - 方法选择器
@@ -354,7 +376,7 @@ const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set())
 const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 ```
 
----
+***
 
 ## 🚀 安装与运行
 
@@ -372,13 +394,11 @@ const [hoveredItem, setHoveredItem] = useState<string | null>(null);
    git clone <repository-url>
    cd apiman
    ```
-
 2. **安装前端依赖**
    ```bash
    cd frontend
    npm install
    ```
-
 3. **安装 Go 依赖**
    ```bash
    cd ..
@@ -388,11 +408,13 @@ const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 ### **开发模式运行**
 
 **方式一：使用 Wails CLI（推荐）**
+
 ```bash
 wails dev
 ```
 
 **方式二：分别启动**
+
 ```bash
 # 终端 1：启动前端开发服务器
 cd frontend
@@ -410,7 +432,7 @@ wails build
 
 构建产物位于 `build/bin/` 目录。
 
----
+***
 
 ## 📖 使用指南
 
@@ -423,6 +445,7 @@ wails build
 ### **2. 管理 API**
 
 #### 创建文件夹
+
 1. 点击侧边栏的 `+` 按钮
 2. 选择「新建文件夹」
 3. 输入文件夹名称
@@ -430,6 +453,7 @@ wails build
 5. 支持创建多级嵌套文件夹
 
 #### 创建 API 请求
+
 1. 选择目标文件夹
 2. 点击 `+` 按钮
 3. 选择「新建请求」
@@ -439,18 +463,22 @@ wails build
 ### **3. 配置请求**
 
 #### 基本信息
+
 - **Method**：选择 HTTP 方法（GET/POST/PUT/DELETE/PATCH）
 - **URL**：输入目标地址
 
 #### Query Parameters
+
 - 在 Params 标签页添加查询参数
 - 自动拼接到 URL
 
 #### 请求头
+
 - 在 Headers 标签页添加自定义请求头
 - 支持启用/禁用切换
 
 #### 请求体
+
 - **Body Type**：选择请求体类型
   - `none`：无请求体
   - `form-data`：表单数据
@@ -474,19 +502,22 @@ wails build
 ### **6. 窗口操作**
 
 #### 拖动窗口
+
 - 点击并拖动标题栏的任意空白区域（Logo 和标签之间）
 - 窗口将跟随鼠标移动
 
 #### 窗口控制
+
 - **最小化**：点击 `─` 按钮，窗口最小化到任务栏
 - **最大化/还原**：点击 `□` 按钮，切换最大化状态
 - **关闭**：点击 `✕` 按钮，关闭应用
 
----
+***
 
 ## 🎨 界面功能说明
 
 ### **首页**
+
 - 展示所有项目卡片
 - 支持新建、打开、重命名、删除项目
 - 支持项目分组（新建、折叠、重命名、删除、拖拽排序）
@@ -497,11 +528,13 @@ wails build
 ### **项目工作区**
 
 #### 自定义标题栏
+
 - **Logo**：应用标识，可点击拖动窗口
 - **标签栏**：显示打开的项目标签页
 - **窗口控制按钮**：最小化、最大化、关闭
 
 #### 侧边栏
+
 - **一级入口**：「接口列表」「环境变量」「**脚本**」同级切换
 - **搜索区**：关键词搜索接口（名称、URL 等；可匹配用例名）
 - **过滤器**：按 HTTP 方法筛选
@@ -514,7 +547,7 @@ wails build
   - 禁止移动到自身/子目录并显示禁止放置提示
   - 移动后自动展开目标并高亮已移动项
 - **接口列表**：
-  - 方法彩色标签；侧栏显示 **`DEL` / `PAT`** 等缩写规则见上文「左侧边栏」
+  - 方法彩色标签；侧栏显示 **`DEL`** **/** **`PAT`** 等缩写规则见上文「左侧边栏」
   - 接口名称与类型列布局见上文（42px 方法列、类型与名称无额外 margin）
   - 有子用例时可展开；用例行带用例图标，选中态与接口行一致（左条 + 灰底）；**仅点用例行高亮用例**
   - 支持复制、重命名、删除；用例支持复制、重命名、删除
@@ -526,6 +559,7 @@ wails build
   - 项目级脚本列表与编辑（存储于项目目录 `scripts/`）
 
 #### 主工作区
+
 - **请求标签栏**：支持多标签切换
 - **环境选择器**：请求标签栏右侧可切换当前执行环境
 - **请求配置**：
@@ -536,7 +570,7 @@ wails build
   - 状态码 + 时间
   - 格式化响应体
 
----
+***
 
 ## 🔧 开发指南
 
@@ -565,6 +599,7 @@ wails build
 ### **API 绑定**
 
 Wails 自动生成绑定文件：
+
 - Go → JavaScript: `frontend/wailsjs/go/main/App.js`
 - Go → TypeScript: `frontend/wailsjs/go/main/App.d.ts`
 - Wails Runtime: `frontend/wailsjs/runtime/runtime.js`
@@ -572,6 +607,7 @@ Wails 自动生成绑定文件：
 ### **窗口系统开发**
 
 #### 窗口配置
+
 ```go
 // main.go
 err := wails.Run(&options.App{
@@ -581,6 +617,7 @@ err := wails.Run(&options.App{
 ```
 
 #### 拖拽实现
+
 ```typescript
 // CSS 中使用 --wails-draggable 属性
 .element {
@@ -590,11 +627,12 @@ err := wails.Run(&options.App{
 ```
 
 #### 窗口控制
+
 ```typescript
 import { WindowMinimise, WindowMaximise, WindowUnmaximise, WindowToggleMaximise, Quit, WindowIsMaximised } from '../../wailsjs/runtime/runtime';
 ```
 
----
+***
 
 ## 🧪 前后置脚本设计（方案 B：内嵌 JavaScript 引擎）
 
@@ -652,55 +690,60 @@ type ScriptExecutionContext struct {
 }
 ```
 
-### **`am` API（已实现完整列表）**
+### **`am`** **API（已实现完整列表）**
 
 #### **变量 API**
 
-| API | 说明 |
-|-----|------|
-| `am.globals.get(key)` | 获取全局变量 |
-| `am.globals.set(key, value)` | 设置全局变量（持久化） |
-| `am.globals.unset(key)` | 删除全局变量 |
-| `am.environment.get(key)` | 获取环境变量（只读） |
-| `am.locals.get(key)` | 获取本地变量 |
-| `am.locals.set(key, value)` | 设置本地变量（仅脚本运行期有效） |
-| `am.locals.unset(key)` | 删除本地变量 |
+| API                          | 说明               |
+| ---------------------------- | ---------------- |
+| `am.globals.get(key)`        | 获取项目全局变量           | - |
+| `am.globals.set(key, value)` | 设置项目全局变量           | ✅ 保存到项目 `variables.json` |
+| `am.globals.unset(key)`      | 删除项目全局变量           | ✅ 保存到项目 `variables.json` |
+| `am.environment.get(key)`    | 获取环境变量（只读）       | - |
+| `am.locals.get(key)`         | 获取本地变量           | ❌ 仅当前脚本运行期有效 |
+| `am.locals.set(key, value)`  | 设置本地变量（仅脚本运行期有效） | ❌ 仅当前脚本运行期有效 |
+| `am.locals.unset(key)`       | 删除本地变量           | ❌ 仅当前脚本运行期有效 |
+
+> **数据持久化说明**：
+> - `am.globals`：存储在项目目录下的 `variables.json` 文件，**跨请求持久化**
+> - `am.locals`：仅存储在内存中，脚本执行完毕即丢失，用于临时计算
 
 #### **请求对象 API**
 
-| API | 说明 |
-|-----|------|
-| `am.request.method` | 获取/设置请求方法 |
-| `am.request.url` | 获取/设置请求 URL |
-| `am.request.headers.all()` | 获取所有请求头 |
-| `am.request.headers.get(key)` | 获取指定请求头 |
-| `am.request.headers.set(key, value)` | 设置请求头 |
-| `am.request.headers.unset(key)` | 删除请求头 |
-| `am.request.params.all()` | 获取所有查询参数 |
-| `am.request.params.get(key)` | 获取指定参数 |
-| `am.request.params.set(key, value)` | 设置参数 |
-| `am.request.params.unset(key)` | 删除参数 |
-| `am.request.body.type` | 获取请求体类型 |
-| `am.request.body.raw` | 获取请求体内容 |
-| `am.request.body.update(raw)` | 更新请求体 |
+| API                                  | 说明          |
+| ------------------------------------ | ----------- |
+| `am.request.method`                  | 获取/设置请求方法   |
+| `am.request.url`                     | 获取/设置请求 URL |
+| `am.request.headers.all()`           | 获取所有请求头     |
+| `am.request.headers.get(key)`        | 获取指定请求头     |
+| `am.request.headers.set(key, value)` | 设置请求头       |
+| `am.request.headers.unset(key)`      | 删除请求头       |
+| `am.request.params.all()`            | 获取所有查询参数    |
+| `am.request.params.get(key)`         | 获取指定参数      |
+| `am.request.params.set(key, value)`  | 设置参数        |
+| `am.request.params.unset(key)`       | 删除参数        |
+| `am.request.body.type`               | 获取请求体类型     |
+| `am.request.body.raw`                | 获取请求体内容     |
+| `am.request.body.update(raw)`        | 更新请求体       |
 
 #### **响应对象 API**
 
-| API | 说明 |
-|-----|------|
-| `am.response.code` | 获取响应状态码 |
-| `am.response.headers.all()` | 获取所有响应头 |
-| `am.response.text` | 获取响应文本 |
-| `am.response.json()` | 解析响应 JSON |
+| API                         | 说明        |
+| --------------------------- | --------- |
+| `am.response.code`          | 获取响应状态码   |
+| `am.response.headers.all()` | 获取所有响应头   |
+| `am.response.text`          | 获取响应文本    |
+| `am.response.json()`        | 解析响应 JSON |
 
 #### **测试 API**
 
-| API | 说明 |
-|-----|------|
-| `am.test(name, fn)` | 定义测试用例 |
+| API                 | 说明          |
+| ------------------- | ----------- |
+| `am.test(name, fn)` | 定义测试用例      |
 | `am.expect(actual)` | 创建断言，支持链式调用 |
 
 **断言方法**：
+
 - `.toBe(expected)` - 相等断言
 - `.eql(expected)` - 深度相等
 - `.include(expected)` - 包含子串
@@ -710,54 +753,54 @@ type ScriptExecutionContext struct {
 
 #### **Console API**
 
-| API | 说明 |
-|-----|------|
-| `console.log(...)` | 普通日志 |
-| `console.info(...)` | 信息日志 |
-| `console.warn(...)` | 警告日志 |
+| API                  | 说明   |
+| -------------------- | ---- |
+| `console.log(...)`   | 普通日志 |
+| `console.info(...)`  | 信息日志 |
+| `console.warn(...)`  | 警告日志 |
 | `console.error(...)` | 错误日志 |
 
 #### **加密工具 API (am.crypto)**
 
-| API | 说明 | 示例 |
-|-----|------|------|
-| `am.crypto.md5(str)` | MD5 哈希 | `am.crypto.md5("hello")` |
-| `am.crypto.sha1(str)` | SHA1 哈希 | `am.crypto.sha1("hello")` |
-| `am.crypto.sha256(str)` | SHA256 哈希 | `am.crypto.sha256("hello")` |
-| `am.crypto.sha512(str)` | SHA512 哈希 | `am.crypto.sha512("hello")` |
-| `am.crypto.base64Encode(str)` | Base64 编码 | `am.crypto.base64Encode("hello")` |
-| `am.crypto.base64Decode(str)` | Base64 解码 | `am.crypto.base64Decode("aGVsbG8=")` |
-| `am.crypto.base64URLEncode(str)` | URL 安全 Base64 | `am.crypto.base64URLEncode("hello world")` |
-| `am.crypto.hmacSHA256(msg, key)` | HMAC-SHA256 签名 | `am.crypto.hmacSHA256("msg", "key")` |
-| `am.crypto.aesEncrypt(str, key)` | AES 加密（密钥 16/24/32 字节） | `am.crypto.aesEncrypt("data", "1234567890123456")` |
-| `am.crypto.aesDecrypt(str, key)` | AES 解密 | `am.crypto.aesDecrypt(encrypted, "1234567890123456")` |
-| `am.crypto.rsaEncrypt(str, pubKey)` | RSA 公钥加密 | `am.crypto.rsaEncrypt("data", pemPublicKey)` |
-| `am.crypto.rsaDecrypt(str, privKey)` | RSA 私钥解密 | `am.crypto.rsaDecrypt(encrypted, pemPrivateKey)` |
-| `am.crypto.rsaSign(msg, privKey)` | RSA 签名 | `am.crypto.rsaSign("message", pemPrivateKey)` |
-| `am.crypto.rsaVerify(msg, sig, pubKey)` | RSA 验签 | `am.crypto.rsaVerify("msg", signature, pemPublicKey)` |
-| `am.crypto.generateKeyPair(bits)` | 生成 RSA 密钥对 | `am.crypto.generateKeyPair(2048)` |
-| `am.crypto.randomString(len)` | 生成随机字符串 | `am.crypto.randomString(16)` |
-| `am.crypto.formatJSON(str)` | 格式化 JSON | `am.crypto.formatJSON('{"a":1}')` |
+| API                                     | 说明                     | 示例                                                    |
+| --------------------------------------- | ---------------------- | ----------------------------------------------------- |
+| `am.crypto.md5(str)`                    | MD5 哈希                 | `am.crypto.md5("hello")`                              |
+| `am.crypto.sha1(str)`                   | SHA1 哈希                | `am.crypto.sha1("hello")`                             |
+| `am.crypto.sha256(str)`                 | SHA256 哈希              | `am.crypto.sha256("hello")`                           |
+| `am.crypto.sha512(str)`                 | SHA512 哈希              | `am.crypto.sha512("hello")`                           |
+| `am.crypto.base64Encode(str)`           | Base64 编码              | `am.crypto.base64Encode("hello")`                     |
+| `am.crypto.base64Decode(str)`           | Base64 解码              | `am.crypto.base64Decode("aGVsbG8=")`                  |
+| `am.crypto.base64URLEncode(str)`        | URL 安全 Base64          | `am.crypto.base64URLEncode("hello world")`            |
+| `am.crypto.hmacSHA256(msg, key)`        | HMAC-SHA256 签名         | `am.crypto.hmacSHA256("msg", "key")`                  |
+| `am.crypto.aesEncrypt(str, key)`        | AES 加密（密钥 16/24/32 字节） | `am.crypto.aesEncrypt("data", "1234567890123456")`    |
+| `am.crypto.aesDecrypt(str, key)`        | AES 解密                 | `am.crypto.aesDecrypt(encrypted, "1234567890123456")` |
+| `am.crypto.rsaEncrypt(str, pubKey)`     | RSA 公钥加密               | `am.crypto.rsaEncrypt("data", pemPublicKey)`          |
+| `am.crypto.rsaDecrypt(str, privKey)`    | RSA 私钥解密               | `am.crypto.rsaDecrypt(encrypted, pemPrivateKey)`      |
+| `am.crypto.rsaSign(msg, privKey)`       | RSA 签名                 | `am.crypto.rsaSign("message", pemPrivateKey)`         |
+| `am.crypto.rsaVerify(msg, sig, pubKey)` | RSA 验签                 | `am.crypto.rsaVerify("msg", signature, pemPublicKey)` |
+| `am.crypto.generateKeyPair(bits)`       | 生成 RSA 密钥对             | `am.crypto.generateKeyPair(2048)`                     |
+| `am.crypto.randomString(len)`           | 生成随机字符串                | `am.crypto.randomString(16)`                          |
+| `am.crypto.formatJSON(str)`             | 格式化 JSON               | `am.crypto.formatJSON('{"a":1}')`                     |
 
 #### **脚本测试用例**
 
 项目目录下 `scripts/` 文件夹包含完整的脚本测试用例：
 
-| 文件 | 功能覆盖 |
-|------|---------|
-| `01-console测试.js` | console.log/info/warn/error |
-| `02-globals测试.js` | am.globals.get/set/unset |
-| `03-environment测试.js` | am.environment.get |
-| `04-request测试.js` | am.request.* |
-| `05-response测试.js` | am.response.* |
-| `06-assert测试.js` | am.expect().toBe/eql/include/beTrue/beFalse |
-| `07-test测试.js` | am.test(name, fn) |
-| `08-variable测试.js` | 变量组合使用场景 |
-| `09-pre-script测试.js` | 前置脚本场景 |
-| `10-post-script测试.js` | 后置脚本场景 |
-| `11-comprehensive测试.js` | 综合测试 |
-| `12-snippets测试.js` | 常用代码片段 |
-| `13-crypto测试.js` | am.crypto 加密函数 |
+| 文件                      | 功能覆盖                                        |
+| ----------------------- | ------------------------------------------- |
+| `01-console测试.js`       | console.log/info/warn/error                 |
+| `02-globals测试.js`       | am.globals.get/set/unset                    |
+| `03-environment测试.js`   | am.environment.get                          |
+| `04-request测试.js`       | am.request.\*                               |
+| `05-response测试.js`      | am.response.\*                              |
+| `06-assert测试.js`        | am.expect().toBe/eql/include/beTrue/beFalse |
+| `07-test测试.js`          | am.test(name, fn)                           |
+| `08-variable测试.js`      | 变量组合使用场景                                    |
+| `09-pre-script测试.js`    | 前置脚本场景                                      |
+| `10-post-script测试.js`   | 后置脚本场景                                      |
+| `11-comprehensive测试.js` | 综合测试                                        |
+| `12-snippets测试.js`      | 常用代码片段                                      |
+| `13-crypto测试.js`        | am.crypto 加密函数                              |
 
 > 首版不开放 `am.sendRequest`，避免引入嵌套请求、并发与安全复杂度。
 
@@ -812,7 +855,7 @@ type CurlRequest struct {
 
 首版必须实现以下限制：
 
-- ⏱️ **执行超时**：单脚本最大执行时间（建议 300~1000ms）
+- ⏱️ **执行超时**：单脚本最大执行时间（建议 300\~1000ms）
 - 🔒 **能力白名单**：仅暴露 `am` 与 `console`，不提供文件系统/网络/系统命令
 - 🧱 **隔离执行**：每次执行使用独立 VM，上下文不跨请求泄漏
 - 📏 **输出限制**：日志最大长度、测试数量上限，防止 UI 与内存膨胀
@@ -863,7 +906,7 @@ type CurlRequest struct {
 - `internal/config`：持久化环境变量/全局变量更新
 - `frontend/src/App.tsx`：新增 Scripts UI 与结果展示区
 
----
+***
 
 ## 📊 数据存储
 
@@ -895,7 +938,7 @@ Linux:   ~/.config/apiman/
 
 直接复制 `~/.apiman/` 目录即可完整迁移数据。
 
----
+***
 
 ## 🐛 故障排查
 
@@ -907,28 +950,24 @@ Linux:   ~/.config/apiman/
    rm -rf node_modules package-lock.json
    npm install
    ```
-
 2. **Go 模块下载失败**
    ```bash
    go mod tidy
    go mod download
    ```
-
 3. **Wails 初始化失败**
    ```bash
    wails doctor
    ```
-
 4. **窗口拖拽不工作**
    - 确保 `--wails-draggable` 属性正确设置
    - 检查控制按钮是否设置了 `no-drag`
    - 重启应用
-
 5. **端口占用**
    - 开发模式默认使用端口 34115
    - 修改配置或关闭占用端口的程序
 
----
+***
 
 ## 🚧 未来规划
 
@@ -943,13 +982,13 @@ Linux:   ~/.config/apiman/
 - [ ] 团队协作功能
 - [ ] API 文档自动生成
 
----
+***
 
 ## 📜 许可证
 
 本项目采用 MIT 许可证。
 
----
+***
 
 ## 🙏 致谢
 
@@ -958,20 +997,21 @@ Linux:   ~/.config/apiman/
 - [Vite](https://vitejs.dev/) - 下一代前端构建工具
 - [Google UUID](https://github.com/google/uuid) - UUID 生成库
 
----
+***
 
 ## 📞 联系方式
 
 - 作者：zetaoxie
-- 邮箱：592334843@qq.com
+- 邮箱：<592334843@qq.com>
 
----
+***
 
 ## 📝 更新日志
 
 ### v1.0 (当前版本)
 
 #### 核心功能
+
 - ✅ 项目管理（创建、删除、打开）
 - ✅ 多级文件夹组织（支持任意深度嵌套）
 - ✅ API 请求测试（支持多种 HTTP 方法和请求体类型）
@@ -980,6 +1020,7 @@ Linux:   ~/.config/apiman/
 - ✅ 持久化存储
 
 #### UI/UX
+
 - ✅ 现代 UI 设计（Apifox/Postman 风格）
 - ✅ 无边框桌面应用
 - ✅ 自定义窗口标题栏
@@ -990,6 +1031,7 @@ Linux:   ~/.config/apiman/
 - ✅ 平滑动画效果
 
 #### 技术特性
+
 - ✅ 热重载开发（前后端代码修改自动更新）
 - ✅ 窗口拖拽功能
 - ✅ 自定义窗口控制按钮
@@ -999,6 +1041,7 @@ Linux:   ~/.config/apiman/
 - ✅ Ant Design 6.3.4 组件库
 
 #### 性能优化
+
 - ✅ 前端构建优化（Vite）
 - ✅ 状态管理优化（React Hooks）
 - ✅ 递归渲染支持（多级目录）
@@ -1007,6 +1050,7 @@ Linux:   ~/.config/apiman/
 ### v1.1 (最新增强)
 
 #### 项目管理与首页体验
+
 - ✅ 首页项目分组（新建、重命名、删除、折叠）
 - ✅ 分组拖拽排序（支持持久化）
 - ✅ 项目卡片拖拽到分组
@@ -1015,6 +1059,7 @@ Linux:   ~/.config/apiman/
 - ✅ 项目搜索框样式升级
 
 #### 接口列表与交互增强
+
 - ✅ 接口列表搜索支持名称 + URL
 - ✅ 接口/文件夹支持拖拽移动
 - ✅ 移动冲突校验与禁止放置提示
@@ -1024,6 +1069,7 @@ Linux:   ~/.config/apiman/
 - ✅ 接口/文件夹重命名体验优化
 
 #### 数据持久化
+
 - ✅ 项目/文件夹/请求采用 `slug__uuid` 存储命名
 - ✅ 展示名与存储名解耦（展示名来自元数据）
 - ✅ 项目分组状态后端持久化到 `projects/projects.json`
@@ -1031,11 +1077,13 @@ Linux:   ~/.config/apiman/
 ### v1.3（集合与侧栏规范）
 
 #### 数据与模型
+
 - ✅ 项目 API 以 **`collection.postman.json`** 为单一集合文件（`internal/postman` 读写）
 - ✅ 请求支持多 **用例**（`HttpRequestCase` / 树节点 `requestCase|...`）
 - ✅ Postman Collection 导入与集合字段对齐（持续迭代中）
 
 #### 侧栏交互与样式（`App.tsx` / `App.css`）
+
 - ✅ 选中接口不自动高亮子用例；仅选中用例行时高亮用例（`sidebarHighlightedCasePath` 等工作区状态）
 - ✅ 接口行与用例行选中样式统一：左侧主题色条 + `--bg-hover` 行背景
 - ✅ 选中用例时父级接口行不再使用「打开」左侧条，避免双重高亮
@@ -1044,24 +1092,61 @@ Linux:   ~/.config/apiman/
 - ✅ 用例行：用例图标 + 与接口名左缘对齐；图标列内靠右贴近名称；图标与名称垂直居中
 
 #### 项目工作区
+
 - ✅ 侧栏增加 **脚本** 入口，与接口列表、环境变量并列
 
 ### v1.2 (当前增强)
 
 #### 环境变量与请求联动
+
 - ✅ 项目页新增「环境变量」一级菜单，与「接口列表」同级
 - ✅ 环境管理支持创建/编辑/删除，按环境维护独立变量集
 - ✅ 请求标签栏右侧新增环境切换，发送时按当前环境替换 `{{variable}}`
 - ✅ 修复 Params 构建对 URL 的污染问题（发送时拼接，不改编辑态 URL）
 
 #### 变量编辑体验
+
 - ✅ URL/Params/Headers/Body 支持 `{{variable}}` 高亮（存在绿色、缺失红色）
 - ✅ 支持输入 `{{` / `{{xx` 的变量联想补全
 - ✅ 补全支持方向键上下选择 + Enter 确认
 - ✅ 引入 `contenteditable` 变量输入控件，修复输入时焦点丢失问题
 
 #### 请求执行与网络能力
+
 - ✅ 代理配置执行链路打通（HTTP/HTTPS/SOCKS5）
 - ✅ 代理地址输入兼容 `http://host` / `host` 形式
 - ✅ curl 解析增强：修复 `-d` JSON 截断问题
 - ✅ curl 执行增强：支持 `-F`（multipart/form-data）字段提交
+
+### v1.4（前后置脚本与加密工具）
+
+#### 前后置脚本功能
+
+- ✅ Go 后端内嵌 JavaScript 引擎（`goja`）
+- ✅ 完整 `am` 运行时 API 实现
+- ✅ 前置脚本（Pre-request Script）支持
+- ✅ 后置脚本（Tests Script）支持
+- ✅ 脚本日志收集（console.log/info/warn/error）
+- ✅ 测试用例断言（am.test / am.expect）
+- ✅ 脚本结果展示 UI（Console Logs / Test Results）
+- ✅ 脚本超时控制（默认 1 秒）
+- ✅ 变量作用域（Globals / Environment / Locals）
+
+#### 加密工具 (am.crypto)
+
+- ✅ MD5 / SHA1 / SHA256 / SHA512 哈希
+- ✅ Base64 / Base64URL 编解码
+- ✅ HMAC-SHA256 / HMAC-SHA1 签名
+- ✅ AES 对称加解密
+- ✅ RSA 密钥生成、公钥加密、私钥解密
+- ✅ RSA 签名与验签
+- ✅ RandomString 随机字符串
+- ✅ FormatJSON JSON 格式化
+
+#### 技术实现
+
+- ✅ `internal/script/` 模块（runtime.go / executor.go）
+- ✅ `internal/curl/exec_with_scripts.go` 脚本执行链路集成
+- ✅ `app.go` / `service.go` 暴露脚本执行方法
+- ✅ 13 个脚本测试用例文件
+

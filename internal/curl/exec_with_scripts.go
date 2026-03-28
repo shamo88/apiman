@@ -59,11 +59,18 @@ func (se *ScriptableExecutor) ExecuteWithScriptsContext(
 
 	var preResult *script.ScriptResult
 	var allLogs []string
+	var allGlobalUpdates map[string]string
 	if preScriptContent != "" {
 		execCtx := se.buildExecutionContext(specCopy, globals, environment)
 		preResult = se.scriptExecutor.RunPreRequestScript(ctx, preScriptContent, execCtx, globalSetter)
 
 		allLogs = append(allLogs, preResult.Logs...)
+		for k, v := range preResult.GlobalUpdates {
+			if allGlobalUpdates == nil {
+				allGlobalUpdates = make(map[string]string)
+			}
+			allGlobalUpdates[k] = v
+		}
 
 		if !preResult.Success {
 			resp := &models.CurlResponse{
@@ -106,6 +113,12 @@ func (se *ScriptableExecutor) ExecuteWithScriptsContext(
 		postResult := se.scriptExecutor.RunTestScript(ctx, postScriptContent, execCtx, globalSetter)
 
 		curlResp.ScriptLogs = append(curlResp.ScriptLogs, postResult.Logs...)
+		for k, v := range postResult.GlobalUpdates {
+			if allGlobalUpdates == nil {
+				allGlobalUpdates = make(map[string]string)
+			}
+			allGlobalUpdates[k] = v
+		}
 		for _, t := range postResult.Tests {
 			curlResp.Tests = append(curlResp.Tests, models.TestResult{
 				Name:     t.Name,
@@ -113,6 +126,12 @@ func (se *ScriptableExecutor) ExecuteWithScriptsContext(
 				Message:  t.Message,
 				Duration: t.Duration,
 			})
+		}
+	}
+
+	if len(allGlobalUpdates) > 0 && globalSetter != nil {
+		for k, v := range allGlobalUpdates {
+			globalSetter(k, v)
 		}
 	}
 

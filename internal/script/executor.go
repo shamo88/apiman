@@ -2,6 +2,9 @@ package script
 
 import (
 	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -19,6 +22,7 @@ type ScriptableRequestExecutor struct {
 type RequestExecutionContext struct {
 	RequestSpec   *models.HttpRequestSpec
 	ProjectID     string
+	ProjectPath   string
 	RequestPath   string
 	PreScript     string
 	PostScript    string
@@ -30,6 +34,84 @@ type RequestExecutionResult struct {
 	Response     *models.CurlResponse
 	ScriptResult *ScriptResult
 	Error        error
+}
+
+type ProjectVariables struct {
+	Variables map[string]string `json:"variables"`
+	mu        sync.RWMutex
+}
+
+func NewProjectVariables() *ProjectVariables {
+	return &ProjectVariables{
+		Variables: make(map[string]string),
+	}
+}
+
+func (pv *ProjectVariables) Get(key string) (string, bool) {
+	pv.mu.RLock()
+	defer pv.mu.RUnlock()
+	val, ok := pv.Variables[key]
+	return val, ok
+}
+
+func (pv *ProjectVariables) Set(key, value string) {
+	pv.mu.Lock()
+	defer pv.mu.Unlock()
+	pv.Variables[key] = value
+}
+
+func (pv *ProjectVariables) Unset(key string) {
+	pv.mu.Lock()
+	defer pv.mu.Unlock()
+	delete(pv.Variables, key)
+}
+
+func (pv *ProjectVariables) GetAll() map[string]string {
+	pv.mu.RLock()
+	defer pv.mu.RUnlock()
+	result := make(map[string]string)
+	for k, v := range pv.Variables {
+		result[k] = v
+	}
+	return result
+}
+
+func (pv *ProjectVariables) LoadFromFile(path string) error {
+	pv.mu.Lock()
+	defer pv.mu.Unlock()
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	var vars map[string]string
+	if err := json.Unmarshal(data, &vars); err != nil {
+		return err
+	}
+
+	pv.Variables = vars
+	return nil
+}
+
+func (pv *ProjectVariables) SaveToFile(path string) error {
+	pv.mu.Lock()
+	defer pv.mu.Unlock()
+
+	data, err := json.MarshalIndent(pv.Variables, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
+	return os.WriteFile(path, data, 0644)
 }
 
 func NewScriptableRequestExecutor(curlExec interface {

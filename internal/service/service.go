@@ -7,6 +7,7 @@ import (
 	"apiman/internal/postman"
 	"apiman/internal/project"
 	"apiman/internal/script"
+	"path/filepath"
 )
 
 type Service struct {
@@ -283,7 +284,17 @@ func (s *Service) ExecuteHTTPRequestWithScripts(
 		}
 	}
 
-	globals := s.GlobalVarStore.GetAll()
+	projectPath, err := s.ProjectMgr.ProjectPathByID(projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	projectVarsPath := filepath.Join(projectPath, "variables.json")
+	projectVars := script.NewProjectVariables()
+	if err := projectVars.LoadFromFile(projectVarsPath); err != nil {
+		return nil, err
+	}
+	globals := projectVars.GetAll()
 
 	var environment map[string]string
 	if environmentID != "" {
@@ -314,9 +325,8 @@ func (s *Service) ExecuteHTTPRequestWithScripts(
 	}
 
 	globalSetter := func(key, value string) {
-		s.GlobalVarStore.Set(key, value)
-		allVars := s.GlobalVarStore.GetAll()
-		_ = s.ConfigManager.SaveGlobalVariables(allVars)
+		projectVars.Set(key, value)
+		_ = projectVars.SaveToFile(projectVarsPath)
 	}
 
 	resp, err := s.ScriptableExecutor.ExecuteWithScripts(
@@ -345,7 +355,17 @@ func (s *Service) ExecuteHTTPRequestWithScriptsInline(
 	preScript string,
 	postScript string,
 ) (*models.CurlResponse, error) {
-	globals := s.GlobalVarStore.GetAll()
+	projectPath, err := s.ProjectMgr.ProjectPathByID(projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	projectVarsPath := filepath.Join(projectPath, "variables.json")
+	projectVars := script.NewProjectVariables()
+	if err := projectVars.LoadFromFile(projectVarsPath); err != nil {
+		return nil, err
+	}
+	globals := projectVars.GetAll()
 
 	var environment map[string]string
 	if environmentID != "" {
@@ -376,9 +396,8 @@ func (s *Service) ExecuteHTTPRequestWithScriptsInline(
 	}
 
 	globalSetter := func(key, value string) {
-		s.GlobalVarStore.Set(key, value)
-		allVars := s.GlobalVarStore.GetAll()
-		_ = s.ConfigManager.SaveGlobalVariables(allVars)
+		projectVars.Set(key, value)
+		_ = projectVars.SaveToFile(projectVarsPath)
 	}
 
 	resp, err := s.ScriptableExecutor.ExecuteWithScripts(
