@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type Environment struct {
 	ID        string            `json:"id"`
@@ -27,17 +30,72 @@ type Folder struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// RequestKeyVal is a key/value row with an on/off flag (headers, query params).
+type RequestKeyVal struct {
+	Key     string `json:"key"`
+	Value   string `json:"value"`
+	Enabled bool   `json:"enabled"`
+}
+
+// RequestPair is a key/value row for form body fields (with enable flag).
+type RequestPair struct {
+	Key     string `json:"key"`
+	Value   string `json:"value"`
+	Enabled bool   `json:"enabled"`
+}
+
+// UnmarshalJSON sets Enabled to true when "enabled" is absent (older collections).
+func (p *RequestPair) UnmarshalJSON(data []byte) error {
+	aux := struct {
+		Key     string `json:"key"`
+		Value   string `json:"value"`
+		Enabled *bool  `json:"enabled"`
+	}{}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	p.Key = aux.Key
+	p.Value = aux.Value
+	if aux.Enabled != nil {
+		p.Enabled = *aux.Enabled
+	} else {
+		p.Enabled = true
+	}
+	return nil
+}
+
+// HttpRequestSpec is the structured request shape (Postman-aligned) used for save and execute.
+type HttpRequestSpec struct {
+	Method     string          `json:"method"`
+	HttpURL    string          `json:"http_url"`
+	Headers    []RequestKeyVal `json:"headers"`
+	Params     []RequestKeyVal `json:"params"`
+	Body       string          `json:"body"`
+	BodyType   string          `json:"body_type"`
+	FormData   []RequestPair   `json:"form_data"`
+	UrlEncoded []RequestPair   `json:"url_encoded"`
+}
+
 type CurlRequest struct {
 	ID           string    `json:"id"`
 	Name         string    `json:"name"`
 	ProjectID    string    `json:"project_id"`
 	FolderID     string    `json:"folder_id"`
 	Path         string    `json:"path"`
-	Content      string    `json:"content"`
+	Content      string    `json:"content,omitempty"`
 	PreScriptID  string    `json:"pre_script_id,omitempty"`
 	PostScriptID string    `json:"post_script_id,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+
+	Method     string          `json:"method,omitempty"`
+	HttpURL    string          `json:"http_url,omitempty"`
+	Headers    []RequestKeyVal `json:"headers,omitempty"`
+	Params     []RequestKeyVal `json:"params,omitempty"`
+	Body       string          `json:"body,omitempty"`
+	BodyType   string          `json:"body_type,omitempty"`
+	FormData   []RequestPair   `json:"form_data,omitempty"`
+	UrlEncoded []RequestPair   `json:"url_encoded,omitempty"`
 }
 
 type ProjectScript struct {

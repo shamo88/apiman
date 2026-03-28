@@ -30,11 +30,19 @@ export interface CurlRequest {
     project_id?: string;
     folder_id?: string;
     path: string;
-    content: string;
+    content?: string;
     pre_script_id?: string;
     post_script_id?: string;
     created_at?: string;
     updated_at?: string;
+    method?: string;
+    http_url?: string;
+    headers?: { key: string; value: string; enabled?: boolean }[];
+    params?: { key: string; value: string; enabled?: boolean }[];
+    body?: string;
+    body_type?: string;
+    form_data?: { key: string; value: string }[];
+    url_encoded?: { key: string; value: string }[];
 }
 
 export interface ProjectScript {

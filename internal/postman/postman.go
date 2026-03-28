@@ -24,58 +24,61 @@ func NewPostmanImporter(cfg *config.ConfigManager) *PostmanImporter {
 	}
 }
 
-type PostmanCollection struct {
-	Info PostmanInfo   `json:"info"`
-	Item []PostmanItem `json:"item"`
+// JSON shapes for Postman Collection v2.x import (subset).
+type importCollection struct {
+	Info importCollectionInfo `json:"info"`
+	Item []importItem         `json:"item"`
 }
 
-type PostmanInfo struct {
+type importCollectionInfo struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 }
 
-type PostmanItem struct {
-	Name    string          `json:"name"`
-	Item    []PostmanItem   `json:"item,omitempty"`
-	Request *PostmanRequest `json:"request,omitempty"`
+type importItem struct {
+	Name    string       `json:"name"`
+	Item    []importItem `json:"item,omitempty"`
+	Request *importReq   `json:"request,omitempty"`
 }
 
-type PostmanRequest struct {
+type importReq struct {
 	Method string          `json:"method"`
-	Header []PostmanHeader `json:"header"`
+	Header []importHdr     `json:"header"`
 	URL    interface{}     `json:"url"`
-	Body   *PostmanBody    `json:"body"`
+	Body   *importBody    `json:"body"`
 }
 
-type PostmanHeader struct {
+type importHdr struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
 }
 
-type PostmanBody struct {
-	Mode       string              `json:"mode"`
-	Raw        string              `json:"raw"`
-	URLEncoded []PostmanURLEncoded `json:"urlencoded"`
-	FormData   []PostmanFormData   `json:"formdata"`
+type importBody struct {
+	Mode       string           `json:"mode"`
+	Raw        string           `json:"raw"`
+	URLEncoded []importURLEnc   `json:"urlencoded"`
+	FormData   []importFormData `json:"formdata"`
 }
 
-type PostmanURLEncoded struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
+type importURLEnc struct {
+	Key      string `json:"key"`
+	Value    string `json:"value"`
+	Disabled bool   `json:"disabled,omitempty"`
 }
 
-type PostmanFormData struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
+type importFormData struct {
+	Key      string `json:"key"`
+	Value    string `json:"value"`
+	Disabled bool   `json:"disabled,omitempty"`
 }
 
 func (pi *PostmanImporter) ImportCollection(jsonData string) (*models.Project, error) {
-	var collection PostmanCollection
-	if err := json.Unmarshal([]byte(jsonData), &collection); err != nil {
+	var raw importCollection
+	if err := json.Unmarshal([]byte(jsonData), &raw); err != nil {
 		return nil, err
 	}
 
-	projectName := collection.Info.Name
+	projectName := raw.Info.Name
 	if projectName == "" {
 		projectName = "Imported from Postman"
 	}
@@ -89,11 +92,107 @@ func (pi *PostmanImporter) ImportCollection(jsonData string) (*models.Project, e
 		return nil, err
 	}
 
-	if err := pi.processItems(collection.Item, project.Path); err != nil {
+	coll := NewCollection(projectName)
+	coll.Info.Name = raw.Info.Name
+	if raw.Info.Description != "" {
+		coll.Info.Description = raw.Info.Description
+	}
+	coll.Item = convertImportItems(raw.Item)
+
+	if err := SaveCollection(project.Path, coll); err != nil {
 		return nil, err
 	}
 
 	return project, nil
+}
+
+func convertImportItems(items []importItem) []CollectionItem {
+	out := make([]CollectionItem, 0, len(items))
+	for _, it := range items {
+		out = append(out, convertImportItem(it))
+	}
+	return out
+}
+
+func convertImportItem(it importItem) CollectionItem {
+	id := uuid.New().String()
+	if it.Request != nil {
+		return CollectionItem{
+			ID:      id,
+			Name:    it.Name,
+			Request: convertImportRequest(it.Request),
+		}
+	}
+	children := make([]CollectionItem, 0, len(it.Item))
+	for _, ch := range it.Item {
+		children = append(children, convertImportItem(ch))
+	}
+	return CollectionItem{
+		ID:   id,
+		Name: it.Name,
+		Item: children,
+	}
+}
+
+func convertImportRequest(req *importReq) *CollectionRequest {
+	cr := &CollectionRequest{
+		Method: strings.ToUpper(strings.TrimSpace(req.Method)),
+		URL: &PostmanURL{
+			Raw: extractImportURL(req.URL),
+		},
+	}
+	if cr.Method == "" {
+		cr.Method = "GET"
+	}
+	for _, h := range req.Header {
+		if strings.TrimSpace(h.Key) == "" {
+			continue
+		}
+		cr.Header = append(cr.Header, PostmanHeader{
+			Key:   h.Key,
+			Value: h.Value,
+		})
+	}
+	if req.Body != nil {
+		b := &PostmanBody{
+			Mode: req.Body.Mode,
+			Raw:  req.Body.Raw,
+		}
+		for _, p := range req.Body.URLEncoded {
+			b.URLEncoded = append(b.URLEncoded, PostmanURLEncoded{
+				Key:      p.Key,
+				Value:    p.Value,
+				Type:     "text",
+				Disabled: p.Disabled,
+			})
+		}
+		for _, f := range req.Body.FormData {
+			b.FormData = append(b.FormData, PostmanFormData{
+				Key:      f.Key,
+				Value:    f.Value,
+				Type:     "text",
+				Disabled: f.Disabled,
+			})
+		}
+		cr.Body = b
+	}
+	return cr
+}
+
+func extractImportURL(urlInterface interface{}) string {
+	switch v := urlInterface.(type) {
+	case string:
+		return v
+	case map[string]interface{}:
+		if raw, ok := v["raw"].(string); ok {
+			return raw
+		}
+	case map[string]string:
+		if raw, ok := v["raw"]; ok {
+			return raw
+		}
+	}
+	return ""
 }
 
 func (pi *PostmanImporter) createProject(name string) (*models.Project, error) {
@@ -102,6 +201,9 @@ func (pi *PostmanImporter) createProject(name string) (*models.Project, error) {
 	projectPath := filepath.Join(pi.configManager.GetProjectsDir(), projectDirName)
 
 	if err := os.MkdirAll(projectPath, 0755); err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(filepath.Join(projectPath, "scripts"), 0755); err != nil {
 		return nil, err
 	}
 
@@ -183,101 +285,6 @@ func (pi *PostmanImporter) loadExistingProjectNames() (map[string]struct{}, erro
 	return result, nil
 }
 
-func (pi *PostmanImporter) processItems(items []PostmanItem, parentPath string) error {
-	for _, item := range items {
-		if item.Request != nil {
-			if err := pi.createRequest(parentPath, item.Name, item.Request); err != nil {
-				continue
-			}
-		} else if len(item.Item) > 0 {
-			folderID := uuid.New().String()
-			folderPath := filepath.Join(parentPath, buildSlugUUIDName(item.Name, folderID))
-			if err := os.MkdirAll(folderPath, 0755); err != nil {
-				continue
-			}
-			if err := pi.saveFolderMeta(folderPath, folderID, item.Name); err != nil {
-				continue
-			}
-			if err := pi.processItems(item.Item, folderPath); err != nil {
-				continue
-			}
-		}
-	}
-	return nil
-}
-
-func (pi *PostmanImporter) createRequest(folderPath, name string, request *PostmanRequest) error {
-	requestID := uuid.New().String()
-	requestName := buildSlugUUIDName(name, requestID) + ".curl"
-	requestPath := filepath.Join(folderPath, requestName)
-
-	curlContent := pi.convertToCurl(request)
-	if err := os.WriteFile(requestPath, []byte(curlContent), 0644); err != nil {
-		return err
-	}
-
-	metaData := map[string]string{
-		"id":   requestID,
-		"name": name,
-	}
-	metaBytes, _ := json.Marshal(metaData)
-	metaPath := filepath.Join(folderPath, requestID+".meta")
-	return os.WriteFile(metaPath, metaBytes, 0644)
-}
-
-func (pi *PostmanImporter) convertToCurl(request *PostmanRequest) string {
-	var curl strings.Builder
-	curl.WriteString("curl ")
-
-	if request.Method != "" && request.Method != "GET" {
-		curl.WriteString("-X " + request.Method + " ")
-	}
-
-	if len(request.Header) > 0 {
-		for _, h := range request.Header {
-			curl.WriteString("-H \"" + h.Key + ": " + h.Value + "\" ")
-		}
-	}
-
-	url := pi.extractURL(request.URL)
-	curl.WriteString("\"" + url + "\"")
-
-	if request.Body != nil {
-		if request.Body.Mode == "raw" && request.Body.Raw != "" {
-			curl.WriteString(" -d '" + request.Body.Raw + "'")
-		} else if request.Body.Mode == "urlencoded" && len(request.Body.URLEncoded) > 0 {
-			curl.WriteString(" -H \"Content-Type: application/x-www-form-urlencoded\"")
-			var params []string
-			for _, p := range request.Body.URLEncoded {
-				params = append(params, p.Key+"="+p.Value)
-			}
-			curl.WriteString(" -d '" + strings.Join(params, "&") + "'")
-		} else if request.Body.Mode == "formdata" && len(request.Body.FormData) > 0 {
-			for _, f := range request.Body.FormData {
-				curl.WriteString(" -F \"" + f.Key + "=" + f.Value + "\"")
-			}
-		}
-	}
-
-	return curl.String()
-}
-
-func (pi *PostmanImporter) extractURL(urlInterface interface{}) string {
-	switch v := urlInterface.(type) {
-	case string:
-		return v
-	case map[string]interface{}:
-		if raw, ok := v["raw"].(string); ok {
-			return raw
-		}
-	case map[string]string:
-		if raw, ok := v["raw"]; ok {
-			return raw
-		}
-	}
-	return ""
-}
-
 func buildSlugUUIDName(name, id string) string {
 	base := strings.TrimSpace(strings.ToLower(name))
 	if base == "" {
@@ -291,16 +298,4 @@ func buildSlugUUIDName(name, id string) string {
 	}
 
 	return slug + "__" + id
-}
-
-func (pi *PostmanImporter) saveFolderMeta(folderPath, id, name string) error {
-	meta := map[string]string{
-		"id":   id,
-		"name": name,
-	}
-	data, err := json.MarshalIndent(meta, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(filepath.Join(folderPath, ".folder.meta"), data, 0644)
 }

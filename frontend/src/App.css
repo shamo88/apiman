@@ -727,17 +727,40 @@ body,
 
 .request-tabs-row {
     display: flex;
-    align-items: center;
+    flex-wrap: nowrap;
+    align-items: stretch;
     border-bottom: 1px solid var(--border-subtle);
     background: var(--bg-secondary);
 }
 
-.request-tabs-row .ant-tabs {
+.request-tabs-scroll-wrap {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.request-tabs-scroll-wrap .ant-tabs {
     border-bottom: none;
 }
 
+/* 多标签时仅标签区域横向滚动，避免挤掉右侧环境选择器 */
+.request-tabs-scroll-wrap .ant-tabs-nav-wrap {
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.request-tabs-scroll-wrap .ant-tabs-nav {
+    margin-bottom: 0;
+}
+
 .request-tabs-environment-select {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    padding-left: 8px;
     padding-right: 16px;
+    border-left: 1px solid var(--border-subtle);
+    background: var(--bg-secondary);
 }
 
 .sidebar-content {
@@ -1238,6 +1261,10 @@ body,
     gap: 8px;
     margin-bottom: 8px;
     align-items: center;
+}
+
+.kv-row-params .kv-param-enabled {
+    flex-shrink: 0;
 }
 
 .kv-row .ant-input {

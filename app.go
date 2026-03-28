@@ -83,12 +83,12 @@ func (a *App) DeleteFolder(path string) error {
 	return a.service.DeleteFolder(path)
 }
 
-func (a *App) CreateRequest(projectID, folderPath, name string, content string) (*models.CurlRequest, error) {
-	return a.service.CreateRequest(projectID, folderPath, name, content)
+func (a *App) CreateRequest(projectID, folderPath, name string, spec models.HttpRequestSpec) (*models.CurlRequest, error) {
+	return a.service.CreateRequest(projectID, folderPath, name, spec)
 }
 
-func (a *App) UpdateRequest(requestPath, content string) error {
-	return a.service.UpdateRequest(requestPath, content)
+func (a *App) UpdateRequest(requestPath string, spec models.HttpRequestSpec) error {
+	return a.service.UpdateRequest(requestPath, spec)
 }
 
 func (a *App) UpdateRequestScripts(requestPath, preScriptID, postScriptID string) error {
@@ -125,6 +125,10 @@ func (a *App) MoveFolder(folderPath, targetParentPath string) (string, error) {
 
 func (a *App) ExecuteCurl(command string) (*models.CurlResponse, error) {
 	return a.service.ExecuteCurl(command)
+}
+
+func (a *App) ExecuteHTTPRequest(spec models.HttpRequestSpec) (*models.CurlResponse, error) {
+	return a.service.ExecuteHTTPRequest(spec)
 }
 
 func (a *App) ExtractVariables(text string) []string {

@@ -89,12 +89,12 @@ func (s *Service) DeleteFolder(path string) error {
 	return s.ProjectMgr.DeleteFolder(path)
 }
 
-func (s *Service) CreateRequest(projectID, folderPath, name string, content string) (*models.CurlRequest, error) {
-	return s.ProjectMgr.CreateRequest(projectID, folderPath, name, content)
+func (s *Service) CreateRequest(projectID, folderPath, name string, spec models.HttpRequestSpec) (*models.CurlRequest, error) {
+	return s.ProjectMgr.CreateRequest(projectID, folderPath, name, spec)
 }
 
-func (s *Service) UpdateRequest(requestPath, content string) error {
-	return s.ProjectMgr.UpdateRequest(requestPath, content)
+func (s *Service) UpdateRequest(requestPath string, spec models.HttpRequestSpec) error {
+	return s.ProjectMgr.UpdateRequest(requestPath, spec)
 }
 
 func (s *Service) UpdateRequestScripts(requestPath, preScriptID, postScriptID string) error {
@@ -146,6 +146,23 @@ func (s *Service) ExecuteCurl(command string) (*models.CurlResponse, error) {
 	}
 
 	return s.CurlExecutor.ExecuteWithProxy(command, proxyOpts)
+}
+
+func (s *Service) ExecuteHTTPRequest(spec models.HttpRequestSpec) (*models.CurlResponse, error) {
+	appCfg, err := s.ConfigManager.LoadAppConfig()
+	if err != nil || appCfg == nil {
+		return s.CurlExecutor.ExecuteHTTPRequest(&spec)
+	}
+	proxyOpts := &curl.ProxyOptions{
+		Enabled:    appCfg.Proxy.Enabled,
+		HTTPHost:   appCfg.Proxy.HTTPHost,
+		HTTPPort:   appCfg.Proxy.HTTPPort,
+		HTTPSHost:  appCfg.Proxy.HTTPSHost,
+		HTTPSPort:  appCfg.Proxy.HTTPSPort,
+		SOCKS5Host: appCfg.Proxy.SOCKS5Host,
+		SOCKS5Port: appCfg.Proxy.SOCKS5Port,
+	}
+	return s.CurlExecutor.ExecuteHTTPRequestWithProxy(&spec, proxyOpts)
 }
 
 func (s *Service) ExtractVariables(text string) []string {

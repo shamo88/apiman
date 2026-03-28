@@ -14,7 +14,7 @@ export function CreateProject(arg1:string):Promise<models.Project>;
 
 export function CreateProjectScript(arg1:string,arg2:string,arg3:string):Promise<models.ProjectScript>;
 
-export function CreateRequest(arg1:string,arg2:string,arg3:string,arg4:string):Promise<models.CurlRequest>;
+export function CreateRequest(arg1:string,arg2:string,arg3:string,arg4:models.HttpRequestSpec):Promise<models.CurlRequest>;
 
 export function DeleteEnvironment(arg1:string):Promise<void>;
 
@@ -27,6 +27,8 @@ export function DeleteProjectScript(arg1:string,arg2:string):Promise<void>;
 export function DeleteRequest(arg1:string):Promise<void>;
 
 export function ExecuteCurl(arg1:string):Promise<models.CurlResponse>;
+
+export function ExecuteHTTPRequest(arg1:models.HttpRequestSpec):Promise<models.CurlResponse>;
 
 export function ExtractVariables(arg1:string):Promise<Array<string>>;
 
@@ -74,6 +76,6 @@ export function UpdateEnvironment(arg1:string,arg2:string,arg3:Record<string, st
 
 export function UpdateProjectScript(arg1:string,arg2:string,arg3:string,arg4:string):Promise<models.ProjectScript>;
 
-export function UpdateRequest(arg1:string,arg2:string):Promise<void>;
+export function UpdateRequest(arg1:string,arg2:models.HttpRequestSpec):Promise<void>;
 
 export function UpdateRequestScripts(arg1:string,arg2:string,arg3:string):Promise<void>;

@@ -3,6 +3,7 @@ package project
 import (
 	"apiman/internal/config"
 	"apiman/internal/models"
+	"apiman/internal/postman"
 	"encoding/json"
 	"errors"
 	"os"
@@ -21,14 +22,10 @@ type ProjectManager struct {
 }
 
 func NewProjectManager(cfg *config.ConfigManager) *ProjectManager {
-	pm := &ProjectManager{
-		configManager: cfg,
-	}
-
+	pm := &ProjectManager{configManager: cfg}
 	if err := os.MkdirAll(cfg.GetProjectsDir(), 0755); err != nil {
 		panic(err)
 	}
-
 	return pm
 }
 
@@ -40,18 +37,6 @@ type ProjectTree struct {
 	URL      string         `json:"url,omitempty"`
 	Children []*ProjectTree `json:"children,omitempty"`
 	Path     string         `json:"path,omitempty"`
-}
-
-type folderMeta struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-}
-
-type requestMeta struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	PreScriptID  string `json:"pre_script_id,omitempty"`
-	PostScriptID string `json:"post_script_id,omitempty"`
 }
 
 type scriptMeta struct {
@@ -181,6 +166,11 @@ func (pm *ProjectManager) CreateProject(name string) (*models.Project, error) {
 		return nil, err
 	}
 
+	coll := postman.NewCollection(name)
+	if err := postman.SaveCollection(projectPath, coll); err != nil {
+		return nil, err
+	}
+
 	return project, nil
 }
 
@@ -244,6 +234,13 @@ func (pm *ProjectManager) RenameProject(id, newName string) (*models.Project, er
 	if err := os.WriteFile(metaFile, data, 0644); err != nil {
 		return nil, err
 	}
+
+	coll, err := postman.LoadCollection(newProjectPath)
+	if err == nil {
+		coll.Info.Name = newName
+		_ = postman.SaveCollection(newProjectPath, coll)
+	}
+
 	return &project, nil
 }
 
@@ -267,494 +264,464 @@ func (pm *ProjectManager) findProjectPathByID(id string) (string, error) {
 }
 
 func (pm *ProjectManager) GetProjectTree(projectID string) (*ProjectTree, error) {
-	projectsDir := pm.configManager.GetProjectsDir()
-	entries, err := os.ReadDir(projectsDir)
+	projectPath, err := pm.findProjectPathByID(projectID)
 	if err != nil {
 		return nil, err
 	}
 
-	var projectPath string
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		if strings.HasSuffix(entry.Name(), "__"+projectID) || entry.Name() == projectID {
-			projectPath = filepath.Join(projectsDir, entry.Name())
-			break
+	coll, err := postman.LoadCollection(projectPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			coll = postman.NewCollection(filepath.Base(projectPath))
+			if saveErr := postman.SaveCollection(projectPath, coll); saveErr != nil {
+				return nil, saveErr
+			}
+		} else {
+			return nil, err
 		}
 	}
 
-	if projectPath == "" {
-		return nil, os.ErrNotExist
-	}
-
-	projectName := filepath.Base(projectPath)
+	displayName := filepath.Base(projectPath)
 	metaFile := filepath.Join(projectPath, "meta.json")
 	if metaData, readErr := os.ReadFile(metaFile); readErr == nil {
 		var project models.Project
 		if json.Unmarshal(metaData, &project) == nil && project.Name != "" {
-			projectName = project.Name
+			displayName = project.Name
 		}
 	}
 
 	tree := &ProjectTree{
-		ID:   projectID,
-		Name: projectName,
-		Type: "project",
-		Path: projectPath,
-	}
-
-	if err := pm.buildTree(projectPath, tree); err != nil {
-		return nil, err
+		ID:       projectID,
+		Name:     displayName,
+		Type:     "project",
+		Path:     projectPath,
+		Children: pm.collectionItemsToTree(projectID, coll.Item),
 	}
 
 	return tree, nil
 }
 
-func (pm *ProjectManager) buildTree(dir string, node *ProjectTree) error {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return err
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			if entry.Name() == "meta.json" || entry.Name() == ".folder.meta" {
-				continue
+func (pm *ProjectManager) collectionItemsToTree(projectID string, items []postman.CollectionItem) []*ProjectTree {
+	var out []*ProjectTree
+	for i := range items {
+		it := &items[i]
+		if it.Request != nil {
+			m := strings.ToUpper(strings.TrimSpace(it.Request.Method))
+			if m == "" {
+				m = "GET"
 			}
-
-			folderPath := filepath.Join(dir, entry.Name())
-			folderID := extractTrailingUUID(entry.Name())
-			if folderID == "" {
-				folderID = uuid.New().String()
+			u := ""
+			if it.Request.URL != nil {
+				u = it.Request.URL.Raw
 			}
-			displayName := stripUUIDSuffix(entry.Name())
-			if meta, err := loadFolderMeta(folderPath); err == nil {
-				if meta.ID != "" {
-					folderID = meta.ID
-				}
-				if meta.Name != "" {
-					displayName = meta.Name
-				}
-			}
-
-			child := &ProjectTree{
-				ID:   folderID,
-				Name: displayName,
-				Type: "folder",
-				Path: folderPath,
-			}
-
-			if err := pm.buildTree(filepath.Join(dir, entry.Name()), child); err != nil {
-				continue
-			}
-
-			node.Children = append(node.Children, child)
-		} else {
-			if filepath.Ext(entry.Name()) == ".curl" {
-				requestName := strings.TrimSuffix(entry.Name(), ".curl")
-				requestID := extractTrailingUUID(requestName)
-				metaPath := filepath.Join(dir, requestID+".meta")
-				method := "GET"
-				url := ""
-
-				if content, err := os.ReadFile(filepath.Join(dir, entry.Name())); err == nil {
-					contentStr := string(content)
-					method = extractMethod(contentStr)
-					url = extractURL(contentStr)
-				}
-
-				if meta, err := loadRequestMeta(metaPath); err == nil {
-					if meta.Name != "" {
-						requestName = meta.Name
-					}
-				}
-
-				child := &ProjectTree{
-					ID:     uuid.New().String(),
-					Name:   requestName,
-					Type:   "request",
-					Path:   filepath.Join(dir, entry.Name()),
-					Method: method,
-					URL:    url,
-				}
-				node.Children = append(node.Children, child)
-			}
+			out = append(out, &ProjectTree{
+				ID:     it.ID,
+				Name:   it.Name,
+				Type:   "request",
+				Path:   postman.RequestRefPath(projectID, it.ID),
+				Method: m,
+				URL:    u,
+			})
+			continue
 		}
+		out = append(out, &ProjectTree{
+			ID:       it.ID,
+			Name:     it.Name,
+			Type:     "folder",
+			Path:     postman.FolderRefPath(projectID, it.ID),
+			Children: pm.collectionItemsToTree(projectID, it.Item),
+		})
 	}
-
-	return nil
+	return out
 }
 
-func extractMethod(curlContent string) string {
-	lines := strings.Split(curlContent, "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-
-		// 查找 curl 命令中的 -X 或 --request 参数
-		if strings.HasPrefix(line, "-X ") || strings.HasPrefix(line, "--request ") {
-			parts := strings.Fields(line)
-			if len(parts) >= 2 {
-				return strings.ToUpper(parts[1])
-			}
-		}
-
-		// 如果行以 curl 开头（可能包含内联参数）
-		if strings.HasPrefix(line, "curl ") {
-			// 直接在行中查找 -X 或 --request
-			if idx := strings.Index(line, "-X "); idx != -1 {
-				methodPart := strings.TrimSpace(line[idx+3:])
-				parts := strings.Fields(methodPart)
-				if len(parts) > 0 {
-					return strings.ToUpper(parts[0])
-				}
-			}
-			if idx := strings.Index(line, "--request "); idx != -1 {
-				methodPart := strings.TrimSpace(line[idx+10:])
-				parts := strings.Fields(methodPart)
-				if len(parts) > 0 {
-					return strings.ToUpper(parts[0])
-				}
-			}
-		}
+func resolveParentFolderID(projectPath, parentPath, projectID string) (string, error) {
+	if postman.IsRootFolderParent(parentPath, projectPath) {
+		return "", nil
 	}
-	return "GET"
-}
-
-func extractURL(curlContent string) string {
-	normalized := strings.ReplaceAll(curlContent, "\\\n", " ")
-	normalized = strings.ReplaceAll(normalized, "\n", " ")
-	parts := strings.Fields(normalized)
-	if len(parts) == 0 {
-		return ""
+	pProj, fid, ok := postman.ParseFolderRef(parentPath)
+	if !ok || pProj != projectID {
+		return "", os.ErrInvalid
 	}
-
-	optionsWithValue := map[string]bool{
-		"-X":               true,
-		"--request":        true,
-		"-H":               true,
-		"--header":         true,
-		"-d":               true,
-		"--data":           true,
-		"--data-raw":       true,
-		"--data-binary":    true,
-		"--data-urlencode": true,
-		"-u":               true,
-		"--user":           true,
-		"-A":               true,
-		"--user-agent":     true,
-		"-e":               true,
-		"--referer":        true,
-		"-b":               true,
-		"--cookie":         true,
-		"-o":               true,
-		"--output":         true,
-		"-k":               false,
-		"--insecure":       false,
-		"-s":               false,
-		"--silent":         false,
-		"-L":               false,
-		"--location":       false,
-	}
-
-	for i := 0; i < len(parts); i++ {
-		token := strings.Trim(parts[i], "'\"")
-		if token == "" || token == "curl" {
-			continue
-		}
-
-		if token == "--url" {
-			if i+1 < len(parts) {
-				return strings.Trim(parts[i+1], "'\"")
-			}
-			continue
-		}
-
-		if needsValue, exists := optionsWithValue[token]; exists {
-			if needsValue {
-				i++
-			}
-			continue
-		}
-
-		if strings.HasPrefix(token, "-") {
-			continue
-		}
-
-		if strings.HasPrefix(token, "http://") ||
-			strings.HasPrefix(token, "https://") ||
-			strings.HasPrefix(token, "//") ||
-			strings.HasPrefix(token, "{{") ||
-			strings.HasPrefix(token, "/") {
-			return token
-		}
-	}
-
-	quotedURLPattern := regexp.MustCompile(`['"]((?:https?:)?//[^'"]+|/\S+|\{\{[^}]+\}\}\S*)['"]`)
-	matches := quotedURLPattern.FindStringSubmatch(normalized)
-	if len(matches) > 1 {
-		return matches[1]
-	}
-
-	return ""
+	return fid, nil
 }
 
 func (pm *ProjectManager) CreateFolder(projectID, parentPath, name string) (*models.Folder, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, os.ErrInvalid
+	}
+
+	projectPath, err := pm.findProjectPathByID(projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	parentID, err := resolveParentFolderID(projectPath, parentPath, projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	coll, err := postman.LoadCollection(projectPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if parentID != "" && postman.FindItemRef(coll.Item, parentID) == nil {
+		return nil, errors.New("父文件夹不存在")
+	}
+
+	if folderNameExists(coll.Item, parentID, name, "") {
+		return nil, errors.New("同级目录下已存在同名文件夹")
+	}
+
 	folderID := uuid.New().String()
-	folderDirName := buildSlugUUIDName(name, folderID)
-	folderPath := filepath.Join(parentPath, folderDirName)
+	folder := postman.CollectionItem{
+		ID:   folderID,
+		Name: name,
+		Item: []postman.CollectionItem{},
+	}
 
-	if err := os.MkdirAll(folderPath, 0755); err != nil {
+	var ok bool
+	coll.Item, ok = postman.InsertItemUnder(coll.Item, parentID, folder)
+	if !ok {
+		return nil, errors.New("父文件夹不存在")
+	}
+
+	if err := postman.SaveCollection(projectPath, coll); err != nil {
 		return nil, err
 	}
 
-	if err := saveFolderMeta(folderPath, folderID, name); err != nil {
-		return nil, err
-	}
-
-	folder := &models.Folder{
+	return &models.Folder{
 		ID:        folderID,
 		Name:      name,
 		ProjectID: projectID,
-		Path:      folderPath,
+		ParentID:  parentID,
+		Path:      postman.FolderRefPath(projectID, folderID),
 		CreatedAt: time.Now(),
-	}
-
-	return folder, nil
+	}, nil
 }
 
-func (pm *ProjectManager) DeleteFolder(path string) error {
-	return os.RemoveAll(path)
+func folderNameExists(items []postman.CollectionItem, parentID, name, excludeFolderID string) bool {
+	if parentID == "" {
+		for _, it := range items {
+			if it.Request != nil {
+				continue
+			}
+			if it.ID == excludeFolderID {
+				continue
+			}
+			if it.Name == name {
+				return true
+			}
+		}
+		return false
+	}
+	for i := range items {
+		if items[i].ID == parentID {
+			return folderNameExists(items[i].Item, "", name, excludeFolderID)
+		}
+		if folderNameExists(items[i].Item, parentID, name, excludeFolderID) {
+			return true
+		}
+	}
+	return false
 }
 
-func (pm *ProjectManager) CreateRequest(projectID, folderPath, name string, content string) (*models.CurlRequest, error) {
-	requestID := uuid.New().String()
-	requestName := buildSlugUUIDName(name, requestID) + ".curl"
-	requestPath := filepath.Join(folderPath, requestName)
-
-	if err := os.WriteFile(requestPath, []byte(content), 0644); err != nil {
-		return nil, err
+func (pm *ProjectManager) DeleteFolder(folderRefPath string) error {
+	projectID, folderID, ok := postman.ParseFolderRef(folderRefPath)
+	if !ok {
+		return os.ErrInvalid
 	}
-
-	metaData := requestMeta{
-		ID:   requestID,
-		Name: name,
-	}
-	metaBytes, _ := json.Marshal(metaData)
-	metaPath := filepath.Join(folderPath, requestID+".meta")
-	os.WriteFile(metaPath, metaBytes, 0644)
-
-	request := &models.CurlRequest{
-		ID:        requestID,
-		Name:      name,
-		ProjectID: projectID,
-		Path:      requestPath,
-		Content:   content,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-
-	return request, nil
-}
-
-func buildSlugUUIDName(name, id string) string {
-	base := strings.TrimSpace(strings.ToLower(name))
-	if base == "" {
-		base = "item"
-	}
-
-	re := regexp.MustCompile(`[^\p{L}\p{N}]+`)
-	slug := strings.Trim(re.ReplaceAllString(base, "-"), "-")
-	if slug == "" {
-		slug = "item"
-	}
-
-	return slug + "__" + id
-}
-
-func stripUUIDSuffix(name string) string {
-	parts := strings.Split(name, "__")
-	if len(parts) < 2 {
-		return name
-	}
-
-	suffix := parts[len(parts)-1]
-	if _, err := uuid.Parse(suffix); err == nil {
-		return strings.Join(parts[:len(parts)-1], "__")
-	}
-
-	return name
-}
-
-func extractTrailingUUID(name string) string {
-	parts := strings.Split(name, "__")
-	if len(parts) < 2 {
-		return ""
-	}
-
-	suffix := parts[len(parts)-1]
-	if _, err := uuid.Parse(suffix); err == nil {
-		return suffix
-	}
-
-	return ""
-}
-
-func saveFolderMeta(folderPath, id, name string) error {
-	meta := folderMeta{
-		ID:   id,
-		Name: name,
-	}
-
-	data, err := json.MarshalIndent(meta, "", "  ")
+	projectPath, err := pm.findProjectPathByID(projectID)
 	if err != nil {
 		return err
 	}
-
-	return os.WriteFile(filepath.Join(folderPath, ".folder.meta"), data, 0644)
+	coll, err := postman.LoadCollection(projectPath)
+	if err != nil {
+		return err
+	}
+	next, removed := postman.DeleteItemByID(coll.Item, folderID)
+	if !removed {
+		return os.ErrNotExist
+	}
+	coll.Item = next
+	return postman.SaveCollection(projectPath, coll)
 }
 
-func loadFolderMeta(folderPath string) (*folderMeta, error) {
-	data, err := os.ReadFile(filepath.Join(folderPath, ".folder.meta"))
+func (pm *ProjectManager) CreateRequest(projectID, folderPath, name string, spec models.HttpRequestSpec) (*models.CurlRequest, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, os.ErrInvalid
+	}
+
+	projectPath, err := pm.findProjectPathByID(projectID)
 	if err != nil {
 		return nil, err
 	}
 
-	var meta folderMeta
-	if err := json.Unmarshal(data, &meta); err != nil {
+	parentID, err := resolveParentFolderID(projectPath, folderPath, projectID)
+	if err != nil {
 		return nil, err
 	}
-	return &meta, nil
+
+	coll, err := postman.LoadCollection(projectPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if parentID != "" && postman.FindItemRef(coll.Item, parentID) == nil {
+		return nil, errors.New("父文件夹不存在")
+	}
+
+	if requestNameExists(coll.Item, parentID, name, "") {
+		return nil, errors.New("同级目录下已存在同名接口")
+	}
+
+	reqID := uuid.New().String()
+	item := postman.NewRequestItemFromSpec(reqID, name, &spec)
+
+	var ok bool
+	coll.Item, ok = postman.InsertItemUnder(coll.Item, parentID, item)
+	if !ok {
+		return nil, errors.New("父文件夹不存在")
+	}
+
+	if err := postman.SaveCollection(projectPath, coll); err != nil {
+		return nil, err
+	}
+
+	created := postman.FindItemRef(coll.Item, reqID)
+	now := time.Now()
+	cr := postman.ItemToCurlRequestModel(projectID, created)
+	cr.CreatedAt = now
+	cr.UpdatedAt = now
+	return cr, nil
 }
 
-func (pm *ProjectManager) UpdateRequest(requestPath, content string) error {
-	return os.WriteFile(requestPath, []byte(content), 0644)
+func requestNameExists(items []postman.CollectionItem, parentID, name, excludeRequestID string) bool {
+	if parentID == "" {
+		for _, it := range items {
+			if it.Request == nil {
+				continue
+			}
+			if it.ID == excludeRequestID {
+				continue
+			}
+			if it.Name == name {
+				return true
+			}
+		}
+		return false
+	}
+	for i := range items {
+		if items[i].ID == parentID {
+			return requestNameExists(items[i].Item, "", name, excludeRequestID)
+		}
+		if requestNameExists(items[i].Item, parentID, name, excludeRequestID) {
+			return true
+		}
+	}
+	return false
+}
+
+func (pm *ProjectManager) UpdateRequest(requestPath string, spec models.HttpRequestSpec) error {
+	projectID, requestID, ok := postman.ParseRequestRef(requestPath)
+	if !ok {
+		return os.ErrInvalid
+	}
+	projectPath, err := pm.findProjectPathByID(projectID)
+	if err != nil {
+		return err
+	}
+	coll, err := postman.LoadCollection(projectPath)
+	if err != nil {
+		return err
+	}
+	item := postman.FindItemRef(coll.Item, requestID)
+	if item == nil || item.Request == nil {
+		return os.ErrNotExist
+	}
+	pre, post := item.PreScriptID, item.PostScriptID
+	postman.ApplyHTTPRequestSpecToItem(item, &spec)
+	item.PreScriptID, item.PostScriptID = pre, post
+	return postman.SaveCollection(projectPath, coll)
+}
+
+func (pm *ProjectManager) UpdateRequestScripts(requestPath, preScriptID, postScriptID string) error {
+	projectID, requestID, ok := postman.ParseRequestRef(requestPath)
+	if !ok {
+		return os.ErrInvalid
+	}
+	projectPath, err := pm.findProjectPathByID(projectID)
+	if err != nil {
+		return err
+	}
+	coll, err := postman.LoadCollection(projectPath)
+	if err != nil {
+		return err
+	}
+	item := postman.FindItemRef(coll.Item, requestID)
+	if item == nil {
+		return os.ErrNotExist
+	}
+	item.PreScriptID = strings.TrimSpace(preScriptID)
+	item.PostScriptID = strings.TrimSpace(postScriptID)
+	return postman.SaveCollection(projectPath, coll)
 }
 
 func (pm *ProjectManager) DeleteRequest(requestPath string) error {
-	requestName := strings.TrimSuffix(filepath.Base(requestPath), ".curl")
-	requestID := extractTrailingUUID(requestName)
-	if requestID == "" {
-		requestID = requestName
+	projectID, requestID, ok := postman.ParseRequestRef(requestPath)
+	if !ok {
+		return os.ErrInvalid
 	}
-	metaPath := filepath.Join(filepath.Dir(requestPath), requestID+".meta")
-	os.Remove(metaPath)
-	return os.Remove(requestPath)
+	projectPath, err := pm.findProjectPathByID(projectID)
+	if err != nil {
+		return err
+	}
+	coll, err := postman.LoadCollection(projectPath)
+	if err != nil {
+		return err
+	}
+	next, ok := postman.DeleteItemByID(coll.Item, requestID)
+	if !ok {
+		return os.ErrNotExist
+	}
+	coll.Item = next
+	return postman.SaveCollection(projectPath, coll)
 }
 
 func (pm *ProjectManager) GetRequest(requestPath string) (*models.CurlRequest, error) {
-	content, err := os.ReadFile(requestPath)
+	projectID, requestID, ok := postman.ParseRequestRef(requestPath)
+	if !ok {
+		return nil, os.ErrInvalid
+	}
+	projectPath, err := pm.findProjectPathByID(projectID)
 	if err != nil {
 		return nil, err
 	}
-
-	requestNameKey := strings.TrimSuffix(filepath.Base(requestPath), ".curl")
-	requestID := extractTrailingUUID(requestNameKey)
-	if requestID == "" {
-		requestID = requestNameKey
+	coll, err := postman.LoadCollection(projectPath)
+	if err != nil {
+		return nil, err
 	}
-	metaPath := filepath.Join(filepath.Dir(requestPath), requestID+".meta")
-
-	var meta requestMeta
-	if loadedMeta, err := loadRequestMeta(metaPath); err == nil {
-		meta = *loadedMeta
+	item := postman.FindItemRef(coll.Item, requestID)
+	if item == nil {
+		return nil, os.ErrNotExist
 	}
-	requestName := meta.Name
-
-	if requestName == "" {
-		requestName = strings.TrimSuffix(filepath.Base(requestPath), ".curl")
-	}
-
-	return &models.CurlRequest{
-		Path:         requestPath,
-		Name:         requestName,
-		Content:      string(content),
-		PreScriptID:  meta.PreScriptID,
-		PostScriptID: meta.PostScriptID,
-	}, nil
+	return postman.ItemToCurlRequestModel(projectID, item), nil
 }
 
 func (pm *ProjectManager) CopyRequest(requestPath string) (*models.CurlRequest, error) {
-	req, err := pm.GetRequest(requestPath)
+	projectID, requestID, ok := postman.ParseRequestRef(requestPath)
+	if !ok {
+		return nil, os.ErrInvalid
+	}
+	projectPath, err := pm.findProjectPathByID(projectID)
+	if err != nil {
+		return nil, err
+	}
+	coll, err := postman.LoadCollection(projectPath)
 	if err != nil {
 		return nil, err
 	}
 
-	folderPath := filepath.Dir(requestPath)
-	existingNames, err := pm.listRequestDisplayNames(folderPath)
-	if err != nil {
+	orig := postman.FindItemRef(coll.Item, requestID)
+	if orig == nil || orig.Request == nil {
+		return nil, os.ErrNotExist
+	}
+
+	parentID, ok := parentFolderIDOfRequest(coll.Item, requestID)
+	if !ok {
+		return nil, os.ErrNotExist
+	}
+
+	baseCopyName := orig.Name + "-副本"
+	copyName := nextAvailableCopyName(coll.Item, parentID, baseCopyName)
+
+	newID := uuid.New().String()
+
+	clone := *orig
+	clone.ID = newID
+	clone.Name = copyName
+
+	var inserted bool
+	coll.Item, inserted = postman.InsertItemUnder(coll.Item, parentID, clone)
+	if !inserted {
+		return nil, errors.New("无法插入副本")
+	}
+
+	if err := postman.SaveCollection(projectPath, coll); err != nil {
 		return nil, err
 	}
 
-	baseCopyName := req.Name + "-副本"
-	copyName := baseCopyName
-	for i := 2; ; i++ {
-		if _, exists := existingNames[copyName]; !exists {
-			break
-		}
-		copyName = baseCopyName + strconv.Itoa(i)
-	}
-
-	requestID := uuid.New().String()
-	fileName := buildSlugUUIDName(copyName, requestID) + ".curl"
-	newRequestPath := filepath.Join(folderPath, fileName)
-
-	if err := os.WriteFile(newRequestPath, []byte(req.Content), 0644); err != nil {
-		return nil, err
-	}
-
-	metaData := requestMeta{
-		ID:   requestID,
-		Name: copyName,
-	}
-	metaBytes, err := json.Marshal(metaData)
-	if err != nil {
-		return nil, err
-	}
-	metaPath := filepath.Join(folderPath, requestID+".meta")
-	if err := os.WriteFile(metaPath, metaBytes, 0644); err != nil {
-		return nil, err
-	}
-
-	return &models.CurlRequest{
-		ID:        requestID,
-		Name:      copyName,
-		Path:      newRequestPath,
-		Content:   req.Content,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}, nil
+	now := time.Now()
+	cr := postman.ItemToCurlRequestModel(projectID, postman.FindItemRef(coll.Item, newID))
+	cr.CreatedAt = now
+	cr.UpdatedAt = now
+	return cr, nil
 }
 
-func (pm *ProjectManager) listRequestDisplayNames(folderPath string) (map[string]struct{}, error) {
+func parentFolderIDOfRequest(items []postman.CollectionItem, requestID string) (parentID string, ok bool) {
+	for _, it := range items {
+		if it.ID == requestID && it.Request != nil {
+			return "", true
+		}
+	}
+	for _, it := range items {
+		for _, ch := range it.Item {
+			if ch.ID == requestID && ch.Request != nil {
+				return it.ID, true
+			}
+		}
+		if pid, ok2 := parentFolderIDOfRequest(it.Item, requestID); ok2 {
+			return pid, ok2
+		}
+	}
+	return "", false
+}
+
+func nextAvailableCopyName(items []postman.CollectionItem, parentID, base string) string {
+	names := collectRequestDisplayNames(items, parentID)
+	copyName := base
+	for i := 2; ; i++ {
+		if _, exists := names[copyName]; !exists {
+			return copyName
+		}
+		copyName = base + strconv.Itoa(i)
+	}
+}
+
+func collectRequestDisplayNames(items []postman.CollectionItem, parentID string) map[string]struct{} {
 	names := make(map[string]struct{})
-
-	entries, err := os.ReadDir(folderPath)
-	if err != nil {
-		return nil, err
+	if parentID == "" {
+		for _, it := range items {
+			if it.Request != nil {
+				names[it.Name] = struct{}{}
+			}
+		}
+		return names
 	}
-
-	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".curl" {
-			continue
+	for i := range items {
+		if items[i].ID == parentID {
+			return collectRequestDisplayNames(items[i].Item, "")
 		}
-
-		requestNameKey := strings.TrimSuffix(entry.Name(), ".curl")
-		requestID := extractTrailingUUID(requestNameKey)
-		if requestID == "" {
-			requestID = requestNameKey
+		if sub := collectRequestDisplayNamesNested(items[i].Item, parentID); len(sub) > 0 {
+			return sub
 		}
-
-		displayName := requestNameKey
-		metaPath := filepath.Join(folderPath, requestID+".meta")
-		if meta, readErr := loadRequestMeta(metaPath); readErr == nil && meta.Name != "" {
-			displayName = meta.Name
-		}
-
-		names[displayName] = struct{}{}
 	}
+	return names
+}
 
-	return names, nil
+func collectRequestDisplayNamesNested(items []postman.CollectionItem, parentID string) map[string]struct{} {
+	for i := range items {
+		if items[i].ID == parentID {
+			return collectRequestDisplayNames(items[i].Item, "")
+		}
+		if sub := collectRequestDisplayNamesNested(items[i].Item, parentID); len(sub) > 0 {
+			return sub
+		}
+	}
+	return nil
 }
 
 func (pm *ProjectManager) RenameRequest(requestPath, newName string) (*models.CurlRequest, error) {
@@ -763,282 +730,209 @@ func (pm *ProjectManager) RenameRequest(requestPath, newName string) (*models.Cu
 		return nil, os.ErrInvalid
 	}
 
-	req, err := pm.GetRequest(requestPath)
+	projectID, requestID, ok := postman.ParseRequestRef(requestPath)
+	if !ok {
+		return nil, os.ErrInvalid
+	}
+	projectPath, err := pm.findProjectPathByID(projectID)
+	if err != nil {
+		return nil, err
+	}
+	coll, err := postman.LoadCollection(projectPath)
 	if err != nil {
 		return nil, err
 	}
 
-	requestNameKey := strings.TrimSuffix(filepath.Base(requestPath), ".curl")
-	requestID := extractTrailingUUID(requestNameKey)
-	if requestID == "" {
-		requestID = requestNameKey
+	item := postman.FindItemRef(coll.Item, requestID)
+	if item == nil || item.Request == nil {
+		return nil, os.ErrNotExist
 	}
 
-	folderPath := filepath.Dir(requestPath)
-	if exists, err := pm.requestNameExists(folderPath, newName, requestPath); err != nil {
-		return nil, err
-	} else if exists {
+	parentID, _ := parentFolderIDOfRequest(coll.Item, requestID)
+	if requestNameExists(coll.Item, parentID, newName, requestID) {
 		return nil, errors.New("同级目录下已存在同名接口")
 	}
 
-	newFileName := buildSlugUUIDName(newName, requestID) + ".curl"
-	newRequestPath := filepath.Join(folderPath, newFileName)
-
-	if newRequestPath != requestPath {
-		if err := os.Rename(requestPath, newRequestPath); err != nil {
-			return nil, err
-		}
-	}
-
-	metaData := requestMeta{
-		ID:           requestID,
-		Name:         newName,
-		PreScriptID:  req.PreScriptID,
-		PostScriptID: req.PostScriptID,
-	}
-	metaBytes, err := json.Marshal(metaData)
-	if err != nil {
-		return nil, err
-	}
-	metaPath := filepath.Join(filepath.Dir(newRequestPath), requestID+".meta")
-	if err := os.WriteFile(metaPath, metaBytes, 0644); err != nil {
+	item.Name = newName
+	if err := postman.SaveCollection(projectPath, coll); err != nil {
 		return nil, err
 	}
 
-	return &models.CurlRequest{
-		ID:        requestID,
-		Name:      newName,
-		Path:      newRequestPath,
-		Content:   req.Content,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}, nil
+	cr := postman.ItemToCurlRequestModel(projectID, item)
+	cr.UpdatedAt = time.Now()
+	return cr, nil
 }
 
-func (pm *ProjectManager) RenameFolder(folderPath, newName string) (*models.Folder, error) {
+func (pm *ProjectManager) RenameFolder(folderRefPath, newName string) (*models.Folder, error) {
 	newName = strings.TrimSpace(newName)
 	if newName == "" {
 		return nil, os.ErrInvalid
 	}
 
-	parentPath := filepath.Dir(folderPath)
-	if exists, err := pm.folderNameExists(parentPath, newName, folderPath); err != nil {
+	projectID, folderID, ok := postman.ParseFolderRef(folderRefPath)
+	if !ok {
+		return nil, os.ErrInvalid
+	}
+	projectPath, err := pm.findProjectPathByID(projectID)
+	if err != nil {
 		return nil, err
-	} else if exists {
+	}
+	coll, err := postman.LoadCollection(projectPath)
+	if err != nil {
+		return nil, err
+	}
+
+	item := postman.FindItemRef(coll.Item, folderID)
+	if item == nil || item.Request != nil {
+		return nil, os.ErrNotExist
+	}
+
+	parentID := parentFolderIDOfFolder(coll.Item, folderID)
+	if folderNameExists(coll.Item, parentID, newName, folderID) {
 		return nil, errors.New("同级目录下已存在同名文件夹")
 	}
 
-	folderID := extractTrailingUUID(filepath.Base(folderPath))
-	if folderID == "" {
-		if meta, err := loadFolderMeta(folderPath); err == nil && meta.ID != "" {
-			folderID = meta.ID
-		}
-	}
-	if folderID == "" {
-		folderID = uuid.New().String()
-	}
-
-	newFolderName := buildSlugUUIDName(newName, folderID)
-	newFolderPath := filepath.Join(parentPath, newFolderName)
-
-	if newFolderPath != folderPath {
-		if err := os.Rename(folderPath, newFolderPath); err != nil {
-			return nil, err
-		}
-	}
-
-	if err := saveFolderMeta(newFolderPath, folderID, newName); err != nil {
+	item.Name = newName
+	if err := postman.SaveCollection(projectPath, coll); err != nil {
 		return nil, err
 	}
 
 	return &models.Folder{
 		ID:        folderID,
 		Name:      newName,
-		Path:      newFolderPath,
+		ProjectID: projectID,
+		ParentID:  parentID,
+		Path:      postman.FolderRefPath(projectID, folderID),
 		CreatedAt: time.Now(),
 	}, nil
 }
 
-func (pm *ProjectManager) requestNameExists(folderPath, name, excludePath string) (bool, error) {
-	names, err := pm.listRequestDisplayNames(folderPath)
-	if err != nil {
-		return false, err
+func parentFolderIDOfFolder(items []postman.CollectionItem, folderID string) string {
+	for i := range items {
+		for _, ch := range items[i].Item {
+			if ch.ID == folderID && ch.Request == nil {
+				return items[i].ID
+			}
+		}
+		if p := parentFolderIDOfFolder(items[i].Item, folderID); p != "" {
+			return p
+		}
 	}
-	if _, exists := names[name]; !exists {
-		return false, nil
+	for i := range items {
+		if items[i].ID == folderID && items[i].Request == nil {
+			return ""
+		}
 	}
-
-	if excludePath == "" {
-		return true, nil
-	}
-
-	req, err := pm.GetRequest(excludePath)
-	if err != nil {
-		return true, nil
-	}
-	return req.Name != name, nil
+	return ""
 }
 
 func (pm *ProjectManager) MoveRequest(requestPath, targetFolderPath string) (string, error) {
-	requestPath = filepath.Clean(requestPath)
-	targetFolderPath = filepath.Clean(targetFolderPath)
-
-	if requestPath == "" || targetFolderPath == "" {
+	projectID, requestID, ok := postman.ParseRequestRef(requestPath)
+	if !ok {
 		return "", os.ErrInvalid
 	}
-
-	targetInfo, err := os.Stat(targetFolderPath)
+	projectPath, err := pm.findProjectPathByID(projectID)
 	if err != nil {
 		return "", err
 	}
-	if !targetInfo.IsDir() {
-		return "", errors.New("目标路径不是文件夹")
-	}
-
-	currentFolderPath := filepath.Dir(requestPath)
-	if currentFolderPath == targetFolderPath {
-		return requestPath, nil
-	}
-
-	req, err := pm.GetRequest(requestPath)
+	targetParentID, err := resolveParentFolderID(projectPath, targetFolderPath, projectID)
 	if err != nil {
 		return "", err
 	}
-	if exists, err := pm.requestNameExists(targetFolderPath, req.Name, ""); err != nil {
+
+	coll, err := postman.LoadCollection(projectPath)
+	if err != nil {
 		return "", err
-	} else if exists {
+	}
+
+	if targetParentID != "" && postman.FindItemRef(coll.Item, targetParentID) == nil {
+		return "", errors.New("目标文件夹不存在")
+	}
+
+	src := postman.FindItemRef(coll.Item, requestID)
+	if src == nil || src.Request == nil {
+		return "", os.ErrNotExist
+	}
+
+	if requestNameExists(coll.Item, targetParentID, src.Name, requestID) {
 		return "", errors.New("目标文件夹中已存在同名接口")
 	}
 
-	newRequestPath := filepath.Join(targetFolderPath, filepath.Base(requestPath))
-	if _, err := os.Stat(newRequestPath); err == nil {
-		return "", errors.New("目标文件夹中已存在同名接口文件")
+	next, moved, ok := postman.ExtractItem(coll.Item, requestID)
+	if !ok || moved.Request == nil {
+		return "", os.ErrNotExist
+	}
+	coll.Item = next
+
+	var inserted bool
+	coll.Item, inserted = postman.InsertItemUnder(coll.Item, targetParentID, moved)
+	if !inserted {
+		return "", errors.New("移动失败")
 	}
 
-	if err := os.Rename(requestPath, newRequestPath); err != nil {
+	if err := postman.SaveCollection(projectPath, coll); err != nil {
 		return "", err
 	}
-
-	requestNameKey := strings.TrimSuffix(filepath.Base(requestPath), ".curl")
-	requestID := extractTrailingUUID(requestNameKey)
-	if requestID == "" {
-		requestID = requestNameKey
-	}
-
-	oldMetaPath := filepath.Join(currentFolderPath, requestID+".meta")
-	newMetaPath := filepath.Join(targetFolderPath, requestID+".meta")
-	if _, err := os.Stat(oldMetaPath); err == nil {
-		if err := os.Rename(oldMetaPath, newMetaPath); err != nil {
-			return "", err
-		}
-	}
-
-	return newRequestPath, nil
+	return requestPath, nil
 }
 
-func (pm *ProjectManager) MoveFolder(folderPath, targetParentPath string) (string, error) {
-	folderPath = filepath.Clean(folderPath)
-	targetParentPath = filepath.Clean(targetParentPath)
-
-	if folderPath == "" || targetParentPath == "" {
+func (pm *ProjectManager) MoveFolder(folderRefPath, targetParentPath string) (string, error) {
+	projectID, folderID, ok := postman.ParseFolderRef(folderRefPath)
+	if !ok {
 		return "", os.ErrInvalid
 	}
-
-	targetInfo, err := os.Stat(targetParentPath)
+	projectPath, err := pm.findProjectPathByID(projectID)
 	if err != nil {
 		return "", err
 	}
-	if !targetInfo.IsDir() {
-		return "", errors.New("目标路径不是文件夹")
-	}
-
-	currentParent := filepath.Dir(folderPath)
-	if currentParent == targetParentPath {
-		return folderPath, nil
-	}
-
-	folderName := pm.getFolderDisplayName(folderPath)
-	if exists, err := pm.folderNameExists(targetParentPath, folderName, folderPath); err != nil {
+	targetParentID, err := resolveParentFolderID(projectPath, targetParentPath, projectID)
+	if err != nil {
 		return "", err
-	} else if exists {
+	}
+
+	coll, err := postman.LoadCollection(projectPath)
+	if err != nil {
+		return "", err
+	}
+
+	if folderID == targetParentID {
+		return "", errors.New("不能移动到自身")
+	}
+
+	if targetParentID != "" {
+		if postman.FolderSubtreeContainsID(coll.Item, folderID, targetParentID) {
+			return "", errors.New("不能移动到自身或子文件夹中")
+		}
+		if postman.FindItemRef(coll.Item, targetParentID) == nil {
+			return "", errors.New("目标位置不存在")
+		}
+	}
+
+	item := postman.FindItemRef(coll.Item, folderID)
+	if item == nil || item.Request != nil {
+		return "", os.ErrNotExist
+	}
+
+	if folderNameExists(coll.Item, targetParentID, item.Name, folderID) {
 		return "", errors.New("目标位置已存在同名文件夹")
 	}
 
-	normalizedFolder := folderPath + string(os.PathSeparator)
-	normalizedTarget := targetParentPath + string(os.PathSeparator)
-	if strings.HasPrefix(normalizedTarget, normalizedFolder) {
-		return "", errors.New("不能移动到自身或子文件夹中")
+	next, moved, ok := postman.ExtractItem(coll.Item, folderID)
+	if !ok {
+		return "", os.ErrNotExist
+	}
+	coll.Item = next
+
+	var inserted bool
+	coll.Item, inserted = postman.InsertItemUnder(coll.Item, targetParentID, moved)
+	if !inserted {
+		return "", errors.New("移动失败")
 	}
 
-	newFolderPath := filepath.Join(targetParentPath, filepath.Base(folderPath))
-	if _, err := os.Stat(newFolderPath); err == nil {
-		return "", errors.New("目标位置已存在同名文件夹")
-	}
-
-	if err := os.Rename(folderPath, newFolderPath); err != nil {
+	if err := postman.SaveCollection(projectPath, coll); err != nil {
 		return "", err
 	}
-
-	return newFolderPath, nil
-}
-
-func (pm *ProjectManager) getFolderDisplayName(folderPath string) string {
-	displayName := stripUUIDSuffix(filepath.Base(folderPath))
-	if meta, err := loadFolderMeta(folderPath); err == nil && meta.Name != "" {
-		displayName = meta.Name
-	}
-	return displayName
-}
-
-func (pm *ProjectManager) folderNameExists(parentPath, name, excludePath string) (bool, error) {
-	entries, err := os.ReadDir(parentPath)
-	if err != nil {
-		return false, err
-	}
-
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		childPath := filepath.Join(parentPath, entry.Name())
-		if excludePath != "" && childPath == excludePath {
-			continue
-		}
-
-		displayName := stripUUIDSuffix(entry.Name())
-		if meta, metaErr := loadFolderMeta(childPath); metaErr == nil && meta.Name != "" {
-			displayName = meta.Name
-		}
-
-		if displayName == name {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
-
-func (pm *ProjectManager) UpdateRequestScripts(requestPath, preScriptID, postScriptID string) error {
-	requestNameKey := strings.TrimSuffix(filepath.Base(requestPath), ".curl")
-	requestID := extractTrailingUUID(requestNameKey)
-	if requestID == "" {
-		requestID = requestNameKey
-	}
-	metaPath := filepath.Join(filepath.Dir(requestPath), requestID+".meta")
-	meta, err := loadRequestMeta(metaPath)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return err
-		}
-		meta = &requestMeta{
-			ID:   requestID,
-			Name: requestNameKey,
-		}
-	}
-	meta.PreScriptID = strings.TrimSpace(preScriptID)
-	meta.PostScriptID = strings.TrimSpace(postScriptID)
-	return saveRequestMeta(metaPath, meta)
+	return folderRefPath, nil
 }
 
 func (pm *ProjectManager) ListProjectScripts(projectID string) ([]models.ProjectScript, error) {
@@ -1182,67 +1076,34 @@ func (pm *ProjectManager) DeleteProjectScript(projectID, scriptID string) error 
 }
 
 func (pm *ProjectManager) clearScriptBindingsInProject(projectPath, scriptID string) error {
-	var firstErr error
-	err := filepath.WalkDir(projectPath, func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() || filepath.Ext(path) != ".meta" {
-			return nil
-		}
-		if filepath.Dir(path) == filepath.Join(projectPath, "scripts") {
-			return nil
-		}
-		meta, loadErr := loadRequestMeta(path)
-		if loadErr != nil {
-			return nil
-		}
-		changed := false
-		if meta.PreScriptID == scriptID {
-			meta.PreScriptID = ""
-			changed = true
-		}
-		if meta.PostScriptID == scriptID {
-			meta.PostScriptID = ""
-			changed = true
-		}
-		if changed {
-			if saveErr := saveRequestMeta(path, meta); saveErr != nil && firstErr == nil {
-				firstErr = saveErr
-			}
-		}
+	coll, err := postman.LoadCollection(projectPath)
+	if err != nil {
+		return err
+	}
+	changed := clearScriptBindingsWalk(&coll.Item, scriptID)
+	if !changed {
 		return nil
-	})
-	if err != nil {
-		return err
 	}
-	return firstErr
+	return postman.SaveCollection(projectPath, coll)
 }
 
-func loadRequestMeta(metaPath string) (*requestMeta, error) {
-	data, err := os.ReadFile(metaPath)
-	if err != nil {
-		return nil, err
+func clearScriptBindingsWalk(items *[]postman.CollectionItem, scriptID string) bool {
+	changed := false
+	for i := range *items {
+		it := &(*items)[i]
+		if it.PreScriptID == scriptID {
+			it.PreScriptID = ""
+			changed = true
+		}
+		if it.PostScriptID == scriptID {
+			it.PostScriptID = ""
+			changed = true
+		}
+		if clearScriptBindingsWalk(&it.Item, scriptID) {
+			changed = true
+		}
 	}
-	meta := &requestMeta{}
-	if err := json.Unmarshal(data, meta); err == nil && (meta.ID != "" || meta.Name != "") {
-		return meta, nil
-	}
-	var legacy map[string]string
-	if err := json.Unmarshal(data, &legacy); err != nil {
-		return nil, err
-	}
-	return &requestMeta{
-		ID:           legacy["id"],
-		Name:         legacy["name"],
-		PreScriptID:  legacy["pre_script_id"],
-		PostScriptID: legacy["post_script_id"],
-	}, nil
-}
-
-func saveRequestMeta(metaPath string, meta *requestMeta) error {
-	data, err := json.Marshal(meta)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(metaPath, data, 0644)
+	return changed
 }
 
 func loadScriptMeta(metaPath string) (*scriptMeta, error) {
@@ -1263,4 +1124,19 @@ func saveScriptMeta(metaPath string, meta *scriptMeta) error {
 		return err
 	}
 	return os.WriteFile(metaPath, data, 0644)
+}
+
+func buildSlugUUIDName(name, id string) string {
+	base := strings.TrimSpace(strings.ToLower(name))
+	if base == "" {
+		base = "item"
+	}
+
+	re := regexp.MustCompile(`[^\p{L}\p{N}]+`)
+	slug := strings.Trim(re.ReplaceAllString(base, "-"), "-")
+	if slug == "" {
+		slug = "item"
+	}
+
+	return slug + "__" + id
 }

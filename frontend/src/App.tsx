@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Space, Modal, Input, message, Spin, Tree, Dropdown, Tabs, Card, Col, Row, Select, Collapse, Empty, Radio, InputRef, Upload, Tooltip } from 'antd';
+import { Button, Space, Modal, Input, message, Spin, Tree, Dropdown, Tabs, Card, Col, Row, Select, Collapse, Empty, Radio, InputRef, Upload, Tooltip, Checkbox } from 'antd';
 import { PlusOutlined, ApiOutlined, ProjectOutlined, FolderOutlined, FileOutlined, CopyOutlined, EditOutlined, CloseOutlined, HomeOutlined, DragOutlined, SearchOutlined, RightOutlined, DownOutlined, MoreOutlined, ImportOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import type { DataNode } from 'antd/es/tree';
 import type { UploadProps } from 'antd';
@@ -7,7 +7,8 @@ import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import './App.css';
 import { TitleBar } from './components/TitleBar';
-import { ListProjects, CreateProject, DeleteProject, RenameProject, GetProjectTree, CreateFolder, CreateRequest, CopyRequest, RenameRequest, RenameFolder, MoveRequest, MoveFolder, GetRequest, DeleteRequest, DeleteFolder, ExecuteCurl, UpdateRequest, ImportPostmanCollection, LoadAppConfig, LoadEnvironments, CreateEnvironment, UpdateEnvironment, DeleteEnvironment, ListProjectScripts, CreateProjectScript, UpdateProjectScript, DeleteProjectScript, UpdateRequestScripts } from '../wailsjs/go/main/App';
+import { ListProjects, CreateProject, DeleteProject, RenameProject, GetProjectTree, CreateFolder, CreateRequest, CopyRequest, RenameRequest, RenameFolder, MoveRequest, MoveFolder, GetRequest, DeleteRequest, DeleteFolder, ExecuteHTTPRequest, UpdateRequest, ImportPostmanCollection, LoadAppConfig, LoadEnvironments, CreateEnvironment, UpdateEnvironment, DeleteEnvironment, ListProjectScripts, CreateProjectScript, UpdateProjectScript, DeleteProjectScript, UpdateRequestScripts } from '../wailsjs/go/main/App';
+import { models } from '../wailsjs/go/models';
 
 interface Project {
     id: string;
@@ -28,9 +29,17 @@ interface ProjectTree {
 interface CurlRequest {
     path: string;
     name: string;
-    content: string;
+    content?: string;
     pre_script_id?: string;
     post_script_id?: string;
+    method?: string;
+    http_url?: string;
+    headers?: { key: string; value: string; enabled?: boolean }[];
+    params?: { key: string; value: string; enabled?: boolean }[];
+    body?: string;
+    body_type?: string;
+    form_data?: { key: string; value: string; enabled?: boolean }[];
+    url_encoded?: { key: string; value: string; enabled?: boolean }[];
 }
 
 interface ProjectTab {
@@ -82,8 +91,8 @@ interface ApiConfig {
     params: { key: string; value: string; enabled: boolean }[];
     body: string;
     bodyType: 'none' | 'form-data' | 'x-www-form-urlencoded' | 'json' | 'xml' | 'raw' | 'binary';
-    formData: { key: string; value: string }[];
-    urlencoded: { key: string; value: string }[];
+    formData: { key: string; value: string; enabled: boolean }[];
+    urlencoded: { key: string; value: string; enabled: boolean }[];
     preScriptId?: string;
     postScriptId?: string;
 }
@@ -92,7 +101,6 @@ interface ProjectWorkspaceState {
     requestTabs: RequestTab[];
     activeRequestTab: string;
     currentRequest: CurlRequest | null;
-    requestContent: string;
     response: any;
     selectedKeys: string[];
     apiConfig: ApiConfig;
@@ -123,12 +131,68 @@ const createEmptyWorkspaceState = (): ProjectWorkspaceState => ({
     requestTabs: [],
     activeRequestTab: '',
     currentRequest: null,
-    requestContent: '',
     response: null,
     selectedKeys: [],
     apiConfig: createDefaultApiConfig(),
     selectedEnvironmentId: ''
 });
+
+const apiConfigFromRequest = (r: CurlRequest, fallbackName: string): ApiConfig => {
+    const bt = (r.body_type || 'none') as ApiConfig['bodyType'];
+    const allowed: ApiConfig['bodyType'][] = ['none', 'form-data', 'x-www-form-urlencoded', 'json', 'xml', 'raw', 'binary'];
+    const bodyType = allowed.includes(bt) ? bt : 'none';
+    return {
+        name: r.name || fallbackName,
+        method: (r.method || 'GET').toUpperCase(),
+        url: r.http_url || '',
+        headers: Array.isArray(r.headers)
+            ? r.headers.map((h) => ({
+                key: h.key || '',
+                value: h.value || '',
+                enabled: h.enabled !== false,
+            }))
+            : [],
+        params: Array.isArray(r.params)
+            ? r.params.map((p) => ({
+                key: p.key || '',
+                value: p.value || '',
+                enabled: p.enabled !== false,
+            }))
+            : [],
+        body: r.body || '',
+        bodyType,
+        formData: Array.isArray(r.form_data)
+            ? r.form_data.map((f) => ({
+                key: f.key || '',
+                value: f.value || '',
+                enabled: f.enabled !== false,
+            }))
+            : [],
+        urlencoded: Array.isArray(r.url_encoded)
+            ? r.url_encoded.map((u) => ({
+                key: u.key || '',
+                value: u.value || '',
+                enabled: u.enabled !== false,
+            }))
+            : [],
+        preScriptId: r.pre_script_id || '',
+        postScriptId: r.post_script_id || '',
+    };
+};
+
+const apiConfigToSpec = (c: ApiConfig) => ({
+    method: c.method,
+    http_url: c.url,
+    headers: c.headers.map((h) => ({ key: h.key, value: h.value, enabled: h.enabled })),
+    params: c.params.map((p) => ({ key: p.key, value: p.value, enabled: p.enabled })),
+    body: c.body,
+    body_type: c.bodyType,
+    form_data: c.formData.map((f) => ({ key: f.key, value: f.value, enabled: f.enabled })),
+    url_encoded: c.urlencoded.map((u) => ({ key: u.key, value: u.value, enabled: u.enabled })),
+});
+
+/** Wails 将 HttpRequestSpec 生成为 class（含 convertValues），需用 createFrom 包装字面量。 */
+const toWailsHttpSpec = (c: ApiConfig) => models.HttpRequestSpec.createFrom(apiConfigToSpec(c));
 
 const createEnvironmentVariableRow = (key: string = '', value: string = ''): EnvironmentVariableRow => ({
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -379,7 +443,6 @@ function App() {
     const [requestTabs, setRequestTabs] = useState<RequestTab[]>([]);
     const [activeRequestTab, setActiveRequestTab] = useState<string>('');
     const [currentRequest, setCurrentRequest] = useState<CurlRequest | null>(null);
-    const [requestContent, setRequestContent] = useState('');
     const [response, setResponse] = useState<any>(null);
     const [executing, setExecuting] = useState(false);
     const [createFolderModal, setCreateFolderModal] = useState(false);
@@ -540,8 +603,15 @@ function App() {
         if (sourceParent === targetFolderPath) return { ok: false, reason: 'same-parent' };
 
         if (dragNode.type === 'folder') {
-            if (targetFolderPath.startsWith(dragNode.path + '\\') || targetFolderPath.startsWith(dragNode.path + '/')) {
-                return { ok: false, reason: 'child' };
+            let p: string | null = targetFolderPath;
+            const seen = new Set<string>();
+            while (p) {
+                if (p === dragNode.path) {
+                    return { ok: false, reason: 'child' };
+                }
+                if (seen.has(p)) break;
+                seen.add(p);
+                p = getParentFolderPath(p);
             }
         }
 
@@ -590,7 +660,6 @@ function App() {
         setRequestTabs(emptyState.requestTabs);
         setActiveRequestTab(emptyState.activeRequestTab);
         setCurrentRequest(emptyState.currentRequest);
-        setRequestContent(emptyState.requestContent);
         setResponse(emptyState.response);
         setSelectedKeys(emptyState.selectedKeys);
         setApiConfig(emptyState.apiConfig);
@@ -601,7 +670,6 @@ function App() {
         requestTabs,
         activeRequestTab,
         currentRequest,
-        requestContent,
         response,
         selectedKeys,
         apiConfig,
@@ -612,7 +680,6 @@ function App() {
         setRequestTabs(state.requestTabs);
         setActiveRequestTab(state.activeRequestTab);
         setCurrentRequest(state.currentRequest);
-        setRequestContent(state.requestContent);
         setResponse(state.response);
         setSelectedKeys(state.selectedKeys);
         setApiConfig(state.apiConfig);
@@ -885,7 +952,7 @@ function App() {
                 >
                     {((api as any).method || 'GET').substring(0, 7).toUpperCase()}
                 </span>
-                <span className="api-name">{api.name.replace('.curl', '')}</span>
+                <span className="api-name">{api.name.replace(/\.curl$/i, '')}</span>
                 {hoveredItem === api.path && (
                     <Dropdown
                         menu={{
@@ -1607,7 +1674,7 @@ function App() {
 
         const parentPath = selectedFolder || currentProject.path;
         try {
-            await CreateRequest(currentProject.id, parentPath, newRequestName, 'curl ');
+            await CreateRequest(currentProject.id, parentPath, newRequestName, toWailsHttpSpec(createDefaultApiConfig()));
             message.success('请求创建成功');
             setCreateRequestModal(false);
             setNewRequestName('');
@@ -1634,9 +1701,7 @@ function App() {
             try {
                 const request = await GetRequest(treeNode.path);
                 setCurrentRequest(request);
-                const parsedConfig = parseCurlToConfig(request.content, request.name, request.pre_script_id, request.post_script_id);
-                setApiConfig(parsedConfig);
-                setRequestContent(request.content);
+                setApiConfig(apiConfigFromRequest(request as CurlRequest, treeNode.name));
                 setResponse(null);
 
                 const existingTab = requestTabs.find(t => t.path === treeNode.path);
@@ -1645,7 +1710,7 @@ function App() {
                 } else {
                     const newTab: RequestTab = {
                         id: `request-${Date.now()}`,
-                        title: request.name || treeNode.name.replace('.curl', ''),
+                        title: request.name || treeNode.name.replace(/\.curl$/i, ''),
                         path: treeNode.path,
                     };
                     setRequestTabs([...requestTabs, newTab]);
@@ -1656,93 +1721,6 @@ function App() {
                 message.error('加载请求失败');
             }
         }
-    };
-
-    const parseCurlToConfig = (curlCommand: string, name: string, preScriptId?: string, postScriptId?: string): ApiConfig => {
-        const config: ApiConfig = {
-            name: name,
-            method: 'GET',
-            url: '',
-            headers: [],
-            params: [],
-            body: '',
-            bodyType: 'none',
-            formData: [],
-            urlencoded: [],
-            preScriptId: preScriptId || '',
-            postScriptId: postScriptId || '',
-        };
-
-        const lines = curlCommand.split('\n');
-        let urlFound = false;
-
-        const extractDataArgumentFromLine = (line: string): string => {
-            const singleQuoted = line.match(/(?:^|\s)-d\s+'([^']*)'/i);
-            if (singleQuoted && singleQuoted[1] !== undefined) {
-                return singleQuoted[1];
-            }
-
-            const doubleQuoted = line.match(/(?:^|\s)-d\s+"((?:[^"\\]|\\.)*)"/i);
-            if (doubleQuoted && doubleQuoted[1] !== undefined) {
-                return doubleQuoted[1]
-                    .replace(/\\"/g, '"')
-                    .replace(/\\\\/g, '\\');
-            }
-
-            const unquoted = line.match(/(?:^|\s)-d\s+([^\s]+)/i);
-            if (unquoted && unquoted[1] !== undefined) {
-                return unquoted[1];
-            }
-
-            return '';
-        };
-
-        for (const line of lines) {
-            const trimmedLine = line.trim();
-            if (trimmedLine.startsWith('#')) continue;
-
-            const methodMatch = trimmedLine.match(/-X\s+(\w+)/i);
-            if (methodMatch) {
-                config.method = methodMatch[1].toUpperCase();
-            }
-
-            const headerMatch = trimmedLine.match(/-H\s+['"]([^'"]+)['"]/i);
-            if (headerMatch) {
-                const [key, ...valueParts] = headerMatch[1].split(':');
-                config.headers.push({
-                    key: key.trim(),
-                    value: valueParts.join(':').trim(),
-                    enabled: true
-                });
-            }
-
-            const dataValue = extractDataArgumentFromLine(trimmedLine);
-            if (dataValue) {
-                config.body = dataValue;
-            }
-
-            const urlMatch = trimmedLine.match(/['"]?(https?:\/\/[^\s'"]+)['"]?/i);
-            if (urlMatch && !urlFound) {
-                let url = urlMatch[1];
-                const paramMatch = url.match(/\?(.+)$/);
-                if (paramMatch) {
-                    url = url.replace(/\?.*$/, '');
-                    const paramPairs = paramMatch[1].split('&');
-                    for (const pair of paramPairs) {
-                        const [key, value] = pair.split('=');
-                        config.params.push({
-                            key: decodeURIComponent(key || ''),
-                            value: decodeURIComponent(value || ''),
-                            enabled: true
-                        });
-                    }
-                }
-                config.url = url;
-                urlFound = true;
-            }
-        }
-
-        return config;
     };
 
     const applyEnvironmentVariables = (input: string, variables: Record<string, string>): string => {
@@ -1765,59 +1743,6 @@ function App() {
         multiline: boolean = false
     ) => <VariableEditableInput value={value} onChange={onChange} placeholder={placeholder} style={style} environmentVariables={currentEnvironmentVariables} multiline={multiline} />;
 
-    const configToCurl = (config: ApiConfig): string => {
-        let curl = 'curl';
-        let requestURL = config.url || '';
-
-        if (config.method !== 'GET') {
-            curl += ` -X ${config.method}`;
-        }
-
-        for (const header of config.headers) {
-            if (header.enabled && header.key) {
-                curl += ` -H "${header.key}: ${header.value}"`;
-            }
-        }
-
-        for (const param of config.params) {
-            if (param.enabled && param.key) {
-                const separator = requestURL.includes('?') ? '&' : '?';
-                requestURL += `${separator}${encodeURIComponent(param.key)}=${encodeURIComponent(param.value)}`;
-            }
-        }
-
-        if (config.bodyType === 'none') {
-            // 不添加 body
-        } else if (config.bodyType === 'form-data' || config.bodyType === 'x-www-form-urlencoded') {
-            const data = config.bodyType === 'form-data' ? config.formData : config.urlencoded;
-            if (data.length > 0) {
-                if (config.bodyType === 'x-www-form-urlencoded') {
-                    curl += ` -H "Content-Type: application/x-www-form-urlencoded"`;
-                    const formBody = data.map(item => `${encodeURIComponent(item.key)}=${encodeURIComponent(item.value)}`).join('&');
-                    curl += ` -d '${formBody}'`;
-                } else {
-                    for (const item of data) {
-                        curl += ` -F "${item.key}=${item.value}"`;
-                    }
-                }
-            }
-        } else if (config.bodyType === 'json') {
-            curl += ` -H "Content-Type: application/json"`;
-            curl += ` -d '${config.body}'`;
-        } else if (config.bodyType === 'xml') {
-            curl += ` -H "Content-Type: application/xml"`;
-            curl += ` -d '${config.body}'`;
-        } else if (config.bodyType === 'raw') {
-            curl += ` -d '${config.body}'`;
-        } else if (config.bodyType === 'binary') {
-            // Binary 类型需要文件路径，暂时不支持
-        }
-
-        curl += ` "${requestURL}"`;
-
-        return curl;
-    };
-
     const handleCloseRequestTab = (tabId: string) => {
         setRequestTabs(requestTabs.filter(t => t.id !== tabId));
         if (activeRequestTab === tabId) {
@@ -1829,7 +1754,6 @@ function App() {
             } else {
                 setActiveRequestTab('');
                 setCurrentRequest(null);
-                setRequestContent('');
                 setResponse(null);
             }
         }
@@ -1840,8 +1764,7 @@ function App() {
         try {
             const request = await GetRequest(path);
             setCurrentRequest(request);
-            setApiConfig(parseCurlToConfig(request.content, request.name, request.pre_script_id, request.post_script_id));
-            setRequestContent(request.content);
+            setApiConfig(apiConfigFromRequest(request as CurlRequest, request.name));
             setResponse(null);
         } catch (error: any) {
             console.error('Failed to load request:', error);
@@ -1879,8 +1802,7 @@ function App() {
             })),
         };
 
-        const curlCommand = configToCurl(resolvedConfig);
-        if (!curlCommand || !apiConfig.url) {
+        if (!apiConfig.url?.trim()) {
             message.warning('请输入 URL');
             return;
         }
@@ -1888,11 +1810,11 @@ function App() {
         setExecuting(true);
         setResponse(null);
         try {
-            const result = await ExecuteCurl(curlCommand);
+            const result = await ExecuteHTTPRequest(toWailsHttpSpec(resolvedConfig));
             setResponse(result);
             setStatus(`请求完成 - ${result.status_code}`);
         } catch (error: any) {
-            console.error('Failed to execute curl:', error);
+            console.error('Failed to execute request:', error);
             message.error(`执行失败: ${error?.message || error}`);
         } finally {
             setExecuting(false);
@@ -1957,10 +1879,8 @@ function App() {
         if (!currentRequest?.path) return;
 
         try {
-            const curlCommand = configToCurl(apiConfig);
-            await UpdateRequest(currentRequest.path, curlCommand);
+            await UpdateRequest(currentRequest.path, toWailsHttpSpec(apiConfig));
             await UpdateRequestScripts(currentRequest.path, apiConfig.preScriptId || '', apiConfig.postScriptId || '');
-            setRequestContent(curlCommand);
             message.success('请求已保存');
             setStatus('请求已保存');
 
@@ -2564,27 +2484,29 @@ function App() {
                         <div className="project-main">
                             {sidebarMenu === 'apis' && requestTabs.length > 0 && (
                                 <div className="request-tabs-row">
-                                    <Tabs
-                                        activeKey={activeRequestTab}
-                                        onChange={(key) => {
-                                            setActiveRequestTab(key);
-                                            const tab = requestTabs.find(t => t.id === key);
-                                            if (tab) loadRequestContent(tab.path);
-                                        }}
-                                        type="editable-card"
-                                        hideAdd
-                                        onEdit={(targetKey, action) => {
-                                            if (action === 'remove') {
-                                                handleCloseRequestTab(targetKey as string);
-                                            }
-                                        }}
-                                        items={requestTabs.map(tab => ({
-                                            key: tab.id,
-                                            label: tab.title,
-                                        }))}
-                                        size="small"
-                                        style={{ marginBottom: 0, flex: 1 }}
-                                    />
+                                    <div className="request-tabs-scroll-wrap">
+                                        <Tabs
+                                            activeKey={activeRequestTab}
+                                            onChange={(key) => {
+                                                setActiveRequestTab(key);
+                                                const tab = requestTabs.find(t => t.id === key);
+                                                if (tab) loadRequestContent(tab.path);
+                                            }}
+                                            type="editable-card"
+                                            hideAdd
+                                            onEdit={(targetKey, action) => {
+                                                if (action === 'remove') {
+                                                    handleCloseRequestTab(targetKey as string);
+                                                }
+                                            }}
+                                            items={requestTabs.map(tab => ({
+                                                key: tab.id,
+                                                label: tab.title,
+                                            }))}
+                                            size="small"
+                                            style={{ marginBottom: 0 }}
+                                        />
+                                    </div>
                                     <div className="request-tabs-environment-select">
                                         <Select
                                             size="small"
@@ -2594,7 +2516,7 @@ function App() {
                                                 { label: '不使用环境', value: '__none__' },
                                                 ...environments.map(env => ({ label: env.name, value: env.id }))
                                             ]}
-                                            style={{ width: 200 }}
+                                            style={{ width: 133 }}
                                         />
                                     </div>
                                 </div>
@@ -2761,7 +2683,17 @@ function App() {
                                                     children: (
                                                         <div className="kv-editor">
                                                             {apiConfig.params.map((param, index) => (
-                                                                <div key={index} className="kv-row">
+                                                                <div key={index} className="kv-row kv-row-params">
+                                                                    <Checkbox
+                                                                        className="kv-param-enabled"
+                                                                        checked={param.enabled !== false}
+                                                                        onChange={(e) => {
+                                                                            const newParams = [...apiConfig.params];
+                                                                            newParams[index].enabled = e.target.checked;
+                                                                            setApiConfig({ ...apiConfig, params: newParams });
+                                                                        }}
+                                                                        title="发送请求时包含该参数"
+                                                                    />
                                                                     <Input
                                                                         placeholder="Key"
                                                                         value={param.key}
@@ -2887,8 +2819,20 @@ function App() {
                                                             )}
                                                             {(apiConfig.bodyType === 'form-data' || apiConfig.bodyType === 'x-www-form-urlencoded') && (
                                                                 <div className="kv-editor">
-                                                                    {(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded).map((item: any, index: number) => (
-                                                                        <div key={index} className="kv-row">
+                                                                    {(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded).map((item, index) => (
+                                                                        <div key={index} className="kv-row kv-row-params">
+                                                                            <Checkbox
+                                                                                className="kv-param-enabled"
+                                                                                checked={item.enabled !== false}
+                                                                                onChange={(e) => {
+                                                                                    const newData = [...(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded)];
+                                                                                    newData[index].enabled = e.target.checked;
+                                                                                    setApiConfig(apiConfig.bodyType === 'form-data'
+                                                                                        ? { ...apiConfig, formData: newData }
+                                                                                        : { ...apiConfig, urlencoded: newData });
+                                                                                }}
+                                                                                title="发送请求时包含该字段"
+                                                                            />
                                                                             {renderVariableAwareInput(
                                                                                 item.key,
                                                                                 (value) => {
@@ -2917,7 +2861,7 @@ function App() {
                                                                                 type="text"
                                                                                 danger
                                                                                 onClick={() => {
-                                                                                    const newData = (apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded).filter((_: any, i: number) => i !== index);
+                                                                                    const newData = (apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded).filter((_, i) => i !== index);
                                                                                     setApiConfig(apiConfig.bodyType === 'form-data'
                                                                                         ? { ...apiConfig, formData: newData }
                                                                                         : { ...apiConfig, urlencoded: newData });
@@ -2931,7 +2875,7 @@ function App() {
                                                                         type="link"
                                                                         icon={<PlusOutlined />}
                                                                         onClick={() => {
-                                                                            const newData = [...(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded), { key: '', value: '' }];
+                                                                            const newData = [...(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded), { key: '', value: '', enabled: true }];
                                                                             setApiConfig(apiConfig.bodyType === 'form-data'
                                                                                 ? { ...apiConfig, formData: newData }
                                                                                 : { ...apiConfig, urlencoded: newData });

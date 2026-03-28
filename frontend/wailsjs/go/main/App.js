@@ -50,6 +50,10 @@ export function ExecuteCurl(arg1) {
   return window['go']['main']['App']['ExecuteCurl'](arg1);
 }
 
+export function ExecuteHTTPRequest(arg1) {
+  return window['go']['main']['App']['ExecuteHTTPRequest'](arg1);
+}
+
 export function ExtractVariables(arg1) {
   return window['go']['main']['App']['ExtractVariables'](arg1);
 }
