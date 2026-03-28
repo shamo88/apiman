@@ -8,8 +8,8 @@ import React, { useEffect, useState } from 'react';
 import { AddRequestCase, CopyRequest, CreateEnvironment, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteEnvironment, DeleteFolder, DeleteProject, DeleteProjectScript, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts, GetProjectTree, GetRequest, ImportPostmanCollection, ListProjects, ListProjectScripts, LoadAppConfig, LoadEnvironments, MoveFolder, MoveRequest, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, UpdateEnvironment, UpdateProjectScript, UpdateRequest, UpdateRequestScripts } from '../wailsjs/go/main/App';
 import { models } from '../wailsjs/go/models';
 import './App.css';
-import { TitleBar } from './components/TitleBar';
 import { ScriptHelpWindow } from './components/ScriptHelpWindow';
+import { TitleBar } from './components/TitleBar';
 
 interface Project {
     id: string;
@@ -229,6 +229,159 @@ const toWailsHttpSpec = (c: ApiConfig) => models.HttpRequestSpec.createFrom(apiC
 
 const cloneApiConfig = (c: ApiConfig): ApiConfig => JSON.parse(JSON.stringify(c));
 
+/** 从 apiConfig 生成 curl 命令 */
+const buildCurlCommand = (c: ApiConfig): string => {
+    const parts: string[] = ['curl'];
+
+    // URL with params
+    let url = c.url || '';
+    const enabledParams = (c.params || []).filter(p => p.enabled && p.key);
+    if (enabledParams.length > 0) {
+        const queryParams = enabledParams.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&');
+        url += (url.includes('?') ? '&' : '?') + queryParams;
+    }
+
+    // Method
+    if (c.method && c.method !== 'GET') {
+        parts.push(`-X ${c.method}`);
+    }
+
+    // Headers
+    const enabledHeaders = (c.headers || []).filter(h => h.enabled && h.key);
+    for (const h of enabledHeaders) {
+        parts.push(`-H '${h.key}: ${h.value}'`);
+    }
+
+    // Body
+    if (c.bodyType === 'json' || c.bodyType === 'raw' || c.bodyType === 'xml') {
+        if (c.body) {
+            // Add Content-Type if not present
+            const hasContentType = enabledHeaders.some(h => h.key.toLowerCase() === 'content-type');
+            if (!hasContentType && c.bodyType === 'json') {
+                parts.push("-H 'Content-Type: application/json'");
+            } else if (!hasContentType && c.bodyType === 'xml') {
+                parts.push("-H 'Content-Type: application/xml'");
+            }
+            parts.push(`-d '${c.body.replace(/'/g, "'\\''")}'`);
+        }
+    } else if (c.bodyType === 'form-data') {
+        for (const f of (c.formData || []).filter(f => f.enabled && f.key)) {
+            parts.push(`-F '${f.key}=${f.value}'`);
+        }
+    } else if (c.bodyType === 'x-www-form-urlencoded') {
+        const enabledFields = (c.urlencoded || []).filter(f => f.enabled && f.key);
+        if (enabledFields.length > 0) {
+            const encoded = enabledFields.map(f => `${encodeURIComponent(f.key)}=${encodeURIComponent(f.value)}`).join('&');
+            if (!enabledHeaders.some(h => h.key.toLowerCase() === 'content-type')) {
+                parts.push("-H 'Content-Type: application/x-www-form-urlencoded'");
+            }
+            parts.push(`-d '${encoded}'`);
+        }
+    }
+
+    // URL (quoted if contains special chars)
+    if (url) {
+        if (url.includes('&') || url.includes('?') || url.includes('=')) {
+            parts.push(`'${url}'`);
+        } else {
+            parts.push(url);
+        }
+    } else {
+        parts.push("'http://example.com/api'");
+    }
+
+    return parts.join(' \\\n  ');
+};
+
+/** 从 curl 命令解析回 apiConfig (仅解析用户编辑的主要部分) */
+const parseCurlToApiConfig = (curl: string): Partial<ApiConfig> => {
+    const result: Partial<ApiConfig> = {
+        method: 'GET',
+        headers: [],
+        params: [],
+        url: '',
+        body: '',
+        bodyType: 'none',
+        formData: [],
+        urlencoded: [],
+    };
+
+    if (!curl) return result;
+
+    // Extract method: -X POST
+    const methodMatch = curl.match(/-X\s+(\S+)/);
+    if (methodMatch) {
+        result.method = methodMatch[1].toUpperCase();
+    }
+
+    // Extract headers: -H 'Key: value' or -H "Key: value"
+    const headerRegex = /-H\s+['"]([^:]+):\s*([^'"]+)['"]/g;
+    let headerMatch;
+    while ((headerMatch = headerRegex.exec(curl)) !== null) {
+        const key = headerMatch[1].trim();
+        const value = headerMatch[2].trim();
+        if (key.toLowerCase() === 'content-type') {
+            if (value.includes('application/json')) {
+                result.bodyType = 'json';
+            } else if (value.includes('application/x-www-form-urlencoded')) {
+                result.bodyType = 'x-www-form-urlencoded';
+            } else if (value.includes('multipart/form-data')) {
+                result.bodyType = 'form-data';
+            } else if (value.includes('xml')) {
+                result.bodyType = 'xml';
+            } else {
+                result.bodyType = 'raw';
+            }
+        } else {
+            result.headers!.push({ key, value, enabled: true });
+        }
+    }
+
+    // Extract URL: 'http://...' or "http://..." or bare URL
+    let urlMatch = curl.match(/['"](https?:\/\/[^\s'"]+)['"]/);
+    if (!urlMatch) {
+        // Try bare URL at the end
+        const bareUrlMatch = curl.match(/(https?:\/\/[^\s'"-]+(?:\?[^\s'"]*)?)/);
+        if (bareUrlMatch) {
+            urlMatch = ['', bareUrlMatch[1]];
+        }
+    }
+    if (urlMatch) {
+        const fullUrl = urlMatch[1];
+        try {
+            const urlObj = new URL(fullUrl);
+            result.url = `${urlObj.origin}${urlObj.pathname}`;
+            // Extract query params
+            urlObj.searchParams.forEach((val, key) => {
+                result.params!.push({ key, value: val, enabled: true });
+            });
+        } catch {
+            result.url = fullUrl.split('?')[0];
+        }
+    }
+
+    // Extract body: -d 'body' or --data 'body'
+    const bodyMatch = curl.match(/-d\s+['"]([^'"]*)['"]/);
+    if (bodyMatch) {
+        result.body = bodyMatch[1];
+        if (result.bodyType === 'none') {
+            result.bodyType = 'raw';
+        }
+    }
+
+    // Extract form-data: -F 'key=value'
+    const formDataRegex = /-F\s+['"]([^=]+)=([^'"]*)['"]/g;
+    let formMatch;
+    while ((formMatch = formDataRegex.exec(curl)) !== null) {
+        result.formData!.push({ key: formMatch[1], value: formMatch[2], enabled: true });
+    }
+    if (result.formData!.length > 0 && result.bodyType === 'none') {
+        result.bodyType = 'form-data';
+    }
+
+    return result;
+};
+
 const apiConfigFromHttpSpec = (spec: models.HttpRequestSpec, requestName: string): ApiConfig => {
     const bt = (spec.body_type || 'none') as ApiConfig['bodyType'];
     const allowed: ApiConfig['bodyType'][] = ['none', 'form-data', 'x-www-form-urlencoded', 'json', 'xml', 'raw', 'binary'];
@@ -375,8 +528,30 @@ const VariableEditableInput: React.FC<{
     const [focused, setFocused] = useState(false);
     const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
     const [forceSuggestAll, setForceSuggestAll] = useState(false);
+    const [suggestionPos, setSuggestionPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
     const suggestions = getVariableSuggestions(value, caretIndex, environmentVariables);
     const suggestionItems = forceSuggestAll ? Object.keys(environmentVariables) : suggestions.items;
+
+    const updateCaretPosition = () => {
+        const editor = editorRef.current;
+        if (!editor) return;
+        const rect = editor.getBoundingClientRect();
+        const range = window.getSelection()?.rangeCount ? window.getSelection()?.getRangeAt(0) : null;
+        if (range) {
+            const caretRect = range.getBoundingClientRect();
+            // Position to the right of caret, within the editor wrapper
+            setSuggestionPos({
+                top: caretRect.top - rect.top + 20,
+                left: caretRect.right - rect.left + 5,
+            });
+        } else {
+            // Fallback: position below cursor line
+            setSuggestionPos({
+                top: 20,
+                left: 5,
+            });
+        }
+    };
 
     useEffect(() => {
         const editor = editorRef.current;
@@ -397,6 +572,12 @@ const VariableEditableInput: React.FC<{
         }
         setActiveSuggestionIndex((prev) => Math.min(prev, suggestionItems.length - 1));
     }, [suggestionItems.length]);
+
+    useEffect(() => {
+        if (focused && suggestionItems.length > 0) {
+            updateCaretPosition();
+        }
+    }, [caretIndex, focused, suggestionItems.length]);
 
     const applySuggestion = (name: string) => {
         const token = `{{${name}}}`;
@@ -429,7 +610,10 @@ const VariableEditableInput: React.FC<{
                 contentEditable
                 suppressContentEditableWarning
                 data-placeholder={placeholder}
-                onFocus={() => setFocused(true)}
+                onFocus={() => {
+                    setFocused(true);
+                    updateCaretPosition();
+                }}
                 onBlur={() => {
                     setFocused(false);
                     setForceSuggestAll(false);
@@ -437,6 +621,7 @@ const VariableEditableInput: React.FC<{
                 onDoubleClick={(e) => {
                     setCaretIndex(getCaretOffset(e.currentTarget));
                     setForceSuggestAll(true);
+                    updateCaretPosition();
                 }}
                 onInput={(e) => {
                     const nextText = multiline
@@ -445,6 +630,7 @@ const VariableEditableInput: React.FC<{
                     onChange(nextText);
                     setCaretIndex(getCaretOffset(e.currentTarget));
                     setForceSuggestAll(false);
+                    updateCaretPosition();
                 }}
                 onKeyDown={(e) => {
                     if (suggestionItems.length > 0) {
@@ -477,10 +663,19 @@ const VariableEditableInput: React.FC<{
                 }}
                 onKeyUp={(e) => {
                     setCaretIndex(getCaretOffset(e.currentTarget));
+                    updateCaretPosition();
                 }}
             />
             {focused && suggestionItems.length > 0 && (
-                <div className="variable-editable-suggestions">
+                <div
+                    className="variable-editable-suggestions"
+                    style={{
+                        position: 'absolute',
+                        top: suggestionPos.top,
+                        left: suggestionPos.left,
+                        zIndex: 1200,
+                    }}
+                >
                     {suggestionItems.map((name, idx) => (
                         <div
                             key={name}
@@ -526,6 +721,7 @@ function App() {
     const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
     const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
     const [apiConfig, setApiConfig] = useState<ApiConfig>(createDefaultApiConfig());
+    const [curlPreview, setCurlPreview] = useState<string>('');
     const [requestCases, setRequestCases] = useState<RequestCaseState[]>([]);
     const [activeCaseId, setActiveCaseId] = useState<string>('');
     const [interfaceApiConfig, setInterfaceApiConfig] = useState<ApiConfig>(createDefaultApiConfig());
@@ -1614,6 +1810,11 @@ function App() {
         };
         persist();
     }, [projectGroups, projectGroupAssignments, collapsedProjectGroups, projectGroupsLoaded]);
+
+    // Update curl preview when apiConfig changes
+    useEffect(() => {
+        setCurlPreview(buildCurlCommand(apiConfig));
+    }, [apiConfig.method, apiConfig.url, apiConfig.headers, apiConfig.params, apiConfig.body, apiConfig.bodyType, apiConfig.formData, apiConfig.urlencoded]);
 
     const triggerOpenTabAnimation = () => {
         if (forceAnimationTimerRef.current) {
@@ -3611,6 +3812,47 @@ function App() {
                                                                     ]}
                                                                 />
                                                             </div>
+                                                        </div>
+                                                    ),
+                                                },
+                                                {
+                                                    key: 'curl',
+                                                    label: 'Curl',
+                                                    children: (
+                                                        <div style={{ padding: '12px 0' }}>
+                                                            {renderVariableAwareInput(
+                                                                curlPreview,
+                                                                (value) => setCurlPreview(value),
+                                                                'curl 命令将显示在这里...',
+                                                                {
+                                                                    fontFamily: 'monospace',
+                                                                    fontSize: 12,
+                                                                    minHeight: 200,
+                                                                    marginTop: 0
+                                                                },
+                                                                true
+                                                            )}
+                                                            <Button
+                                                                type="primary"
+                                                                onClick={() => {
+                                                                    const parsed = parseCurlToApiConfig(curlPreview);
+                                                                    setApiConfig({
+                                                                        ...apiConfig,
+                                                                        method: parsed.method || apiConfig.method,
+                                                                        url: parsed.url || apiConfig.url,
+                                                                        headers: parsed.headers || apiConfig.headers,
+                                                                        params: parsed.params || apiConfig.params,
+                                                                        body: parsed.body !== undefined ? parsed.body : apiConfig.body,
+                                                                        bodyType: parsed.bodyType || apiConfig.bodyType,
+                                                                        formData: parsed.formData || apiConfig.formData,
+                                                                        urlencoded: parsed.urlencoded || apiConfig.urlencoded,
+                                                                    });
+                                                                    message.success('保存成功');
+                                                                }}
+                                                                style={{ marginTop: 12 }}
+                                                            >
+                                                                保存Curl
+                                                            </Button>
                                                         </div>
                                                     ),
                                                 },
