@@ -76,6 +76,13 @@ type HttpRequestSpec struct {
 	UrlEncoded []RequestPair   `json:"url_encoded"`
 }
 
+// HttpRequestCase is a named variant of a request under one interface (用例).
+type HttpRequestCase struct {
+	ID   string          `json:"id"`
+	Name string          `json:"name"`
+	Spec HttpRequestSpec `json:"spec"`
+}
+
 type CurlRequest struct {
 	ID           string    `json:"id"`
 	Name         string    `json:"name"`
@@ -96,6 +103,26 @@ type CurlRequest struct {
 	BodyType   string          `json:"body_type,omitempty"`
 	FormData   []RequestPair   `json:"form_data,omitempty"`
 	UrlEncoded []RequestPair   `json:"url_encoded,omitempty"`
+
+	Cases        []HttpRequestCase `json:"cases,omitempty"`
+	ActiveCaseID string            `json:"active_case_id,omitempty"`
+}
+
+// SpecFromCurlRequest builds HttpRequestSpec from flattened CurlRequest fields.
+func SpecFromCurlRequest(cr *CurlRequest) HttpRequestSpec {
+	if cr == nil {
+		return HttpRequestSpec{}
+	}
+	return HttpRequestSpec{
+		Method:     cr.Method,
+		HttpURL:    cr.HttpURL,
+		Headers:    append([]RequestKeyVal(nil), cr.Headers...),
+		Params:     append([]RequestKeyVal(nil), cr.Params...),
+		Body:       cr.Body,
+		BodyType:   cr.BodyType,
+		FormData:   append([]RequestPair(nil), cr.FormData...),
+		UrlEncoded: append([]RequestPair(nil), cr.UrlEncoded...),
+	}
 }
 
 type ProjectScript struct {

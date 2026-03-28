@@ -1,6 +1,7 @@
 package postman
 
 import (
+	"apiman/internal/models"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -25,6 +26,9 @@ type CollectionItem struct {
 	Event        []PostmanEvent     `json:"event,omitempty"`
 	PreScriptID  string             `json:"_apiman_pre_script_id,omitempty"`
 	PostScriptID string             `json:"_apiman_post_script_id,omitempty"`
+
+	ApimanCases        []models.HttpRequestCase `json:"_apiman_cases,omitempty"`
+	ApimanActiveCaseID string                   `json:"_apiman_active_case_id,omitempty"`
 }
 
 type PostmanInfo struct {
@@ -154,6 +158,25 @@ func ParseRequestRef(path string) (projectID, requestID string, ok bool) {
 	return inner[:i], inner[i+1:], true
 }
 
+// RequestCaseRefPath identifies one 用例 under a request (for tree UI).
+func RequestCaseRefPath(projectID, requestID, caseID string) string {
+	return "requestCase|" + projectID + "|" + requestID + "|" + caseID
+}
+
+// ParseRequestCaseRef parses RequestCaseRefPath.
+func ParseRequestCaseRef(path string) (projectID, requestID, caseID string, ok bool) {
+	const p = "requestCase|"
+	if !strings.HasPrefix(path, p) {
+		return "", "", "", false
+	}
+	rest := path[len(p):]
+	parts := strings.Split(rest, "|")
+	if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
+		return "", "", "", false
+	}
+	return parts[0], parts[1], parts[2], true
+}
+
 func ParseFolderRef(path string) (projectID, folderID string, ok bool) {
 	if !strings.HasPrefix(path, "folder|") {
 		return "", "", false
@@ -188,21 +211,45 @@ func ExtractItem(items []CollectionItem, id string) ([]CollectionItem, Collectio
 
 // InsertItemUnder appends item under the folder with parentID, or at root when parentID is empty.
 func InsertItemUnder(items []CollectionItem, parentID string, item CollectionItem) ([]CollectionItem, bool) {
+	return InsertItemUnderBefore(items, parentID, item, "")
+}
+
+// InsertItemUnderBefore inserts item as a direct child of parentID (root when parentID is empty),
+// immediately before the sibling with ID beforeID. If beforeID is empty, appends at end.
+// If beforeID is not found among siblings, appends at end.
+func InsertItemUnderBefore(items []CollectionItem, parentID string, item CollectionItem, beforeID string) ([]CollectionItem, bool) {
+	beforeID = strings.TrimSpace(beforeID)
 	if parentID == "" {
-		return append(items, item), true
+		return insertSiblingBefore(items, item, beforeID), true
 	}
 	for i := range items {
 		if items[i].ID == parentID {
-			items[i].Item = append(items[i].Item, item)
+			items[i].Item = insertSiblingBefore(items[i].Item, item, beforeID)
 			return items, true
 		}
-		newChildren, ok := InsertItemUnder(items[i].Item, parentID, item)
+		newChildren, ok := InsertItemUnderBefore(items[i].Item, parentID, item, beforeID)
 		if ok {
 			items[i].Item = newChildren
 			return items, true
 		}
 	}
 	return items, false
+}
+
+func insertSiblingBefore(siblings []CollectionItem, item CollectionItem, beforeID string) []CollectionItem {
+	if beforeID == "" {
+		return append(siblings, item)
+	}
+	for i := range siblings {
+		if siblings[i].ID == beforeID {
+			out := make([]CollectionItem, 0, len(siblings)+1)
+			out = append(out, siblings[:i]...)
+			out = append(out, item)
+			out = append(out, siblings[i:]...)
+			return out
+		}
+	}
+	return append(siblings, item)
 }
 
 func FindItemRef(items []CollectionItem, id string) *CollectionItem {

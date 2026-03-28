@@ -31,20 +31,20 @@ func (a *App) GetProjectsDir() string {
 	return a.service.GetProjectsDir()
 }
 
-func (a *App) LoadEnvironments() ([]models.Environment, error) {
-	return a.service.LoadEnvironments()
+func (a *App) LoadEnvironments(projectID string) ([]models.Environment, error) {
+	return a.service.LoadEnvironments(projectID)
 }
 
-func (a *App) CreateEnvironment(name string, variables map[string]string) (*models.Environment, error) {
-	return a.service.CreateEnvironment(name, variables)
+func (a *App) CreateEnvironment(projectID string, name string, variables map[string]string) (*models.Environment, error) {
+	return a.service.CreateEnvironment(projectID, name, variables)
 }
 
-func (a *App) UpdateEnvironment(id string, name string, variables map[string]string) error {
-	return a.service.UpdateEnvironment(id, name, variables)
+func (a *App) UpdateEnvironment(projectID string, id string, name string, variables map[string]string) error {
+	return a.service.UpdateEnvironment(projectID, id, name, variables)
 }
 
-func (a *App) DeleteEnvironment(id string) error {
-	return a.service.DeleteEnvironment(id)
+func (a *App) DeleteEnvironment(projectID string, id string) error {
+	return a.service.DeleteEnvironment(projectID, id)
 }
 
 func (a *App) GetGlobalVariables() (map[string]string, error) {
@@ -87,8 +87,24 @@ func (a *App) CreateRequest(projectID, folderPath, name string, spec models.Http
 	return a.service.CreateRequest(projectID, folderPath, name, spec)
 }
 
-func (a *App) UpdateRequest(requestPath string, spec models.HttpRequestSpec) error {
-	return a.service.UpdateRequest(requestPath, spec)
+func (a *App) UpdateRequest(requestPath string, spec models.HttpRequestSpec, cases []models.HttpRequestCase, activeCaseID string) error {
+	return a.service.UpdateRequest(requestPath, spec, cases, activeCaseID)
+}
+
+func (a *App) AddRequestCase(requestPath, caseName string) (*models.CurlRequest, error) {
+	return a.service.AddRequestCase(requestPath, caseName)
+}
+
+func (a *App) DuplicateRequestCase(requestPath, caseID string) (*models.CurlRequest, error) {
+	return a.service.DuplicateRequestCase(requestPath, caseID)
+}
+
+func (a *App) DeleteRequestCase(requestPath, caseID string) (*models.CurlRequest, error) {
+	return a.service.DeleteRequestCase(requestPath, caseID)
+}
+
+func (a *App) RenameRequestCase(requestPath, caseID, newName string) (*models.CurlRequest, error) {
+	return a.service.RenameRequestCase(requestPath, caseID, newName)
 }
 
 func (a *App) UpdateRequestScripts(requestPath, preScriptID, postScriptID string) error {
@@ -115,12 +131,12 @@ func (a *App) RenameFolder(folderPath, newName string) (*models.Folder, error) {
 	return a.service.RenameFolder(folderPath, newName)
 }
 
-func (a *App) MoveRequest(requestPath, targetFolderPath string) (string, error) {
-	return a.service.MoveRequest(requestPath, targetFolderPath)
+func (a *App) MoveRequest(requestPath, targetFolderPath string, beforeID string) (string, error) {
+	return a.service.MoveRequest(requestPath, targetFolderPath, beforeID)
 }
 
-func (a *App) MoveFolder(folderPath, targetParentPath string) (string, error) {
-	return a.service.MoveFolder(folderPath, targetParentPath)
+func (a *App) MoveFolder(folderPath, targetParentPath string, beforeID string) (string, error) {
+	return a.service.MoveFolder(folderPath, targetParentPath, beforeID)
 }
 
 func (a *App) ExecuteCurl(command string) (*models.CurlResponse, error) {

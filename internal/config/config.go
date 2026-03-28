@@ -42,11 +42,16 @@ func (c *ConfigManager) ensureDir(dir string) error {
 	return os.MkdirAll(dir, 0755)
 }
 
-func (c *ConfigManager) LoadEnvironments() ([]models.Environment, error) {
+func projectEnvironmentsFile(projectPath string) string {
+	return filepath.Join(projectPath, "environments.json")
+}
+
+// LoadProjectEnvironments reads environments stored under the project directory.
+func (c *ConfigManager) LoadProjectEnvironments(projectPath string) ([]models.Environment, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	envFile := filepath.Join(c.configDir, "environments.json")
+	envFile := projectEnvironmentsFile(projectPath)
 	data, err := os.ReadFile(envFile)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -63,20 +68,23 @@ func (c *ConfigManager) LoadEnvironments() ([]models.Environment, error) {
 	return envs, nil
 }
 
-func (c *ConfigManager) SaveEnvironments(envs []models.Environment) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	envFile := filepath.Join(c.configDir, "environments.json")
+func (c *ConfigManager) saveProjectEnvironmentsLocked(projectPath string, envs []models.Environment) error {
+	if err := c.ensureDir(projectPath); err != nil {
+		return err
+	}
+	envFile := projectEnvironmentsFile(projectPath)
 	data, err := json.MarshalIndent(envs, "", "  ")
 	if err != nil {
 		return err
 	}
-
 	return os.WriteFile(envFile, data, 0644)
 }
 
-func (c *ConfigManager) CreateEnvironment(name string, variables map[string]string) (*models.Environment, error) {
+// CreateProjectEnvironment appends an environment to the project's environments.json.
+func (c *ConfigManager) CreateProjectEnvironment(projectPath string, name string, variables map[string]string) (*models.Environment, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	env := &models.Environment{
 		ID:        uuid.New().String(),
 		Name:      name,
@@ -85,22 +93,39 @@ func (c *ConfigManager) CreateEnvironment(name string, variables map[string]stri
 		UpdatedAt: time.Now(),
 	}
 
-	envs, err := c.LoadEnvironments()
+	envFile := projectEnvironmentsFile(projectPath)
+	data, err := os.ReadFile(envFile)
+	var envs []models.Environment
 	if err != nil {
-		return nil, err
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+	} else if len(data) > 0 {
+		if err := json.Unmarshal(data, &envs); err != nil {
+			return nil, err
+		}
 	}
 
 	envs = append(envs, *env)
-	if err := c.SaveEnvironments(envs); err != nil {
+	if err := c.saveProjectEnvironmentsLocked(projectPath, envs); err != nil {
 		return nil, err
 	}
 
 	return env, nil
 }
 
-func (c *ConfigManager) UpdateEnvironment(id string, name string, variables map[string]string) error {
-	envs, err := c.LoadEnvironments()
+// UpdateProjectEnvironment updates one environment in the project's file.
+func (c *ConfigManager) UpdateProjectEnvironment(projectPath string, id string, name string, variables map[string]string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	envFile := projectEnvironmentsFile(projectPath)
+	data, err := os.ReadFile(envFile)
 	if err != nil {
+		return err
+	}
+	var envs []models.Environment
+	if err := json.Unmarshal(data, &envs); err != nil {
 		return err
 	}
 
@@ -113,12 +138,21 @@ func (c *ConfigManager) UpdateEnvironment(id string, name string, variables map[
 		}
 	}
 
-	return c.SaveEnvironments(envs)
+	return c.saveProjectEnvironmentsLocked(projectPath, envs)
 }
 
-func (c *ConfigManager) DeleteEnvironment(id string) error {
-	envs, err := c.LoadEnvironments()
+// DeleteProjectEnvironment removes an environment from the project's file.
+func (c *ConfigManager) DeleteProjectEnvironment(projectPath string, id string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	envFile := projectEnvironmentsFile(projectPath)
+	data, err := os.ReadFile(envFile)
 	if err != nil {
+		return err
+	}
+	var envs []models.Environment
+	if err := json.Unmarshal(data, &envs); err != nil {
 		return err
 	}
 
@@ -129,7 +163,7 @@ func (c *ConfigManager) DeleteEnvironment(id string) error {
 		}
 	}
 
-	return c.SaveEnvironments(envs)
+	return c.saveProjectEnvironmentsLocked(projectPath, envs)
 }
 
 func (c *ConfigManager) GetGlobalVariables() (map[string]string, error) {

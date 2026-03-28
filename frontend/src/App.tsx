@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Space, Modal, Input, message, Spin, Tree, Dropdown, Tabs, Card, Col, Row, Select, Collapse, Empty, Radio, InputRef, Upload, Tooltip, Checkbox } from 'antd';
-import { PlusOutlined, ApiOutlined, ProjectOutlined, FolderOutlined, FileOutlined, CopyOutlined, EditOutlined, CloseOutlined, HomeOutlined, DragOutlined, SearchOutlined, RightOutlined, DownOutlined, MoreOutlined, ImportOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import { PlusOutlined, ApiOutlined, ProjectOutlined, FolderOutlined, FileOutlined, CopyOutlined, EditOutlined, CloseOutlined, HomeOutlined, DragOutlined, SearchOutlined, RightOutlined, DownOutlined, MoreOutlined, ImportOutlined, QuestionCircleOutlined, ExperimentOutlined } from '@ant-design/icons';
 import type { DataNode } from 'antd/es/tree';
 import type { UploadProps } from 'antd';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import './App.css';
 import { TitleBar } from './components/TitleBar';
-import { ListProjects, CreateProject, DeleteProject, RenameProject, GetProjectTree, CreateFolder, CreateRequest, CopyRequest, RenameRequest, RenameFolder, MoveRequest, MoveFolder, GetRequest, DeleteRequest, DeleteFolder, ExecuteHTTPRequest, UpdateRequest, ImportPostmanCollection, LoadAppConfig, LoadEnvironments, CreateEnvironment, UpdateEnvironment, DeleteEnvironment, ListProjectScripts, CreateProjectScript, UpdateProjectScript, DeleteProjectScript, UpdateRequestScripts } from '../wailsjs/go/main/App';
+import { ListProjects, CreateProject, DeleteProject, RenameProject, GetProjectTree, CreateFolder, CreateRequest, CopyRequest, RenameRequest, RenameFolder, MoveRequest, MoveFolder, GetRequest, DeleteRequest, DeleteFolder, ExecuteHTTPRequest, UpdateRequest, ImportPostmanCollection, LoadAppConfig, LoadEnvironments, CreateEnvironment, UpdateEnvironment, DeleteEnvironment, ListProjectScripts, CreateProjectScript, UpdateProjectScript, DeleteProjectScript, UpdateRequestScripts, AddRequestCase, DuplicateRequestCase, DeleteRequestCase, RenameRequestCase } from '../wailsjs/go/main/App';
 import { models } from '../wailsjs/go/models';
 
 interface Project {
@@ -26,6 +26,15 @@ interface ProjectTree {
     path?: string;
 }
 
+const parseRequestCaseRef = (path: string): { projectId: string; requestId: string; caseId: string } | null => {
+    if (!path.startsWith('requestCase|')) return null;
+    const parts = path.slice('requestCase|'.length).split('|');
+    if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return null;
+    return { projectId: parts[0], requestId: parts[1], caseId: parts[2] };
+};
+
+const requestRefFromIds = (projectId: string, requestId: string) => `request|${projectId}|${requestId}`;
+
 interface CurlRequest {
     path: string;
     name: string;
@@ -40,6 +49,14 @@ interface CurlRequest {
     body_type?: string;
     form_data?: { key: string; value: string; enabled?: boolean }[];
     url_encoded?: { key: string; value: string; enabled?: boolean }[];
+    cases?: models.HttpRequestCase[];
+    active_case_id?: string;
+}
+
+interface RequestCaseState {
+    id: string;
+    name: string;
+    config: ApiConfig;
 }
 
 interface ProjectTab {
@@ -105,6 +122,10 @@ interface ProjectWorkspaceState {
     selectedKeys: string[];
     apiConfig: ApiConfig;
     selectedEnvironmentId: string;
+    requestCases: RequestCaseState[];
+    activeCaseId: string;
+    /** 侧栏用例高亮：仅用户点击用例行时设置；点击接口行或切换请求标签时清空 */
+    sidebarHighlightedCasePath: string;
 }
 
 interface ProjectGroupStore {
@@ -134,7 +155,10 @@ const createEmptyWorkspaceState = (): ProjectWorkspaceState => ({
     response: null,
     selectedKeys: [],
     apiConfig: createDefaultApiConfig(),
-    selectedEnvironmentId: ''
+    selectedEnvironmentId: '',
+    requestCases: [],
+    activeCaseId: '',
+    sidebarHighlightedCasePath: ''
 });
 
 const apiConfigFromRequest = (r: CurlRequest, fallbackName: string): ApiConfig => {
@@ -193,6 +217,43 @@ const apiConfigToSpec = (c: ApiConfig) => ({
 
 /** Wails 将 HttpRequestSpec 生成为 class（含 convertValues），需用 createFrom 包装字面量。 */
 const toWailsHttpSpec = (c: ApiConfig) => models.HttpRequestSpec.createFrom(apiConfigToSpec(c));
+
+const cloneApiConfig = (c: ApiConfig): ApiConfig => JSON.parse(JSON.stringify(c));
+
+const apiConfigFromHttpSpec = (spec: models.HttpRequestSpec, requestName: string): ApiConfig => {
+    const bt = (spec.body_type || 'none') as ApiConfig['bodyType'];
+    const allowed: ApiConfig['bodyType'][] = ['none', 'form-data', 'x-www-form-urlencoded', 'json', 'xml', 'raw', 'binary'];
+    const bodyType = allowed.includes(bt) ? bt : 'none';
+    const mapKV = (arr: models.RequestKeyVal[] | undefined) =>
+        Array.isArray(arr)
+            ? arr.map((h) => ({
+                key: h.key || '',
+                value: h.value || '',
+                enabled: h.enabled !== false,
+            }))
+            : [];
+    const mapPair = (arr: models.RequestPair[] | undefined) =>
+        Array.isArray(arr)
+            ? arr.map((p) => ({
+                key: p.key || '',
+                value: p.value || '',
+                enabled: p.enabled !== false,
+            }))
+            : [];
+    return {
+        name: requestName,
+        method: (spec.method || 'GET').toUpperCase(),
+        url: spec.http_url || '',
+        headers: mapKV(spec.headers),
+        params: mapKV(spec.params),
+        body: spec.body || '',
+        bodyType,
+        formData: mapPair(spec.form_data),
+        urlencoded: mapPair(spec.url_encoded),
+        preScriptId: '',
+        postScriptId: '',
+    };
+};
 
 const createEnvironmentVariableRow = (key: string = '', value: string = ''): EnvironmentVariableRow => ({
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -456,10 +517,19 @@ function App() {
     const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
     const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
     const [apiConfig, setApiConfig] = useState<ApiConfig>(createDefaultApiConfig());
+    const [requestCases, setRequestCases] = useState<RequestCaseState[]>([]);
+    const [activeCaseId, setActiveCaseId] = useState<string>('');
+    const [sidebarHighlightedCasePath, setSidebarHighlightedCasePath] = useState<string>('');
+    const [expandedRequestPaths, setExpandedRequestPaths] = useState<Set<string>>(() => new Set());
+    const [caseRenameModalOpen, setCaseRenameModalOpen] = useState(false);
+    const [caseRenameCasePath, setCaseRenameCasePath] = useState('');
+    const [caseRenameInput, setCaseRenameInput] = useState('');
+    const [addCaseModalOpen, setAddCaseModalOpen] = useState(false);
+    const [addCaseTargetPath, setAddCaseTargetPath] = useState('');
+    const [addCaseNameInput, setAddCaseNameInput] = useState('');
     const [searchKeyword, setSearchKeyword] = useState('');
     const [filterMethod, setFilterMethod] = useState<string>('ALL');
     const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
-    const [hoveredItem, setHoveredItem] = useState<string | null>(null);
     const [draggingNode, setDraggingNode] = useState<{ type: 'request' | 'folder'; path: string } | null>(null);
     const [dropTargetFolderPath, setDropTargetFolderPath] = useState<string | null>(null);
     const [invalidDropHint, setInvalidDropHint] = useState<{ message: string; x: number; y: number } | null>(null);
@@ -594,13 +664,10 @@ function App() {
         return foundParent;
     };
 
-    const checkDropValidity = (dragNode: { type: 'request' | 'folder'; path: string }, targetFolderPath: string): { ok: boolean; reason?: string } => {
+    /** 拖入某文件夹（或根）末尾 */
+    const checkDropAppendIntoFolder = (dragNode: { type: 'request' | 'folder'; path: string }, targetFolderPath: string): { ok: boolean; reason?: string } => {
         if (!currentProject?.path) return { ok: false, reason: 'invalid-target' };
         if (dragNode.path === targetFolderPath) return { ok: false, reason: 'self' };
-
-        const sourceParent = getParentFolderPath(dragNode.path);
-        if (!sourceParent) return { ok: false, reason: 'missing-source' };
-        if (sourceParent === targetFolderPath) return { ok: false, reason: 'same-parent' };
 
         if (dragNode.type === 'folder') {
             let p: string | null = targetFolderPath;
@@ -620,11 +687,61 @@ function App() {
 
         const targetChildren = getChildrenByFolderPath(targetFolderPath);
         if (dragNode.type === 'request') {
-            const conflict = targetChildren.some(child => child.type === 'request' && child.name === draggingTreeNode.name);
+            const conflict = targetChildren.some(
+                (child) => child.type === 'request' && child.name === draggingTreeNode.name && child.path !== dragNode.path
+            );
             if (conflict) return { ok: false, reason: 'duplicate-request-name' };
         } else {
-            const conflict = targetChildren.some(child => child.type === 'folder' && child.name === draggingTreeNode.name && child.path !== dragNode.path);
+            const conflict = targetChildren.some(
+                (child) => child.type === 'folder' && child.name === draggingTreeNode.name && child.path !== dragNode.path
+            );
             if (conflict) return { ok: false, reason: 'duplicate-folder-name' };
+        }
+
+        return { ok: true };
+    };
+
+    const subtreeContainsId = (folderRefPath: string, needleId: string): boolean => {
+        const node = findTreeNode(currentTree, folderRefPath);
+        if (!node) return false;
+        const walk = (n: ProjectTree): boolean => {
+            if (n.id === needleId) return true;
+            return (n.children || []).some(walk);
+        };
+        return walk(node);
+    };
+
+    /** 插入到 parentContainerPath 的子列表中，位于 beforeID 之前；beforeID 为空表示末尾 */
+    const checkDropOrdered = (
+        dragNode: { type: 'request' | 'folder'; path: string },
+        parentContainerPath: string,
+        beforeID: string
+    ): { ok: boolean; reason?: string } => {
+        if (!currentProject?.path) return { ok: false, reason: 'invalid-target' };
+
+        const dragParent = getParentFolderPath(dragNode.path);
+        if (dragParent === null) return { ok: false, reason: 'missing-source' };
+
+        if (dragNode.type === 'folder' && beforeID) {
+            if (subtreeContainsId(dragNode.path, beforeID)) {
+                return { ok: false, reason: 'child' };
+            }
+        }
+
+        const draggingTreeNode = getNodeByPath(dragNode.path);
+        if (!draggingTreeNode) return { ok: false, reason: 'missing-source' };
+
+        if (dragParent !== parentContainerPath) {
+            const targetChildren = getChildrenByFolderPath(parentContainerPath);
+            if (dragNode.type === 'request') {
+                const conflict = targetChildren.some((c) => c.type === 'request' && c.name === draggingTreeNode.name);
+                if (conflict) return { ok: false, reason: 'duplicate-request-name' };
+            } else {
+                const conflict = targetChildren.some(
+                    (c) => c.type === 'folder' && c.name === draggingTreeNode.name && c.path !== dragNode.path
+                );
+                if (conflict) return { ok: false, reason: 'duplicate-folder-name' };
+            }
         }
 
         return { ok: true };
@@ -664,6 +781,10 @@ function App() {
         setSelectedKeys(emptyState.selectedKeys);
         setApiConfig(emptyState.apiConfig);
         setSelectedEnvironmentId(emptyState.selectedEnvironmentId);
+        setRequestCases(emptyState.requestCases);
+        setActiveCaseId(emptyState.activeCaseId);
+        setSidebarHighlightedCasePath(emptyState.sidebarHighlightedCasePath);
+        setExpandedRequestPaths(new Set());
     };
 
     const captureCurrentWorkspaceState = (): ProjectWorkspaceState => ({
@@ -673,7 +794,10 @@ function App() {
         response,
         selectedKeys,
         apiConfig,
-        selectedEnvironmentId
+        selectedEnvironmentId,
+        requestCases,
+        activeCaseId,
+        sidebarHighlightedCasePath
     });
 
     const applyWorkspaceState = (state: ProjectWorkspaceState) => {
@@ -684,6 +808,9 @@ function App() {
         setSelectedKeys(state.selectedKeys);
         setApiConfig(state.apiConfig);
         setSelectedEnvironmentId(state.selectedEnvironmentId || '');
+        setRequestCases(state.requestCases || []);
+        setActiveCaseId(state.activeCaseId || '');
+        setSidebarHighlightedCasePath(state.sidebarHighlightedCasePath || '');
     };
 
     const environmentToRows = (variables: Record<string, string>): EnvironmentVariableRow[] => {
@@ -706,14 +833,15 @@ function App() {
         setEnvironmentFormVariables([createEnvironmentVariableRow()]);
     };
 
-    const loadEnvironmentsData = async () => {
+    const loadEnvironmentsData = async (projectID: string) => {
         setEnvLoading(true);
         try {
-            const envs = await LoadEnvironments();
+            const envs = await LoadEnvironments(projectID);
             setEnvironments(envs || []);
         } catch (error: any) {
             console.error('Failed to load environments:', error);
             message.error(`加载环境失败: ${error?.message || error}`);
+            setEnvironments([]);
         } finally {
             setEnvLoading(false);
         }
@@ -821,6 +949,11 @@ function App() {
     };
 
     const openCreateEnvironmentTab = () => {
+        const p = projectTabs.find(t => t.id === activeTab)?.project;
+        if (!p?.id) {
+            message.warning('请先打开项目');
+            return;
+        }
         const tabKey = `new-env-${Date.now()}`;
         setEnvironmentTabs(prev => [...prev, { key: tabKey, title: '新建环境', isNew: true }]);
         setActiveEnvironmentTab(tabKey);
@@ -876,9 +1009,22 @@ function App() {
         return colors[method.toUpperCase()] || '#999';
     };
 
+    /** 侧栏方法标签文案（DELETE→DEL、PATCH→PAT，其余最长 7 字符） */
+    const formatSidebarMethodLabel = (method: string): string => {
+        const m = (method || 'GET').toUpperCase();
+        if (m === 'DELETE') return 'DEL';
+        if (m === 'PATCH') return 'PAT';
+        return m.substring(0, 7);
+    };
+
     const filterTreeNodes = (tree: ProjectTree | null, keyword: string, method: string): ProjectTree | null => {
         if (!tree) return null;
         const normalizedKeyword = keyword.trim().toLowerCase();
+        const noSearchOrMethodFilter = normalizedKeyword === '' && method === 'ALL';
+
+        if (tree.type === 'case') {
+            return tree;
+        }
 
         if (tree.type === 'request') {
             const nameLower = (tree.name || '').toLowerCase();
@@ -887,9 +1033,19 @@ function App() {
             const matchName = normalizedKeyword === '' || nameLower.includes(normalizedKeyword);
             const matchURL = normalizedKeyword === '' || urlLower.includes(normalizedKeyword);
             const matchMethod = method === 'ALL' || tree.method === method;
+            const caseChildren = (tree.children || []).filter((c): c is ProjectTree => c.type === 'case');
+            const caseNameMatch =
+                normalizedKeyword === '' ||
+                caseChildren.some((c) => (c.name || '').toLowerCase().includes(normalizedKeyword));
 
-            if ((matchName || matchURL) && matchMethod) {
-                return tree;
+            if ((matchName || matchURL || caseNameMatch) && matchMethod) {
+                let nextChildren = tree.children;
+                if (normalizedKeyword !== '' && !matchName && !matchURL && caseNameMatch) {
+                    nextChildren = caseChildren.filter((c) =>
+                        (c.name || '').toLowerCase().includes(normalizedKeyword)
+                    );
+                }
+                return { ...tree, children: nextChildren };
             }
             return null;
         }
@@ -900,7 +1056,8 @@ function App() {
                 .map(child => filterTreeNodes(child, keyword, method))
                 .filter((child): child is ProjectTree => child !== null);
 
-            if (filteredChildren.length > 0) {
+            // 无搜索/方法筛选时保留空文件夹，否则新建的空目录不会出现在树里
+            if (filteredChildren.length > 0 || noSearchOrMethodFilter) {
                 return { ...tree, children: filteredChildren };
             }
             return null;
@@ -931,52 +1088,228 @@ function App() {
             return <div style={{ padding: 20, color: '#999', textAlign: 'center' }}>没有找到匹配的接口</div>;
         }
 
-        const renderRequestItem = (api: any) => (
-            <div
-                key={api.path}
-                className={`api-item ${currentRequest?.path === api.path ? 'active' : ''} ${movedHighlightPath === api.path ? 'moved-highlight' : ''}`}
-                draggable
-                onClick={() => handleTreeItemClick(api)}
-                onDragStart={(e) => {
-                    e.stopPropagation();
-                    setDraggingNode({ type: 'request', path: api.path! });
-                    e.dataTransfer.effectAllowed = 'move';
-                }}
-                onDragEnd={clearDragState}
-                onMouseEnter={() => setHoveredItem(api.path || '')}
-                onMouseLeave={() => setHoveredItem(null)}
-            >
-                <span
-                    className="api-method-tag"
-                    style={{ backgroundColor: getMethodColor((api as any).method || 'GET') + '20', color: getMethodColor((api as any).method || 'GET') }}
+        const renderCaseRow = (c: ProjectTree) => {
+            const caseActive =
+                sidebarHighlightedCasePath !== '' && sidebarHighlightedCasePath === c.path;
+            return (
+                <div
+                    key={c.path}
+                    className={`api-case-item ${caseActive ? 'active' : ''} ${movedHighlightPath === c.path ? 'moved-highlight' : ''}`}
+                    onClick={() => handleCaseTreeClick(c)}
                 >
-                    {((api as any).method || 'GET').substring(0, 7).toUpperCase()}
-                </span>
-                <span className="api-name">{api.name.replace(/\.curl$/i, '')}</span>
-                {hoveredItem === api.path && (
+                    <div className="api-request-expand-cell" aria-hidden>
+                        <span className="api-request-expand-placeholder" />
+                    </div>
+                    <div className="api-item-main">
+                        <span className="api-method-col api-method-col--case-icon" title="用例" aria-hidden>
+                            <ExperimentOutlined className="api-case-type-icon" />
+                        </span>
+                        <span className="api-case-name">{c.name}</span>
+                    </div>
                     <Dropdown
                         menu={{
                             items: [
-                                { key: 'copy', icon: <CopyOutlined />, label: '复制', onClick: () => { handleCopyRequest(api.path!); } },
-                                { key: 'rename', icon: <EditOutlined />, label: '重命名', onClick: () => { openRenameModal('request', api.path!, api.name); } },
-                                { key: 'delete', icon: <CloseOutlined />, label: '删除', danger: true, onClick: () => { handleDeleteRequest(api.path!); } }
-                            ]
+                                {
+                                    key: 'dup',
+                                    icon: <CopyOutlined />,
+                                    label: '复制',
+                                    onClick: () => { handleDuplicateCaseFromTree(c.path!); },
+                                },
+                                {
+                                    key: 'ren',
+                                    icon: <EditOutlined />,
+                                    label: '重命名',
+                                    onClick: () => { openCaseRenameFromTree(c.path!, c.name); },
+                                },
+                                { type: 'divider' },
+                                {
+                                    key: 'del',
+                                    icon: <CloseOutlined />,
+                                    label: '删除',
+                                    danger: true,
+                                    onClick: () => { handleDeleteCaseFromTree(c.path!); },
+                                },
+                            ],
                         }}
                         trigger={['click']}
                     >
-                        <button className="api-action-btn" onClick={(e) => e.stopPropagation()}>
+                        <button type="button" className="api-action-btn" onClick={(e) => e.stopPropagation()}>
                             <MoreOutlined />
                         </button>
                     </Dropdown>
-                )}
-            </div>
-        );
+                </div>
+            );
+        };
+
+        const renderRequestItem = (api: ProjectTree) => {
+            const caseKids = (api.children || []).filter((c): c is ProjectTree => c.type === 'case');
+            const hasCases = caseKids.length > 0;
+            const expanded = !!(api.path && expandedRequestPaths.has(api.path));
+            const caseHighlightRef = sidebarHighlightedCasePath
+                ? parseRequestCaseRef(sidebarHighlightedCasePath)
+                : null;
+            const caseHighlightReqPath = caseHighlightRef
+                ? requestRefFromIds(caseHighlightRef.projectId, caseHighlightRef.requestId)
+                : '';
+            const parentOpen =
+                currentRequest?.path === api.path &&
+                caseHighlightReqPath !== api.path;
+            const method = formatSidebarMethodLabel(api.method || 'GET');
+            const mc = getMethodColor(api.method || 'GET');
+
+            return (
+                <div key={api.path} className="api-request-block">
+                    <div
+                        className={`api-item ${parentOpen ? 'is-parent-open' : ''} ${movedHighlightPath === api.path ? 'moved-highlight' : ''}`}
+                        onDragOver={(e) => {
+                            e.stopPropagation();
+                            if (!draggingNode) return;
+                            const parentPath = getParentFolderPath(api.path!);
+                            if (parentPath === null) return;
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                            const topHalf = e.clientY < rect.top + rect.height / 2;
+                            const sibs = getChildrenByFolderPath(parentPath).filter((c) => c.type === 'folder' || c.type === 'request');
+                            const idx = sibs.findIndex((c) => c.path === api.path);
+                            const beforeID = topHalf ? api.id : (idx >= 0 && sibs[idx + 1] ? sibs[idx + 1].id : '');
+                            const check = checkDropOrdered(draggingNode, parentPath, beforeID);
+                            if (!check.ok) {
+                                e.dataTransfer.dropEffect = 'none';
+                                setInvalidDropHint({
+                                    message: getDropHintMessage(check.reason),
+                                    x: e.clientX + 14,
+                                    y: e.clientY + 14,
+                                });
+                                return;
+                            }
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'move';
+                            setInvalidDropHint(null);
+                        }}
+                        onDrop={async (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (!draggingNode) return;
+                            const parentPath = getParentFolderPath(api.path!);
+                            if (parentPath === null) {
+                                clearDragState();
+                                return;
+                            }
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                            const topHalf = e.clientY < rect.top + rect.height / 2;
+                            const sibs = getChildrenByFolderPath(parentPath).filter((c) => c.type === 'folder' || c.type === 'request');
+                            const idx = sibs.findIndex((c) => c.path === api.path);
+                            const beforeID = topHalf ? api.id : (idx >= 0 && sibs[idx + 1] ? sibs[idx + 1].id : '');
+                            const check = checkDropOrdered(draggingNode, parentPath, beforeID);
+                            if (!check.ok) {
+                                clearDragState();
+                                return;
+                            }
+                            if (draggingNode.type === 'request') {
+                                await moveRequestNode(draggingNode.path, parentPath, beforeID);
+                            } else {
+                                await moveFolderNode(draggingNode.path, parentPath, beforeID);
+                            }
+                            clearDragState();
+                        }}
+                    >
+                        <div className="api-request-expand-cell">
+                            {hasCases ? (
+                                <button
+                                    type="button"
+                                    className="api-request-expand"
+                                    aria-expanded={expanded}
+                                    aria-label={expanded ? '折叠用例' : '展开用例'}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleRequestCasesExpanded(api.path!);
+                                    }}
+                                >
+                                    {expanded ? <DownOutlined /> : <RightOutlined />}
+                                </button>
+                            ) : (
+                                <span className="api-request-expand-placeholder" aria-hidden />
+                            )}
+                        </div>
+                        <div
+                            className="api-item-main"
+                            draggable
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => handleTreeItemClick(api)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    handleTreeItemClick(api);
+                                }
+                            }}
+                            onDragStart={(e) => {
+                                e.stopPropagation();
+                                setDraggingNode({ type: 'request', path: api.path! });
+                                e.dataTransfer.effectAllowed = 'move';
+                            }}
+                            onDragEnd={clearDragState}
+                        >
+                            <span className="api-method-col">
+                                <span
+                                    className="api-method-tag"
+                                    style={{ backgroundColor: `${mc}20`, color: mc }}
+                                >
+                                    {method}
+                                </span>
+                            </span>
+                            <span className="api-name">{(api.name || '').replace(/\.curl$/i, '')}</span>
+                        </div>
+                        <Dropdown
+                            menu={{
+                                items: [
+                                    {
+                                        key: 'add-case',
+                                        icon: <PlusOutlined />,
+                                        label: '新增用例',
+                                        onClick: () => { openAddCaseModal(api.path!); },
+                                    },
+                                    { type: 'divider' },
+                                    {
+                                        key: 'copy',
+                                        icon: <CopyOutlined />,
+                                        label: '复制',
+                                        onClick: () => { handleCopyRequest(api.path!); },
+                                    },
+                                    {
+                                        key: 'rename',
+                                        icon: <EditOutlined />,
+                                        label: '重命名',
+                                        onClick: () => { openRenameModal('request', api.path!, api.name); },
+                                    },
+                                    {
+                                        key: 'delete',
+                                        icon: <CloseOutlined />,
+                                        label: '删除',
+                                        danger: true,
+                                        onClick: () => { handleDeleteRequest(api.path!); },
+                                    },
+                                ],
+                            }}
+                            trigger={['click']}
+                        >
+                            <button type="button" className="api-action-btn" onClick={(e) => e.stopPropagation()}>
+                                <MoreOutlined />
+                            </button>
+                        </Dropdown>
+                    </div>
+                    {hasCases && expanded && (
+                        <div className="api-case-list">
+                            {caseKids.map((c) => renderCaseRow(c))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
 
         // 递归渲染文件夹及其内容
         const renderFolder = (folder: any) => {
             const folderChildren = folder.children || [];
-            const subFolders = folderChildren.filter((child: any) => child.type === 'folder');
-            const requests = folderChildren.filter((child: any) => child.type === 'request');
+            const orderedKids = folderChildren.filter((child: any) => child.type === 'folder' || child.type === 'request');
             const isCollapsed = collapsedFolders.has(folder.path || folder.id);
             const totalCount = folderChildren.length;
 
@@ -996,7 +1329,15 @@ function App() {
                             e.stopPropagation();
                             if (!draggingNode) return;
                             const targetPath = folder.path || folder.id;
-                            const check = checkDropValidity(draggingNode, targetPath);
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                            const intoFolderHalf = e.clientY >= rect.top + rect.height / 2;
+                            const check = intoFolderHalf
+                                ? checkDropAppendIntoFolder(draggingNode, targetPath)
+                                : (() => {
+                                      const p = getParentFolderPath(folder.path!);
+                                      if (p === null) return { ok: false as const, reason: 'invalid-target' };
+                                      return checkDropOrdered(draggingNode, p, folder.id);
+                                  })();
                             if (!check.ok) {
                                 e.dataTransfer.dropEffect = 'none';
                                 setDropTargetFolderPath(null);
@@ -1017,15 +1358,35 @@ function App() {
                             e.stopPropagation();
                             if (!draggingNode) return;
                             const targetPath = folder.path || folder.id;
-                            const check = checkDropValidity(draggingNode, targetPath);
-                            if (!check.ok) {
-                                clearDragState();
-                                return;
-                            }
-                            if (draggingNode.type === 'request') {
-                                await moveRequestNode(draggingNode.path, targetPath);
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                            const intoFolderHalf = e.clientY >= rect.top + rect.height / 2;
+                            if (intoFolderHalf) {
+                                const check = checkDropAppendIntoFolder(draggingNode, targetPath);
+                                if (!check.ok) {
+                                    clearDragState();
+                                    return;
+                                }
+                                if (draggingNode.type === 'request') {
+                                    await moveRequestNode(draggingNode.path, targetPath, '');
+                                } else {
+                                    await moveFolderNode(draggingNode.path, targetPath, '');
+                                }
                             } else {
-                                await moveFolderNode(draggingNode.path, targetPath);
+                                const parentPath = getParentFolderPath(folder.path!);
+                                if (parentPath === null) {
+                                    clearDragState();
+                                    return;
+                                }
+                                const check = checkDropOrdered(draggingNode, parentPath, folder.id);
+                                if (!check.ok) {
+                                    clearDragState();
+                                    return;
+                                }
+                                if (draggingNode.type === 'request') {
+                                    await moveRequestNode(draggingNode.path, parentPath, folder.id);
+                                } else {
+                                    await moveFolderNode(draggingNode.path, parentPath, folder.id);
+                                }
                             }
                             clearDragState();
                         }}
@@ -1054,29 +1415,42 @@ function App() {
                         </Dropdown>
                     </div>
 
-                    {!isCollapsed && folderChildren.length > 0 && (
+                    {!isCollapsed && orderedKids.length > 0 && (
                         <div className="api-folder-content">
-                            {requests.map(renderRequestItem)}
-                            {subFolders.map(renderFolder)}
+                            {orderedKids.map((child: ProjectTree) =>
+                                child.type === 'request' ? (
+                                    <React.Fragment key={child.path || child.id}>{renderRequestItem(child)}</React.Fragment>
+                                ) : (
+                                    <React.Fragment key={child.path || child.id}>{renderFolder(child)}</React.Fragment>
+                                )
+                            )}
                         </div>
                     )}
                 </div>
             );
         };
 
-        const rootFolders = filteredTree.children?.filter((child: any) => child.type === 'folder') || [];
-        const rootRequests = filteredTree.children?.filter((child: any) => child.type === 'request') || [];
+        // 与 collection 子项顺序一致：根下文件夹与接口可任意交错（拖拽排序才能生效）
+        const rootChildren = (filteredTree.children || []).filter(
+            (child: ProjectTree) => child.type === 'folder' || child.type === 'request'
+        );
 
         return (
             <>
-                {rootRequests.length > 0 && (
-                    <div className="api-folder">
-                        <div className="api-folder-content">
-                            {rootRequests.map(renderRequestItem)}
+                {rootChildren.map((child: ProjectTree) => {
+                    if (child.type === 'request') {
+                        return (
+                            <div key={child.path || child.id} className="api-root-sibling">
+                                {renderRequestItem(child)}
+                            </div>
+                        );
+                    }
+                    return (
+                        <div key={child.path || child.id} className="api-root-sibling">
+                            {renderFolder(child)}
                         </div>
-                    </div>
-                )}
-                {rootFolders.map(renderFolder)}
+                    );
+                })}
             </>
         );
     };
@@ -1085,7 +1459,6 @@ function App() {
         loadProjects();
         loadUiConfig();
         loadProjectGroupsState();
-        loadEnvironmentsData();
     }, []);
 
     useEffect(() => {
@@ -1116,9 +1489,11 @@ function App() {
             setEditingScriptId('');
             setScriptFormName('');
             setScriptFormContent('// 在这里编写 JavaScript 脚本\n');
+            setEnvironments([]);
             return;
         }
         loadProjectScriptsData(activeProject.id);
+        loadEnvironmentsData(activeProject.id);
     }, [activeTab, projectTabs]);
 
     useEffect(() => {
@@ -1604,12 +1979,12 @@ function App() {
         return null;
     };
 
-    const moveRequestNode = async (requestPath: string, targetFolderPath: string) => {
+    const moveRequestNode = async (requestPath: string, targetFolderPath: string, beforeID: string = '') => {
         const currentProject = projectTabs.find(t => t.id === activeTab)?.project;
         if (!currentProject) return;
 
         try {
-            const newRequestPath = await MoveRequest(requestPath, targetFolderPath);
+            const newRequestPath = await MoveRequest(requestPath, targetFolderPath, beforeID ?? '');
 
             setRequestTabs(prev => prev.map(tab =>
                 tab.path === requestPath ? { ...tab, path: newRequestPath } : tab
@@ -1632,12 +2007,12 @@ function App() {
         }
     };
 
-    const moveFolderNode = async (folderPath: string, targetFolderPath: string) => {
+    const moveFolderNode = async (folderPath: string, targetFolderPath: string, beforeID: string = '') => {
         const currentProject = projectTabs.find(t => t.id === activeTab)?.project;
         if (!currentProject) return;
 
         try {
-            const newFolderPath = await MoveFolder(folderPath, targetFolderPath);
+            const newFolderPath = await MoveFolder(folderPath, targetFolderPath, beforeID ?? '');
 
             setRequestTabs(prev => prev.map(tab => ({
                 ...tab,
@@ -1699,10 +2074,9 @@ function App() {
     const handleTreeItemClick = async (treeNode: ProjectTree) => {
         if (treeNode.type === 'request' && treeNode.path) {
             try {
+                setSidebarHighlightedCasePath('');
                 const request = await GetRequest(treeNode.path);
-                setCurrentRequest(request);
-                setApiConfig(apiConfigFromRequest(request as CurlRequest, treeNode.name));
-                setResponse(null);
+                hydrateRequestEditor(request);
 
                 const existingTab = requestTabs.find(t => t.path === treeNode.path);
                 if (existingTab) {
@@ -1743,6 +2117,185 @@ function App() {
         multiline: boolean = false
     ) => <VariableEditableInput value={value} onChange={onChange} placeholder={placeholder} style={style} environmentVariables={currentEnvironmentVariables} multiline={multiline} />;
 
+    const hydrateRequestEditor = (request: any, preferredCaseId?: string) => {
+        const name = request.name || '';
+        const scriptPre = request.pre_script_id || '';
+        const scriptPost = request.post_script_id || '';
+        setCurrentRequest(request as CurlRequest);
+        const reqCases = request.cases as models.HttpRequestCase[] | undefined;
+        if (reqCases && reqCases.length > 0) {
+            const rows: RequestCaseState[] = reqCases.map((c) => ({
+                id: c.id,
+                name: (c.name || '').trim() || '未命名',
+                config: {
+                    ...apiConfigFromHttpSpec(c.spec, name),
+                    preScriptId: scriptPre,
+                    postScriptId: scriptPost,
+                },
+            }));
+            const want = preferredCaseId || (request.active_case_id as string) || rows[0].id;
+            const resolved = rows.some((r) => r.id === want) ? want : rows[0].id;
+            setRequestCases(rows);
+            setActiveCaseId(resolved);
+            const activeRow = rows.find((r) => r.id === resolved) || rows[0];
+            setApiConfig({ ...cloneApiConfig(activeRow.config), name });
+        } else {
+            const cfg = apiConfigFromRequest(request as CurlRequest, name);
+            setRequestCases([]);
+            setActiveCaseId('');
+            setApiConfig(cfg);
+        }
+        setResponse(null);
+    };
+
+    const commitActiveCaseIntoList = (): RequestCaseState[] => {
+        if (!currentRequest) return requestCases;
+        return requestCases.map((c) =>
+            c.id === activeCaseId ? { ...c, config: cloneApiConfig({ ...apiConfig, name: currentRequest.name }) } : c
+        );
+    };
+
+    const refreshProjectTree = async () => {
+        const cp = projectTabs.find((t) => t.id === activeTab)?.project;
+        if (!cp) return;
+        const tree = await GetProjectTree(cp.id);
+        setProjectTrees((prev) => ({ ...prev, [cp.id]: tree }));
+    };
+
+    const toggleRequestCasesExpanded = (requestPath: string) => {
+        setExpandedRequestPaths((prev) => {
+            const next = new Set(prev);
+            if (next.has(requestPath)) next.delete(requestPath);
+            else next.add(requestPath);
+            return next;
+        });
+    };
+
+    const handleCaseTreeClick = async (caseNode: ProjectTree) => {
+        const p = parseRequestCaseRef(caseNode.path || '');
+        if (!p) return;
+        const reqPath = requestRefFromIds(p.projectId, p.requestId);
+        try {
+            const request = await GetRequest(reqPath);
+            hydrateRequestEditor(request, p.caseId);
+            setSidebarHighlightedCasePath(caseNode.path || '');
+            const existingTab = requestTabs.find((t) => t.path === reqPath);
+            if (existingTab) {
+                setActiveRequestTab(existingTab.id);
+            } else {
+                const newTab: RequestTab = {
+                    id: `request-${Date.now()}`,
+                    title: request.name || caseNode.name,
+                    path: reqPath,
+                };
+                setRequestTabs([...requestTabs, newTab]);
+                setActiveRequestTab(newTab.id);
+            }
+        } catch (error: any) {
+            console.error('Failed to load case:', error);
+            message.error('加载用例失败');
+        }
+    };
+
+    const openAddCaseModal = (requestPath: string) => {
+        setAddCaseTargetPath(requestPath);
+        setAddCaseNameInput('');
+        setAddCaseModalOpen(true);
+    };
+
+    const confirmAddCaseModal = async () => {
+        const name = addCaseNameInput.trim();
+        if (!name) {
+            message.warning('请输入用例名称');
+            return Promise.reject();
+        }
+        const targetPath = addCaseTargetPath;
+        try {
+            await AddRequestCase(targetPath, name);
+            message.success('已新增用例');
+            setAddCaseModalOpen(false);
+            setAddCaseTargetPath('');
+            setAddCaseNameInput('');
+            setExpandedRequestPaths((prev) => new Set(prev).add(targetPath));
+            await refreshProjectTree();
+            if (currentRequest?.path === targetPath) {
+                const r = await GetRequest(targetPath);
+                hydrateRequestEditor(r);
+            }
+        } catch (error: any) {
+            message.error(`新增用例失败: ${error?.message || error}`);
+            return Promise.reject();
+        }
+    };
+
+    const handleDuplicateCaseFromTree = async (casePath: string) => {
+        const p = parseRequestCaseRef(casePath);
+        if (!p) return;
+        const reqPath = requestRefFromIds(p.projectId, p.requestId);
+        try {
+            await DuplicateRequestCase(reqPath, p.caseId);
+            message.success('已复制用例');
+            setExpandedRequestPaths((prev) => new Set(prev).add(reqPath));
+            await refreshProjectTree();
+            if (currentRequest?.path === reqPath) {
+                const r = await GetRequest(reqPath);
+                hydrateRequestEditor(r);
+            }
+        } catch (error: any) {
+            message.error(`复制失败: ${error?.message || error}`);
+        }
+    };
+
+    const handleDeleteCaseFromTree = (casePath: string) => {
+        const p = parseRequestCaseRef(casePath);
+        if (!p) return;
+        const reqPath = requestRefFromIds(p.projectId, p.requestId);
+        Modal.confirm({
+            title: '删除用例',
+            content: '确定删除该用例吗？',
+            onOk: async () => {
+                try {
+                    await DeleteRequestCase(reqPath, p.caseId);
+                    message.success('用例已删除');
+                    await refreshProjectTree();
+                    if (currentRequest?.path === reqPath) {
+                        const r = await GetRequest(reqPath);
+                        hydrateRequestEditor(r);
+                    }
+                } catch (error: any) {
+                    message.error(`删除失败: ${error?.message || error}`);
+                }
+            },
+        });
+    };
+
+    const openCaseRenameFromTree = (casePath: string, currentName: string) => {
+        setCaseRenameCasePath(casePath);
+        setCaseRenameInput(currentName);
+        setCaseRenameModalOpen(true);
+    };
+
+    const confirmCaseRenameFromTree = async () => {
+        const p = parseRequestCaseRef(caseRenameCasePath);
+        if (!p) {
+            setCaseRenameModalOpen(false);
+            return;
+        }
+        const reqPath = requestRefFromIds(p.projectId, p.requestId);
+        const name = caseRenameInput.trim() || '未命名';
+        try {
+            await RenameRequestCase(reqPath, p.caseId, name);
+            message.success('用例已重命名');
+            setCaseRenameModalOpen(false);
+            await refreshProjectTree();
+            if (currentRequest?.path === reqPath) {
+                setRequestCases((prev) => prev.map((c) => (c.id === p.caseId ? { ...c, name } : c)));
+            }
+        } catch (error: any) {
+            message.error(`重命名失败: ${error?.message || error}`);
+        }
+    };
+
     const handleCloseRequestTab = (tabId: string) => {
         setRequestTabs(requestTabs.filter(t => t.id !== tabId));
         if (activeRequestTab === tabId) {
@@ -1755,6 +2308,10 @@ function App() {
                 setActiveRequestTab('');
                 setCurrentRequest(null);
                 setResponse(null);
+                setRequestCases([]);
+                setActiveCaseId('');
+                setSidebarHighlightedCasePath('');
+                setApiConfig(createDefaultApiConfig());
             }
         }
     };
@@ -1762,10 +2319,9 @@ function App() {
     const loadRequestContent = async (path: string) => {
         setLoading(true);
         try {
+            setSidebarHighlightedCasePath('');
             const request = await GetRequest(path);
-            setCurrentRequest(request);
-            setApiConfig(apiConfigFromRequest(request as CurlRequest, request.name));
-            setResponse(null);
+            hydrateRequestEditor(request);
         } catch (error: any) {
             console.error('Failed to load request:', error);
         } finally {
@@ -1826,6 +2382,11 @@ function App() {
     };
 
     const handleSaveEnvironment = async () => {
+        const projectId = projectTabs.find(t => t.id === activeTab)?.project?.id;
+        if (!projectId) {
+            message.warning('请先打开项目');
+            return;
+        }
         const name = environmentFormName.trim();
         if (!name) {
             message.warning('请输入环境名称');
@@ -1836,10 +2397,10 @@ function App() {
         setEnvSaving(true);
         try {
             if (editingEnvironmentId) {
-                await UpdateEnvironment(editingEnvironmentId, name, variables);
+                await UpdateEnvironment(projectId, editingEnvironmentId, name, variables);
                 message.success('环境已更新');
             } else {
-                const created = await CreateEnvironment(name, variables);
+                const created = await CreateEnvironment(projectId, name, variables);
                 message.success('环境已创建');
                 setSelectedEnvironmentId(created.id);
                 setEnvironmentTabs(prev => prev.map(tab => tab.key === activeEnvironmentTab
@@ -1848,7 +2409,7 @@ function App() {
                 setActiveEnvironmentTab(`env-${created.id}`);
                 setEditingEnvironmentId(created.id);
             }
-            await loadEnvironmentsData();
+            await loadEnvironmentsData(projectId);
         } catch (error: any) {
             message.error(`保存环境失败: ${error?.message || error}`);
         } finally {
@@ -1857,15 +2418,16 @@ function App() {
     };
 
     const handleDeleteEnvironmentCurrent = async () => {
-        if (!editingEnvironmentId) return;
+        const projectId = projectTabs.find(t => t.id === activeTab)?.project?.id;
+        if (!projectId || !editingEnvironmentId) return;
         Modal.confirm({
             title: '删除环境',
             content: '确定删除当前环境吗？删除后无法恢复。',
             onOk: async () => {
                 try {
-                    await DeleteEnvironment(editingEnvironmentId);
+                    await DeleteEnvironment(projectId, editingEnvironmentId);
                     message.success('环境已删除');
-                    await loadEnvironmentsData();
+                    await loadEnvironmentsData(projectId);
                     setEnvironmentTabs(prev => prev.filter(tab => tab.environmentId !== editingEnvironmentId));
                     resetEnvironmentEditor();
                 } catch (error: any) {
@@ -1879,7 +2441,21 @@ function App() {
         if (!currentRequest?.path) return;
 
         try {
-            await UpdateRequest(currentRequest.path, toWailsHttpSpec(apiConfig));
+            const committed = commitActiveCaseIntoList();
+            setRequestCases(committed);
+            const wailsCases = committed.map((c) =>
+                models.HttpRequestCase.createFrom({
+                    id: c.id,
+                    name: (c.name || '').trim() || '未命名',
+                    spec: models.HttpRequestSpec.createFrom(apiConfigToSpec({ ...c.config, name: currentRequest.name })),
+                })
+            );
+            await UpdateRequest(
+                currentRequest.path,
+                toWailsHttpSpec({ ...apiConfig, name: currentRequest.name }),
+                wailsCases,
+                requestCases.length > 0 ? activeCaseId : ''
+            );
             await UpdateRequestScripts(currentRequest.path, apiConfig.preScriptId || '', apiConfig.postScriptId || '');
             message.success('请求已保存');
             setStatus('请求已保存');
@@ -1958,6 +2534,9 @@ function App() {
                 if (currentRequest?.path === renamePath) {
                     setCurrentRequest({ ...currentRequest, path: renamed.path, name: renamed.name });
                     setApiConfig({ ...apiConfig, name: renamed.name });
+                    setRequestCases((prev) =>
+                        prev.map((c) => ({ ...c, config: { ...c.config, name: renamed.name } }))
+                    );
                 }
             } else {
                 await RenameFolder(renamePath, newName);
@@ -2398,7 +2977,7 @@ function App() {
                                         className={`sidebar-content${(listAnimationEnabled || forceListAnimation) ? ' list-animations-enabled' : ''}${dropTargetFolderPath === currentProject?.path ? ' root-drop-target' : ''}`}
                                         onDragOver={(e) => {
                                             if (!draggingNode || !currentProject?.path) return;
-                                            const check = checkDropValidity(draggingNode, currentProject.path);
+                                            const check = checkDropAppendIntoFolder(draggingNode, currentProject.path);
                                             if (!check.ok) {
                                                 e.dataTransfer.dropEffect = 'none';
                                                 setDropTargetFolderPath(null);
@@ -2417,15 +2996,15 @@ function App() {
                                         onDrop={async (e) => {
                                             e.preventDefault();
                                             if (!draggingNode || !currentProject?.path) return;
-                                            const check = checkDropValidity(draggingNode, currentProject.path);
+                                            const check = checkDropAppendIntoFolder(draggingNode, currentProject.path);
                                             if (!check.ok) {
                                                 clearDragState();
                                                 return;
                                             }
                                             if (draggingNode.type === 'request') {
-                                                await moveRequestNode(draggingNode.path, currentProject.path);
+                                                await moveRequestNode(draggingNode.path, currentProject.path, '');
                                             } else {
-                                                await moveFolderNode(draggingNode.path, currentProject.path);
+                                                await moveFolderNode(draggingNode.path, currentProject.path, '');
                                             }
                                             clearDragState();
                                         }}
@@ -2647,6 +3226,12 @@ function App() {
                                 </div>
                             ) : currentRequest ? (
                                 <div className="request-panel">
+                                    {requestCases.length > 0 && (
+                                        <div className="request-active-case-hint">
+                                            当前用例：
+                                            {requestCases.find((c) => c.id === activeCaseId)?.name ?? '—'}
+                                        </div>
+                                    )}
                                     <div className="api-request-bar">
                                         <Select
                                             value={apiConfig.method}
@@ -3107,6 +3692,42 @@ function App() {
                     value={renameValue}
                     onChange={(e) => setRenameValue(trimRightSpaces(e.target.value))}
                     onPressEnter={handleRename}
+                />
+            </Modal>
+
+            <Modal
+                title="新增用例"
+                open={addCaseModalOpen}
+                onOk={confirmAddCaseModal}
+                onCancel={() => {
+                    setAddCaseModalOpen(false);
+                    setAddCaseTargetPath('');
+                    setAddCaseNameInput('');
+                }}
+            >
+                <Input
+                    placeholder="输入用例名称"
+                    value={addCaseNameInput}
+                    onChange={(e) => setAddCaseNameInput(e.target.value)}
+                    onPressEnter={confirmAddCaseModal}
+                />
+            </Modal>
+
+            <Modal
+                title="重命名用例"
+                open={caseRenameModalOpen}
+                onOk={confirmCaseRenameFromTree}
+                onCancel={() => {
+                    setCaseRenameModalOpen(false);
+                    setCaseRenameCasePath('');
+                    setCaseRenameInput('');
+                }}
+            >
+                <Input
+                    placeholder="用例名称"
+                    value={caseRenameInput}
+                    onChange={(e) => setCaseRenameInput(e.target.value)}
+                    onPressEnter={confirmCaseRenameFromTree}
                 />
             </Modal>
 

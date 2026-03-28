@@ -74,6 +74,84 @@ export namespace config {
 
 export namespace models {
 	
+	export class HttpRequestSpec {
+	    method: string;
+	    http_url: string;
+	    headers: RequestKeyVal[];
+	    params: RequestKeyVal[];
+	    body: string;
+	    body_type: string;
+	    form_data: RequestPair[];
+	    url_encoded: RequestPair[];
+	
+	    static createFrom(source: any = {}) {
+	        return new HttpRequestSpec(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.method = source["method"];
+	        this.http_url = source["http_url"];
+	        this.headers = this.convertValues(source["headers"], RequestKeyVal);
+	        this.params = this.convertValues(source["params"], RequestKeyVal);
+	        this.body = source["body"];
+	        this.body_type = source["body_type"];
+	        this.form_data = this.convertValues(source["form_data"], RequestPair);
+	        this.url_encoded = this.convertValues(source["url_encoded"], RequestPair);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class HttpRequestCase {
+	    id: string;
+	    name: string;
+	    spec: HttpRequestSpec;
+	
+	    static createFrom(source: any = {}) {
+	        return new HttpRequestCase(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.spec = this.convertValues(source["spec"], HttpRequestSpec);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class RequestPair {
 	    key: string;
 	    value: string;
@@ -127,6 +205,8 @@ export namespace models {
 	    body_type?: string;
 	    form_data?: RequestPair[];
 	    url_encoded?: RequestPair[];
+	    cases?: HttpRequestCase[];
+	    active_case_id?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new CurlRequest(source);
@@ -152,6 +232,8 @@ export namespace models {
 	        this.body_type = source["body_type"];
 	        this.form_data = this.convertValues(source["form_data"], RequestPair);
 	        this.url_encoded = this.convertValues(source["url_encoded"], RequestPair);
+	        this.cases = this.convertValues(source["cases"], HttpRequestCase);
+	        this.active_case_id = source["active_case_id"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -273,50 +355,8 @@ export namespace models {
 		    return a;
 		}
 	}
-	export class HttpRequestSpec {
-	    method: string;
-	    http_url: string;
-	    headers: RequestKeyVal[];
-	    params: RequestKeyVal[];
-	    body: string;
-	    body_type: string;
-	    form_data: RequestPair[];
-	    url_encoded: RequestPair[];
 	
-	    static createFrom(source: any = {}) {
-	        return new HttpRequestSpec(source);
-	    }
 	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.method = source["method"];
-	        this.http_url = source["http_url"];
-	        this.headers = this.convertValues(source["headers"], RequestKeyVal);
-	        this.params = this.convertValues(source["params"], RequestKeyVal);
-	        this.body = source["body"];
-	        this.body_type = source["body_type"];
-	        this.form_data = this.convertValues(source["form_data"], RequestPair);
-	        this.url_encoded = this.convertValues(source["url_encoded"], RequestPair);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class Project {
 	    id: string;
 	    name: string;

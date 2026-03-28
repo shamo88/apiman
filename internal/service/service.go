@@ -37,20 +37,36 @@ func (s *Service) GetProjectsDir() string {
 	return s.ConfigManager.GetProjectsDir()
 }
 
-func (s *Service) LoadEnvironments() ([]models.Environment, error) {
-	return s.ConfigManager.LoadEnvironments()
+func (s *Service) LoadEnvironments(projectID string) ([]models.Environment, error) {
+	path, err := s.ProjectMgr.ProjectPathByID(projectID)
+	if err != nil {
+		return nil, err
+	}
+	return s.ConfigManager.LoadProjectEnvironments(path)
 }
 
-func (s *Service) CreateEnvironment(name string, variables map[string]string) (*models.Environment, error) {
-	return s.ConfigManager.CreateEnvironment(name, variables)
+func (s *Service) CreateEnvironment(projectID string, name string, variables map[string]string) (*models.Environment, error) {
+	path, err := s.ProjectMgr.ProjectPathByID(projectID)
+	if err != nil {
+		return nil, err
+	}
+	return s.ConfigManager.CreateProjectEnvironment(path, name, variables)
 }
 
-func (s *Service) UpdateEnvironment(id string, name string, variables map[string]string) error {
-	return s.ConfigManager.UpdateEnvironment(id, name, variables)
+func (s *Service) UpdateEnvironment(projectID string, id string, name string, variables map[string]string) error {
+	path, err := s.ProjectMgr.ProjectPathByID(projectID)
+	if err != nil {
+		return err
+	}
+	return s.ConfigManager.UpdateProjectEnvironment(path, id, name, variables)
 }
 
-func (s *Service) DeleteEnvironment(id string) error {
-	return s.ConfigManager.DeleteEnvironment(id)
+func (s *Service) DeleteEnvironment(projectID string, id string) error {
+	path, err := s.ProjectMgr.ProjectPathByID(projectID)
+	if err != nil {
+		return err
+	}
+	return s.ConfigManager.DeleteProjectEnvironment(path, id)
 }
 
 func (s *Service) GetGlobalVariables() (map[string]string, error) {
@@ -93,8 +109,24 @@ func (s *Service) CreateRequest(projectID, folderPath, name string, spec models.
 	return s.ProjectMgr.CreateRequest(projectID, folderPath, name, spec)
 }
 
-func (s *Service) UpdateRequest(requestPath string, spec models.HttpRequestSpec) error {
-	return s.ProjectMgr.UpdateRequest(requestPath, spec)
+func (s *Service) UpdateRequest(requestPath string, spec models.HttpRequestSpec, cases []models.HttpRequestCase, activeCaseID string) error {
+	return s.ProjectMgr.UpdateRequest(requestPath, spec, cases, activeCaseID)
+}
+
+func (s *Service) AddRequestCase(requestPath, caseName string) (*models.CurlRequest, error) {
+	return s.ProjectMgr.AddRequestCase(requestPath, caseName)
+}
+
+func (s *Service) DuplicateRequestCase(requestPath, caseID string) (*models.CurlRequest, error) {
+	return s.ProjectMgr.DuplicateRequestCase(requestPath, caseID)
+}
+
+func (s *Service) DeleteRequestCase(requestPath, caseID string) (*models.CurlRequest, error) {
+	return s.ProjectMgr.DeleteRequestCase(requestPath, caseID)
+}
+
+func (s *Service) RenameRequestCase(requestPath, caseID, newName string) (*models.CurlRequest, error) {
+	return s.ProjectMgr.RenameRequestCase(requestPath, caseID, newName)
 }
 
 func (s *Service) UpdateRequestScripts(requestPath, preScriptID, postScriptID string) error {
@@ -121,12 +153,12 @@ func (s *Service) RenameFolder(folderPath, newName string) (*models.Folder, erro
 	return s.ProjectMgr.RenameFolder(folderPath, newName)
 }
 
-func (s *Service) MoveRequest(requestPath, targetFolderPath string) (string, error) {
-	return s.ProjectMgr.MoveRequest(requestPath, targetFolderPath)
+func (s *Service) MoveRequest(requestPath, targetFolderPath string, beforeID string) (string, error) {
+	return s.ProjectMgr.MoveRequest(requestPath, targetFolderPath, beforeID)
 }
 
-func (s *Service) MoveFolder(folderPath, targetParentPath string) (string, error) {
-	return s.ProjectMgr.MoveFolder(folderPath, targetParentPath)
+func (s *Service) MoveFolder(folderPath, targetParentPath string, beforeID string) (string, error) {
+	return s.ProjectMgr.MoveFolder(folderPath, targetParentPath, beforeID)
 }
 
 func (s *Service) ExecuteCurl(command string) (*models.CurlResponse, error) {

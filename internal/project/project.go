@@ -263,6 +263,11 @@ func (pm *ProjectManager) findProjectPathByID(id string) (string, error) {
 	return "", os.ErrNotExist
 }
 
+// ProjectPathByID returns the on-disk directory for a project UUID.
+func (pm *ProjectManager) ProjectPathByID(projectID string) (string, error) {
+	return pm.findProjectPathByID(projectID)
+}
+
 func (pm *ProjectManager) GetProjectTree(projectID string) (*ProjectTree, error) {
 	projectPath, err := pm.findProjectPathByID(projectID)
 	if err != nil {
@@ -315,12 +320,13 @@ func (pm *ProjectManager) collectionItemsToTree(projectID string, items []postma
 				u = it.Request.URL.Raw
 			}
 			out = append(out, &ProjectTree{
-				ID:     it.ID,
-				Name:   it.Name,
-				Type:   "request",
-				Path:   postman.RequestRefPath(projectID, it.ID),
-				Method: m,
-				URL:    u,
+				ID:       it.ID,
+				Name:     it.Name,
+				Type:     "request",
+				Path:     postman.RequestRefPath(projectID, it.ID),
+				Method:   m,
+				URL:      u,
+				Children: requestCaseTreeNodes(projectID, it.ID, it),
 			})
 			continue
 		}
@@ -333,6 +339,65 @@ func (pm *ProjectManager) collectionItemsToTree(projectID string, items []postma
 		})
 	}
 	return out
+}
+
+func requestCaseTreeNodes(projectID, requestID string, it *postman.CollectionItem) []*ProjectTree {
+	if len(it.ApimanCases) == 0 {
+		return nil
+	}
+	list := it.ApimanCases
+	out := make([]*ProjectTree, 0, len(list))
+	for _, c := range list {
+		nm := strings.TrimSpace(c.Name)
+		if nm == "" {
+			nm = "未命名"
+		}
+		out = append(out, &ProjectTree{
+			ID:   c.ID,
+			Name: nm,
+			Type: "case",
+			Path: postman.RequestCaseRefPath(projectID, requestID, c.ID),
+		})
+	}
+	return out
+}
+
+func cloneHTTPRequestSpec(s models.HttpRequestSpec) models.HttpRequestSpec {
+	b, err := json.Marshal(s)
+	if err != nil {
+		return s
+	}
+	var out models.HttpRequestSpec
+	if err := json.Unmarshal(b, &out); err != nil {
+		return s
+	}
+	return out
+}
+
+func activeCaseSpec(item *postman.CollectionItem, projectID string) models.HttpRequestSpec {
+	if item == nil || item.Request == nil {
+		return models.HttpRequestSpec{}
+	}
+	if len(item.ApimanCases) == 0 {
+		cr := postman.ItemToCurlRequestModel(projectID, item)
+		return models.SpecFromCurlRequest(cr)
+	}
+	aid := strings.TrimSpace(item.ApimanActiveCaseID)
+	for _, c := range item.ApimanCases {
+		if c.ID == aid {
+			return cloneHTTPRequestSpec(c.Spec)
+		}
+	}
+	return cloneHTTPRequestSpec(item.ApimanCases[0].Spec)
+}
+
+func findCaseIndex(cases []models.HttpRequestCase, caseID string) int {
+	for i := range cases {
+		if cases[i].ID == caseID {
+			return i
+		}
+	}
+	return -1
 }
 
 func resolveParentFolderID(projectPath, parentPath, projectID string) (string, error) {
@@ -493,10 +558,28 @@ func (pm *ProjectManager) CreateRequest(projectID, folderPath, name string, spec
 
 	created := postman.FindItemRef(coll.Item, reqID)
 	now := time.Now()
-	cr := postman.ItemToCurlRequestModel(projectID, created)
+	cr := postman.CurlRequestFromCollectionItem(projectID, created)
 	cr.CreatedAt = now
 	cr.UpdatedAt = now
 	return cr, nil
+}
+
+// directParentFolderID returns the folder ID whose Item slice directly contains itemID, or "" if item is at collection root.
+func directParentFolderID(items []postman.CollectionItem, itemID string) string {
+	for i := range items {
+		if items[i].ID == itemID {
+			return ""
+		}
+		for j := range items[i].Item {
+			if items[i].Item[j].ID == itemID {
+				return items[i].ID
+			}
+		}
+		if pid := directParentFolderID(items[i].Item, itemID); pid != "" {
+			return pid
+		}
+	}
+	return ""
 }
 
 func requestNameExists(items []postman.CollectionItem, parentID, name, excludeRequestID string) bool {
@@ -525,7 +608,7 @@ func requestNameExists(items []postman.CollectionItem, parentID, name, excludeRe
 	return false
 }
 
-func (pm *ProjectManager) UpdateRequest(requestPath string, spec models.HttpRequestSpec) error {
+func (pm *ProjectManager) UpdateRequest(requestPath string, spec models.HttpRequestSpec, cases []models.HttpRequestCase, activeCaseID string) error {
 	projectID, requestID, ok := postman.ParseRequestRef(requestPath)
 	if !ok {
 		return os.ErrInvalid
@@ -542,10 +625,208 @@ func (pm *ProjectManager) UpdateRequest(requestPath string, spec models.HttpRequ
 	if item == nil || item.Request == nil {
 		return os.ErrNotExist
 	}
+	if len(cases) == 0 {
+		pre, post := item.PreScriptID, item.PostScriptID
+		item.ApimanCases = nil
+		item.ApimanActiveCaseID = ""
+		postman.ApplyHTTPRequestSpecToItem(item, &spec)
+		item.PreScriptID, item.PostScriptID = pre, post
+		return postman.SaveCollection(projectPath, coll)
+	}
+	activeCaseID = strings.TrimSpace(activeCaseID)
+	activeIdx := -1
+	for i := range cases {
+		if cases[i].ID == activeCaseID {
+			activeIdx = i
+			break
+		}
+	}
+	if activeIdx < 0 {
+		activeIdx = 0
+		activeCaseID = cases[0].ID
+	}
+	cases[activeIdx].Spec = spec
+
 	pre, post := item.PreScriptID, item.PostScriptID
+	item.ApimanCases = postman.CloneHttpRequestCases(cases)
+	item.ApimanActiveCaseID = activeCaseID
 	postman.ApplyHTTPRequestSpecToItem(item, &spec)
 	item.PreScriptID, item.PostScriptID = pre, post
 	return postman.SaveCollection(projectPath, coll)
+}
+
+func (pm *ProjectManager) AddRequestCase(requestPath, caseName string) (*models.CurlRequest, error) {
+	caseName = strings.TrimSpace(caseName)
+	if caseName == "" {
+		return nil, errors.New("用例名称不能为空")
+	}
+	projectID, requestID, ok := postman.ParseRequestRef(requestPath)
+	if !ok {
+		return nil, os.ErrInvalid
+	}
+	projectPath, err := pm.findProjectPathByID(projectID)
+	if err != nil {
+		return nil, err
+	}
+	coll, err := postman.LoadCollection(projectPath)
+	if err != nil {
+		return nil, err
+	}
+	item := postman.FindItemRef(coll.Item, requestID)
+	if item == nil || item.Request == nil {
+		return nil, os.ErrNotExist
+	}
+	pre, postScr := item.PreScriptID, item.PostScriptID
+	specDup := cloneHTTPRequestSpec(activeCaseSpec(item, projectID))
+	var cases []models.HttpRequestCase
+	var newActive string
+	if len(item.ApimanCases) == 0 {
+		newActive = uuid.New().String()
+		cases = []models.HttpRequestCase{{ID: newActive, Name: caseName, Spec: specDup}}
+	} else {
+		cases = postman.CloneHttpRequestCases(item.ApimanCases)
+		newActive = uuid.New().String()
+		cases = append(cases, models.HttpRequestCase{
+			ID:   newActive,
+			Name: caseName,
+			Spec: specDup,
+		})
+	}
+	item.ApimanCases = cases
+	item.ApimanActiveCaseID = newActive
+	last := len(cases) - 1
+	postman.ApplyHTTPRequestSpecToItem(item, &cases[last].Spec)
+	item.PreScriptID, item.PostScriptID = pre, postScr
+	if err := postman.SaveCollection(projectPath, coll); err != nil {
+		return nil, err
+	}
+	return postman.CurlRequestFromCollectionItem(projectID, postman.FindItemRef(coll.Item, requestID)), nil
+}
+
+func (pm *ProjectManager) DuplicateRequestCase(requestPath, caseID string) (*models.CurlRequest, error) {
+	projectID, requestID, ok := postman.ParseRequestRef(requestPath)
+	if !ok {
+		return nil, os.ErrInvalid
+	}
+	projectPath, err := pm.findProjectPathByID(projectID)
+	if err != nil {
+		return nil, err
+	}
+	coll, err := postman.LoadCollection(projectPath)
+	if err != nil {
+		return nil, err
+	}
+	item := postman.FindItemRef(coll.Item, requestID)
+	if item == nil || item.Request == nil {
+		return nil, os.ErrNotExist
+	}
+	cases := postman.CloneHttpRequestCases(item.ApimanCases)
+	if len(cases) == 0 {
+		return nil, errors.New("该接口没有用例")
+	}
+	idx := findCaseIndex(cases, caseID)
+	if idx < 0 {
+		return nil, os.ErrNotExist
+	}
+	pre, postScr := item.PreScriptID, item.PostScriptID
+	newID := uuid.New().String()
+	baseName := strings.TrimSpace(cases[idx].Name)
+	dupName := baseName + " 副本"
+	if baseName == "" {
+		dupName = "未命名 副本"
+	}
+	cases = append(cases, models.HttpRequestCase{
+		ID:   newID,
+		Name: dupName,
+		Spec: cloneHTTPRequestSpec(cases[idx].Spec),
+	})
+	item.ApimanCases = cases
+	item.ApimanActiveCaseID = newID
+	last := len(cases) - 1
+	postman.ApplyHTTPRequestSpecToItem(item, &cases[last].Spec)
+	item.PreScriptID, item.PostScriptID = pre, postScr
+	if err := postman.SaveCollection(projectPath, coll); err != nil {
+		return nil, err
+	}
+	return postman.CurlRequestFromCollectionItem(projectID, postman.FindItemRef(coll.Item, requestID)), nil
+}
+
+func (pm *ProjectManager) DeleteRequestCase(requestPath, caseID string) (*models.CurlRequest, error) {
+	projectID, requestID, ok := postman.ParseRequestRef(requestPath)
+	if !ok {
+		return nil, os.ErrInvalid
+	}
+	projectPath, err := pm.findProjectPathByID(projectID)
+	if err != nil {
+		return nil, err
+	}
+	coll, err := postman.LoadCollection(projectPath)
+	if err != nil {
+		return nil, err
+	}
+	item := postman.FindItemRef(coll.Item, requestID)
+	if item == nil || item.Request == nil {
+		return nil, os.ErrNotExist
+	}
+	cases := postman.CloneHttpRequestCases(item.ApimanCases)
+	if len(cases) == 0 {
+		return nil, os.ErrNotExist
+	}
+	idx := findCaseIndex(cases, caseID)
+	if idx < 0 {
+		return nil, os.ErrNotExist
+	}
+	pre, postScr := item.PreScriptID, item.PostScriptID
+	cases = append(cases[:idx], cases[idx+1:]...)
+	item.ApimanCases = cases
+	if len(cases) == 0 {
+		item.ApimanActiveCaseID = ""
+	} else {
+		if item.ApimanActiveCaseID == caseID || findCaseIndex(cases, item.ApimanActiveCaseID) < 0 {
+			item.ApimanActiveCaseID = cases[0].ID
+		}
+		activeIdx := findCaseIndex(cases, item.ApimanActiveCaseID)
+		postman.ApplyHTTPRequestSpecToItem(item, &cases[activeIdx].Spec)
+	}
+	item.PreScriptID, item.PostScriptID = pre, postScr
+	if err := postman.SaveCollection(projectPath, coll); err != nil {
+		return nil, err
+	}
+	return postman.CurlRequestFromCollectionItem(projectID, postman.FindItemRef(coll.Item, requestID)), nil
+}
+
+func (pm *ProjectManager) RenameRequestCase(requestPath, caseID, newName string) (*models.CurlRequest, error) {
+	newName = strings.TrimSpace(newName)
+	if newName == "" {
+		newName = "未命名"
+	}
+	projectID, requestID, ok := postman.ParseRequestRef(requestPath)
+	if !ok {
+		return nil, os.ErrInvalid
+	}
+	projectPath, err := pm.findProjectPathByID(projectID)
+	if err != nil {
+		return nil, err
+	}
+	coll, err := postman.LoadCollection(projectPath)
+	if err != nil {
+		return nil, err
+	}
+	item := postman.FindItemRef(coll.Item, requestID)
+	if item == nil || item.Request == nil {
+		return nil, os.ErrNotExist
+	}
+	cases := postman.CloneHttpRequestCases(item.ApimanCases)
+	idx := findCaseIndex(cases, caseID)
+	if idx < 0 {
+		return nil, os.ErrNotExist
+	}
+	cases[idx].Name = newName
+	item.ApimanCases = cases
+	if err := postman.SaveCollection(projectPath, coll); err != nil {
+		return nil, err
+	}
+	return postman.CurlRequestFromCollectionItem(projectID, postman.FindItemRef(coll.Item, requestID)), nil
 }
 
 func (pm *ProjectManager) UpdateRequestScripts(requestPath, preScriptID, postScriptID string) error {
@@ -608,7 +889,7 @@ func (pm *ProjectManager) GetRequest(requestPath string) (*models.CurlRequest, e
 	if item == nil {
 		return nil, os.ErrNotExist
 	}
-	return postman.ItemToCurlRequestModel(projectID, item), nil
+	return postman.CurlRequestFromCollectionItem(projectID, item), nil
 }
 
 func (pm *ProjectManager) CopyRequest(requestPath string) (*models.CurlRequest, error) {
@@ -643,6 +924,8 @@ func (pm *ProjectManager) CopyRequest(requestPath string) (*models.CurlRequest, 
 	clone := *orig
 	clone.ID = newID
 	clone.Name = copyName
+	clone.ApimanCases = postman.CloneHttpRequestCases(orig.ApimanCases)
+	clone.ApimanActiveCaseID = orig.ApimanActiveCaseID
 
 	var inserted bool
 	coll.Item, inserted = postman.InsertItemUnder(coll.Item, parentID, clone)
@@ -655,7 +938,7 @@ func (pm *ProjectManager) CopyRequest(requestPath string) (*models.CurlRequest, 
 	}
 
 	now := time.Now()
-	cr := postman.ItemToCurlRequestModel(projectID, postman.FindItemRef(coll.Item, newID))
+	cr := postman.CurlRequestFromCollectionItem(projectID, postman.FindItemRef(coll.Item, newID))
 	cr.CreatedAt = now
 	cr.UpdatedAt = now
 	return cr, nil
@@ -758,7 +1041,7 @@ func (pm *ProjectManager) RenameRequest(requestPath, newName string) (*models.Cu
 		return nil, err
 	}
 
-	cr := postman.ItemToCurlRequestModel(projectID, item)
+	cr := postman.CurlRequestFromCollectionItem(projectID, item)
 	cr.UpdatedAt = time.Now()
 	return cr, nil
 }
@@ -826,7 +1109,8 @@ func parentFolderIDOfFolder(items []postman.CollectionItem, folderID string) str
 	return ""
 }
 
-func (pm *ProjectManager) MoveRequest(requestPath, targetFolderPath string) (string, error) {
+func (pm *ProjectManager) MoveRequest(requestPath, targetFolderPath string, beforeID string) (string, error) {
+	beforeID = strings.TrimSpace(beforeID)
 	projectID, requestID, ok := postman.ParseRequestRef(requestPath)
 	if !ok {
 		return "", os.ErrInvalid
@@ -854,8 +1138,15 @@ func (pm *ProjectManager) MoveRequest(requestPath, targetFolderPath string) (str
 		return "", os.ErrNotExist
 	}
 
-	if requestNameExists(coll.Item, targetParentID, src.Name, requestID) {
-		return "", errors.New("目标文件夹中已存在同名接口")
+	srcParent := directParentFolderID(coll.Item, requestID)
+	if srcParent != targetParentID {
+		if requestNameExists(coll.Item, targetParentID, src.Name, requestID) {
+			return "", errors.New("目标文件夹中已存在同名接口")
+		}
+	}
+
+	if beforeID == requestID {
+		beforeID = ""
 	}
 
 	next, moved, ok := postman.ExtractItem(coll.Item, requestID)
@@ -865,7 +1156,7 @@ func (pm *ProjectManager) MoveRequest(requestPath, targetFolderPath string) (str
 	coll.Item = next
 
 	var inserted bool
-	coll.Item, inserted = postman.InsertItemUnder(coll.Item, targetParentID, moved)
+	coll.Item, inserted = postman.InsertItemUnderBefore(coll.Item, targetParentID, moved, beforeID)
 	if !inserted {
 		return "", errors.New("移动失败")
 	}
@@ -876,7 +1167,8 @@ func (pm *ProjectManager) MoveRequest(requestPath, targetFolderPath string) (str
 	return requestPath, nil
 }
 
-func (pm *ProjectManager) MoveFolder(folderRefPath, targetParentPath string) (string, error) {
+func (pm *ProjectManager) MoveFolder(folderRefPath, targetParentPath string, beforeID string) (string, error) {
+	beforeID = strings.TrimSpace(beforeID)
 	projectID, folderID, ok := postman.ParseFolderRef(folderRefPath)
 	if !ok {
 		return "", os.ErrInvalid
@@ -913,8 +1205,15 @@ func (pm *ProjectManager) MoveFolder(folderRefPath, targetParentPath string) (st
 		return "", os.ErrNotExist
 	}
 
-	if folderNameExists(coll.Item, targetParentID, item.Name, folderID) {
-		return "", errors.New("目标位置已存在同名文件夹")
+	srcParent := directParentFolderID(coll.Item, folderID)
+	if srcParent != targetParentID {
+		if folderNameExists(coll.Item, targetParentID, item.Name, folderID) {
+			return "", errors.New("目标位置已存在同名文件夹")
+		}
+	}
+
+	if beforeID == folderID {
+		beforeID = ""
 	}
 
 	next, moved, ok := postman.ExtractItem(coll.Item, folderID)
@@ -924,7 +1223,7 @@ func (pm *ProjectManager) MoveFolder(folderRefPath, targetParentPath string) (st
 	coll.Item = next
 
 	var inserted bool
-	coll.Item, inserted = postman.InsertItemUnder(coll.Item, targetParentID, moved)
+	coll.Item, inserted = postman.InsertItemUnderBefore(coll.Item, targetParentID, moved, beforeID)
 	if !inserted {
 		return "", errors.New("移动失败")
 	}

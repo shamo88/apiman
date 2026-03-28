@@ -804,13 +804,15 @@ body,
 .api-folder-header {
     display: flex;
     align-items: center;
-    padding: 6px 12px;
+    padding: 5px 10px 5px 6px;
     cursor: pointer;
     transition: all 0.2s ease;
     color: var(--text-secondary);
     font-size: 13px;
     font-weight: 500;
     text-align: left;
+    /* 与 .api-item 同宽左边框，同级下文件夹/接口的展开箭头左对齐 */
+    border-left: 2px solid transparent;
 }
 
 .api-folder-header:hover {
@@ -839,7 +841,8 @@ body,
 }
 
 .api-folder-header.moved-highlight,
-.api-item.moved-highlight {
+.api-item.moved-highlight,
+.api-case-item.moved-highlight {
     background: rgba(79, 70, 229, 0.18);
 }
 
@@ -847,17 +850,24 @@ body,
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 16px;
-    height: 16px;
-    margin-right: 6px;
-    font-size: 10px;
+    width: 13px;
+    height: 13px;
+    margin-left: 2px;
+    margin-right: 2px;
+    flex-shrink: 0;
+    font-size: 8px;
     color: var(--text-muted);
+}
+
+.folder-toggle-icon .anticon {
+    font-size: 8px;
 }
 
 .folder-icon {
     margin-right: 6px;
     color: #faad14;
     font-size: 14px;
+    flex-shrink: 0;
 }
 
 .folder-name {
@@ -866,6 +876,8 @@ body,
     text-overflow: ellipsis;
     white-space: nowrap;
     text-align: left;
+    font-size: 13px;
+    font-weight: 500;
 }
 
 .folder-count {
@@ -903,13 +915,19 @@ body,
 }
 
 .api-folder-content {
-    padding-left: 12px;
+    padding-left: 8px;
+}
+
+/* 根目录下接口与文件夹同一左缩进，且可与 collection 顺序交错 */
+.api-root-sibling {
+    padding-left: 8px;
+    margin-bottom: 2px;
 }
 
 .api-item {
     display: flex;
     align-items: center;
-    padding: 5px 12px;
+    padding: 5px 10px 5px 6px;
     cursor: pointer;
     transition: all 0.2s ease;
     border-left: 2px solid transparent;
@@ -921,9 +939,10 @@ body,
 .api-item:hover {
     background: var(--bg-hover);
     color: var(--text-primary);
-    border-left-color: var(--accent-primary);
+    border-left-color: transparent;
 }
 
+.api-item .api-item-main[draggable="true"],
 .api-item[draggable="true"],
 .api-folder-header[draggable="true"] {
     cursor: grab;
@@ -939,15 +958,57 @@ body,
     border-left-color: var(--accent-primary);
 }
 
+/* 固定宽度，同级接口名称左缘对齐 */
+.api-method-col {
+    flex: 0 0 36px;
+    width: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    margin-right: 0;
+    flex-shrink: 0;
+    box-sizing: border-box;
+}
+
+/*
+ * 用例行：列宽仍 42px，与父级 method 列对齐，保证 .api-case-name 与 .api-name 左缘一致。
+ * 图标在列内右对齐，避免 42px 左对齐时图标与名称之间出现大块空白（改 margin-right 无效的原因）。
+ */
+.api-method-col.api-method-col--case-icon {
+    pointer-events: none;
+    margin-right: 0;
+    justify-content: flex-end;
+    align-items: center;
+    align-self: center;
+    padding-right: 8px; /* 原 2px + 再加 3px */
+}
+
+.api-case-type-icon {
+    font-size: 11px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.api-case-item.active .api-case-type-icon {
+    color: var(--accent-primary);
+}
+
 .api-method-tag {
-    padding: 1px 6px;
-    border-radius: 4px;
-    font-size: 10px;
+    padding: 0 4px;
+    border-radius: 3px;
+    font-size: 8px;
     font-weight: 700;
-    margin-right: 8px;
-    letter-spacing: 0.5px;
-    min-width: 44px;
+    line-height: 1.45;
+    margin-right: 0;
+    letter-spacing: 0.35px;
+    min-width: 0;
     text-align: center;
+    flex-shrink: 0;
+    box-sizing: border-box;
 }
 
 .api-name {
@@ -956,16 +1017,22 @@ body,
     text-overflow: ellipsis;
     white-space: nowrap;
     text-align: left;
+    font-size: 13px;
+    font-weight: 500;
 }
 
 .api-action-btn {
     opacity: 0;
-    padding: 4px;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    box-sizing: border-box;
     background: transparent;
     border: none;
     cursor: pointer;
     color: var(--text-muted);
-    transition: all 0.2s;
+    transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease;
     margin-left: 8px;
     border-radius: 4px;
     display: flex;
@@ -973,7 +1040,8 @@ body,
     justify-content: center;
 }
 
-.api-item:hover .api-action-btn {
+.api-item:hover .api-action-btn,
+.api-item.is-parent-open .api-action-btn {
     opacity: 1;
 }
 
@@ -1073,6 +1141,137 @@ body,
     flex-direction: column;
     overflow: auto;
     padding: 24px;
+}
+
+.request-active-case-hint {
+    font-size: 13px;
+    color: var(--text-secondary, rgba(0, 0, 0, 0.55));
+    margin-bottom: 12px;
+}
+
+.api-request-block {
+    margin-bottom: 2px;
+}
+
+.api-item .api-item-main,
+.api-case-item .api-item-main {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    cursor: pointer;
+    text-align: left;
+}
+
+/* 选中接口行：与 .api-case-item.active 一致（左侧主题色条 + 整行灰底） */
+.api-item.is-parent-open {
+    background: var(--bg-hover);
+    border-left-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.api-item.is-parent-open:hover {
+    background: var(--bg-hover);
+    border-left-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+/* 固定槽宽，有/无子用例时接口文字左对齐 */
+.api-request-expand-cell {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 13px;
+    height: 13px;
+    margin-right: 2px;
+    margin-left: 2px;
+    box-sizing: border-box;
+}
+
+.api-request-expand-placeholder {
+    display: block;
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+    pointer-events: none;
+}
+
+.api-request-expand {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 13px;
+    height: 13px;
+    padding: 0;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.api-request-expand .anticon {
+    font-size: 8px;
+}
+
+.api-request-expand:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.api-case-list {
+    padding-left: 0;
+    margin-bottom: 2px;
+}
+
+/* 与 .api-item 同列结构：展开槽 + method 列 + 名称，保证与父级接口名称左对齐 */
+.api-case-item {
+    display: flex;
+    align-items: center;
+    padding: 5px 10px 5px 6px;
+    margin-left: 0;
+    border-left: 2px solid transparent;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+}
+
+.api-case-item:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+/* 选中：左侧色条 + 整行背景与 hover 一致 */
+.api-case-item.active {
+    background: var(--bg-hover);
+    border-left-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.api-case-item .api-action-btn {
+    opacity: 0;
+}
+
+.api-case-item:hover .api-action-btn,
+.api-case-item.active .api-action-btn {
+    opacity: 1;
+}
+
+.api-case-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.25;
+    display: flex;
+    align-items: center;
+    text-align: left;
+    font-size: 13px;
+    font-weight: 500;
 }
 
 .api-request-bar {

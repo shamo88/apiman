@@ -4,9 +4,11 @@ import {models} from '../models';
 import {project} from '../models';
 import {config} from '../models';
 
+export function AddRequestCase(arg1:string,arg2:string):Promise<models.CurlRequest>;
+
 export function CopyRequest(arg1:string):Promise<models.CurlRequest>;
 
-export function CreateEnvironment(arg1:string,arg2:Record<string, string>):Promise<models.Environment>;
+export function CreateEnvironment(arg1:string,arg2:string,arg3:Record<string, string>):Promise<models.Environment>;
 
 export function CreateFolder(arg1:string,arg2:string,arg3:string):Promise<models.Folder>;
 
@@ -16,7 +18,7 @@ export function CreateProjectScript(arg1:string,arg2:string,arg3:string):Promise
 
 export function CreateRequest(arg1:string,arg2:string,arg3:string,arg4:models.HttpRequestSpec):Promise<models.CurlRequest>;
 
-export function DeleteEnvironment(arg1:string):Promise<void>;
+export function DeleteEnvironment(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteFolder(arg1:string):Promise<void>;
 
@@ -25,6 +27,10 @@ export function DeleteProject(arg1:string):Promise<void>;
 export function DeleteProjectScript(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteRequest(arg1:string):Promise<void>;
+
+export function DeleteRequestCase(arg1:string,arg2:string):Promise<models.CurlRequest>;
+
+export function DuplicateRequestCase(arg1:string,arg2:string):Promise<models.CurlRequest>;
 
 export function ExecuteCurl(arg1:string):Promise<models.CurlResponse>;
 
@@ -50,19 +56,21 @@ export function ListProjects():Promise<Array<models.Project>>;
 
 export function LoadAppConfig():Promise<config.AppConfig>;
 
-export function LoadEnvironments():Promise<Array<models.Environment>>;
+export function LoadEnvironments(arg1:string):Promise<Array<models.Environment>>;
 
 export function LoadProjectGroupsState():Promise<project.ProjectGroupsState>;
 
-export function MoveFolder(arg1:string,arg2:string):Promise<string>;
+export function MoveFolder(arg1:string,arg2:string,arg3:string):Promise<string>;
 
-export function MoveRequest(arg1:string,arg2:string):Promise<string>;
+export function MoveRequest(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function RenameFolder(arg1:string,arg2:string):Promise<models.Folder>;
 
 export function RenameProject(arg1:string,arg2:string):Promise<models.Project>;
 
 export function RenameRequest(arg1:string,arg2:string):Promise<models.CurlRequest>;
+
+export function RenameRequestCase(arg1:string,arg2:string,arg3:string):Promise<models.CurlRequest>;
 
 export function ReplaceVariables(arg1:string,arg2:Record<string, string>):Promise<string>;
 
@@ -72,10 +80,10 @@ export function SaveGlobalVariables(arg1:Record<string, string>):Promise<void>;
 
 export function SaveProjectGroupsState(arg1:project.ProjectGroupsState):Promise<void>;
 
-export function UpdateEnvironment(arg1:string,arg2:string,arg3:Record<string, string>):Promise<void>;
+export function UpdateEnvironment(arg1:string,arg2:string,arg3:string,arg4:Record<string, string>):Promise<void>;
 
 export function UpdateProjectScript(arg1:string,arg2:string,arg3:string,arg4:string):Promise<models.ProjectScript>;
 
-export function UpdateRequest(arg1:string,arg2:models.HttpRequestSpec):Promise<void>;
+export function UpdateRequest(arg1:string,arg2:models.HttpRequestSpec,arg3:Array<models.HttpRequestCase>,arg4:string):Promise<void>;
 
 export function UpdateRequestScripts(arg1:string,arg2:string,arg3:string):Promise<void>;
