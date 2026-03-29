@@ -473,7 +473,7 @@ const setCaretOffset = (root: HTMLElement, targetOffset: number) => {
 
 const renderHighlightedVariableHtml = (value: string, environmentVariables: Record<string, string>) => {
     const input = value || '';
-    const regex = /\{\{(\w+)\}\}/g;
+    const regex = /\{\{([\w$.()']+)\}\}/g;
     let html = '';
     let lastIndex = 0;
     let match = regex.exec(input);
@@ -486,8 +486,11 @@ const renderHighlightedVariableHtml = (value: string, environmentVariables: Reco
         if (start > lastIndex) {
             html += `<span class="variable-inline-text">${escapeHtml(input.slice(lastIndex, start))}</span>`;
         }
+        // Check if it's a valid built-in generator
+        const isBuiltIn = isBuiltInGenerator(varName);
         const exists = Object.prototype.hasOwnProperty.call(environmentVariables, varName);
-        html += `<span class="variable-inline-token ${exists ? 'active' : 'missing'}">${escapeHtml(token)}</span>`;
+        const tokenClass = isBuiltIn ? 'built-in' : (exists ? 'active' : 'missing');
+        html += `<span class="variable-inline-token ${tokenClass}">${escapeHtml(token)}</span>`;
         lastIndex = end;
         match = regex.exec(input);
     }
@@ -502,14 +505,52 @@ const renderHighlightedVariableHtml = (value: string, environmentVariables: Reco
     return html;
 };
 
+const isBuiltInGenerator = (varName: string): boolean => {
+    // Check exact match first
+    if (builtInGenerators.some(g => g.name === varName)) {
+        return true;
+    }
+    // Check function call format: baseName('arg') or baseName(arg)
+    if (varName.includes('(')) {
+        const baseName = varName.substring(0, varName.indexOf('('));
+        const closingIdx = varName.indexOf(')');
+        // Must have matching parentheses and baseName must be a valid generator
+        if (closingIdx > 0 && varName.endsWith(')') && builtInGenerators.some(g => g.name === baseName)) {
+            const args = varName.substring(varName.indexOf('(') + 1, closingIdx);
+            // Args must be non-empty and contain only valid characters (for our generators, numbers or quoted strings)
+            if (args.length > 0 && /^(\d+|'[^']*'|"[^"]*")$/.test(args)) {
+                return true;
+            }
+        }
+    }
+    return false;
+};
+
+// 内置变量生成器列表
+const builtInGenerators = [
+    { name: '$date.timestamp', description: '当前Unix时间戳（秒）', example: '{{$date.timestamp}}' },
+    { name: '$date.timestampMs', description: '当前Unix时间戳（毫秒）', example: '{{$date.timestampMs}}' },
+    { name: '$date.now', description: '当前时间（ISO格式）', example: '{{$date.now}}' },
+    { name: '$date.now', description: '格式化日期', example: '{{$date.now(\'yyyy-MM-dd\')}}' },
+    { name: '$uuid', description: '随机UUID', example: '{{$uuid}}' },
+    { name: '$random.int', description: '随机整数', example: '{{$random.int}}' },
+    { name: '$random.float', description: '随机浮点数', example: '{{$random.float}}' },
+    { name: '$random.alpha', description: '随机字母字符串', example: '{{$random.alpha(10)}}' },
+    { name: '$random.alphanumeric', description: '随机字母数字字符串', example: '{{$random.alphanumeric(10)}}' },
+];
+
 const getVariableSuggestions = (text: string, caretIndex: number, environmentVariables: Record<string, string>) => {
     const beforeCaret = (text || '').slice(0, Math.max(0, caretIndex));
+    // 匹配 {{ 后面的内容，包括 $ 字符
     const match = beforeCaret.match(/\{\{(\w*)$/);
     if (!match) return { items: [] as string[], rangeStart: -1, rangeEnd: -1 };
     const keyword = (match[1] || '').toLowerCase();
-    const items = Object.keys(environmentVariables).filter(name => name.toLowerCase().includes(keyword));
+    // 合并环境变量和内置生成器
+    const envItems = Object.keys(environmentVariables).map(name => ({ name, isBuiltIn: false }));
+    const builtInItems = builtInGenerators.filter(g => g.name.toLowerCase().includes(keyword)).map(g => ({ name: g.name, isBuiltIn: true }));
+    const allItems = [...envItems, ...builtInItems];
     return {
-        items,
+        items: allItems.map(item => item.name),
         rangeStart: beforeCaret.length - match[0].length,
         rangeEnd: beforeCaret.length,
     };
@@ -676,19 +717,25 @@ const VariableEditableInput: React.FC<{
                         zIndex: 1200,
                     }}
                 >
-                    {suggestionItems.map((name, idx) => (
-                        <div
-                            key={name}
-                            className={`variable-editable-suggestion-item ${idx === activeSuggestionIndex ? 'active' : ''}`}
-                            onMouseDown={(e) => {
-                                e.preventDefault();
-                                applySuggestion(name);
-                            }}
-                            onMouseEnter={() => setActiveSuggestionIndex(idx)}
-                        >
-                            {`{{${name}}}`}
-                        </div>
-                    ))}
+                    {suggestionItems.map((name, idx) => {
+                        const builtIn = builtInGenerators.find(g => g.name === name);
+                        const isEnvironmentVar = environmentVariables && name in environmentVariables;
+                        const itemClass = builtIn ? 'built-in-generator' : (!isEnvironmentVar ? 'invalid-variable' : '');
+                        return (
+                            <div
+                                key={name}
+                                className={`variable-editable-suggestion-item ${idx === activeSuggestionIndex ? 'active' : ''} ${itemClass}`}
+                                onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    applySuggestion(name);
+                                }}
+                                onMouseEnter={() => setActiveSuggestionIndex(idx)}
+                            >
+                                <div className="suggestion-item-name">{`{{${name}}}`}</div>
+                                {builtIn && <div className="suggestion-item-desc">{builtIn.description}</div>}
+                            </div>
+                        );
+                    })}
                 </div>
             )}
         </div>

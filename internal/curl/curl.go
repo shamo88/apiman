@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/rand"
 	"mime/multipart"
 	"net"
 	"net/http"
@@ -377,11 +378,144 @@ func (c *CurlExecutor) ExtractVariables(text string) []string {
 }
 
 func (c *CurlExecutor) ReplaceVariables(text string, variables map[string]string) string {
+	// 首先处理内置的动态生成器
+	text = replaceDynamicGenerators(text)
+
+	// 然后处理用户定义的变量
 	for key, value := range variables {
 		placeholder := "{{" + key + "}}"
 		text = strings.ReplaceAll(text, placeholder, value)
 	}
 	return text
+}
+
+// replaceDynamicGenerators 处理内置的动态变量生成器
+func replaceDynamicGenerators(text string) string {
+	// {{$date.timestamp}} - 当前Unix时间戳（秒）
+	text = replaceGenerator(text, `{{$date.timestamp}}`, func() string {
+		return fmt.Sprintf("%d", time.Now().Unix())
+	})
+
+	// {{$date.timestampMs}} - 当前Unix时间戳（毫秒）
+	text = replaceGenerator(text, `{{$date.timestampMs}}`, func() string {
+		return fmt.Sprintf("%d", time.Now().UnixMilli())
+	})
+
+	// {{$date.now}} - 当前时间ISO格式
+	text = replaceGenerator(text, `{{$date.now}}`, func() string {
+		return time.Now().Format(time.RFC3339)
+	})
+
+	// {{$date.now('格式')}} - 自定义格式，如 {{$date.now('2006-01-02')}}
+	text = replaceGeneratorWithFormat(text, `{{$date.now('`, `'}}`, func(format string) string {
+		// 使用Go的日期格式
+		return time.Now().Format(format)
+	})
+
+	// {{$uuid}} - 随机UUID
+	text = replaceGenerator(text, `{{$uuid}}`, func() string {
+		return generateUUID()
+	})
+
+	// {{$random.int}} - 随机整数
+	text = replaceGenerator(text, `{{$random.int}}`, func() string {
+		return fmt.Sprintf("%d", time.Now().UnixNano()%1000000)
+	})
+
+	// {{$random.float}} - 随机浮点数
+	text = replaceGenerator(text, `{{$random.float}}`, func() string {
+		return fmt.Sprintf("%f", float64(time.Now().UnixNano())/float64(time.Now().Unix()))
+	})
+
+	// {{$random.alpha(10)}} - 随机字母字符串
+	text = replaceGeneratorWithArg(text, `{{$random.alpha(`, `)}}`, func(arg string) string {
+		length := 10
+		if n, err := strconv.Atoi(arg); err == nil && n > 0 && n <= 100 {
+			length = n
+		}
+		return randomAlpha(length)
+	})
+
+	// {{$random.alphanumeric(10)}} - 随机字母数字字符串
+	text = replaceGeneratorWithArg(text, `{{$random.alphanumeric(`, `)}}`, func(arg string) string {
+		length := 10
+		if n, err := strconv.Atoi(arg); err == nil && n > 0 && n <= 100 {
+			length = n
+		}
+		return randomAlphanumeric(length)
+	})
+
+	return text
+}
+
+func replaceGenerator(text, pattern string, generator func() string) string {
+	if strings.Contains(text, pattern) {
+		return strings.ReplaceAll(text, pattern, generator())
+	}
+	return text
+}
+
+func replaceGeneratorWithFormat(text, prefix, suffix string, generator func(string) string) string {
+	for {
+		idx := strings.Index(text, prefix)
+		if idx == -1 {
+			break
+		}
+		endIdx := strings.Index(text[idx+len(prefix):], suffix)
+		if endIdx == -1 {
+			break
+		}
+		endIdx = idx + len(prefix) + endIdx
+		format := text[idx+len(prefix) : endIdx]
+		value := generator(format)
+		text = text[:idx] + value + text[endIdx+len(suffix):]
+	}
+	return text
+}
+
+func replaceGeneratorWithArg(text, prefix, suffix string, generator func(string) string) string {
+	for {
+		idx := strings.Index(text, prefix)
+		if idx == -1 {
+			break
+		}
+		endIdx := strings.Index(text[idx+len(prefix):], suffix)
+		if endIdx == -1 {
+			break
+		}
+		endIdx = idx + len(prefix) + endIdx
+		arg := text[idx+len(prefix) : endIdx]
+		value := generator(arg)
+		text = text[:idx] + value + text[endIdx+len(suffix):]
+	}
+	return text
+}
+
+var uuidRegex = regexp.MustCompile(`[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}`)
+
+func generateUUID() string {
+	// 使用时间和随机数生成一个伪UUID格式
+	timestamp := time.Now().UnixNano()
+	high := timestamp / 1000000000
+	low := timestamp % 1000000000
+	return fmt.Sprintf("%08x-%04x-4%03x-%04x-%012x",
+		uint32(high), uint16(high>>16), uint16(low>>48),
+		0x8000|(low>>32)&0x0fff,
+		low&0xffffffffffff)
+}
+
+var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
+func randomAlpha(length int) string {
+	b := make([]rune, length)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return string(b)
+}
+
+func randomAlphanumeric(length int) string {
+	return randomAlpha(length)
 }
 
 func (c *CurlExecutor) FormatResponseBody(body string, contentType string) string {

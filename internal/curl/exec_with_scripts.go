@@ -62,6 +62,12 @@ func (se *ScriptableExecutor) ExecuteWithScriptsContext(
 		UrlEncoded: copyPairSlice(spec.UrlEncoded),
 	}
 
+	// Merge globals and environment for variable replacement
+	allVars := mergeVariables(globals, environment)
+
+	// Replace variables in specCopy before execution
+	se.replaceVariablesInSpec(specCopy, allVars)
+
 	var allLogs []string
 	var allGlobalUpdates map[string]string
 
@@ -312,4 +318,38 @@ func copyPairSlice(src []models.RequestPair) []models.RequestPair {
 	dst := make([]models.RequestPair, len(src))
 	copy(dst, src)
 	return dst
+}
+
+func mergeVariables(globals, environment map[string]string) map[string]string {
+	allVars := make(map[string]string)
+	if globals != nil {
+		for k, v := range globals {
+			allVars[k] = v
+		}
+	}
+	if environment != nil {
+		for k, v := range environment {
+			allVars[k] = v
+		}
+	}
+	return allVars
+}
+
+func (se *ScriptableExecutor) replaceVariablesInSpec(spec *models.HttpRequestSpec, variables map[string]string) {
+	spec.HttpURL = se.CurlExecutor.ReplaceVariables(spec.HttpURL, variables)
+	for i := range spec.Headers {
+		spec.Headers[i].Value = se.CurlExecutor.ReplaceVariables(spec.Headers[i].Value, variables)
+	}
+	for i := range spec.Params {
+		spec.Params[i].Value = se.CurlExecutor.ReplaceVariables(spec.Params[i].Value, variables)
+	}
+	if spec.Body != "" {
+		spec.Body = se.CurlExecutor.ReplaceVariables(spec.Body, variables)
+	}
+	for i := range spec.FormData {
+		spec.FormData[i].Value = se.CurlExecutor.ReplaceVariables(spec.FormData[i].Value, variables)
+	}
+	for i := range spec.UrlEncoded {
+		spec.UrlEncoded[i].Value = se.CurlExecutor.ReplaceVariables(spec.UrlEncoded[i].Value, variables)
+	}
 }
