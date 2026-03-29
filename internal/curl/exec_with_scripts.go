@@ -25,12 +25,14 @@ func (se *ScriptableExecutor) ExecuteWithScripts(
 	proxyOpts *ProxyOptions,
 	preScriptContents []string,
 	postScriptContents []string,
+	preScriptNames []string,
+	postScriptNames []string,
 	globals map[string]string,
 	environment map[string]string,
 	globalSetter func(key, value string),
 ) (*models.CurlResponse, error) {
 	ctx := context.Background()
-	return se.ExecuteWithScriptsContext(ctx, spec, proxyOpts, preScriptContents, postScriptContents, globals, environment, globalSetter)
+	return se.ExecuteWithScriptsContext(ctx, spec, proxyOpts, preScriptContents, postScriptContents, preScriptNames, postScriptNames, globals, environment, globalSetter)
 }
 
 func (se *ScriptableExecutor) ExecuteWithScriptsContext(
@@ -39,6 +41,8 @@ func (se *ScriptableExecutor) ExecuteWithScriptsContext(
 	proxyOpts *ProxyOptions,
 	preScriptContents []string,
 	postScriptContents []string,
+	preScriptNames []string,
+	postScriptNames []string,
 	globals map[string]string,
 	environment map[string]string,
 	globalSetter func(key, value string),
@@ -66,10 +70,15 @@ func (se *ScriptableExecutor) ExecuteWithScriptsContext(
 		if preScriptContent == "" {
 			continue
 		}
+		scriptName := fmt.Sprintf("Pre-Script %d", i+1)
+		if i < len(preScriptNames) && preScriptNames[i] != "" {
+			scriptName = preScriptNames[i]
+		}
+
+		allLogs = append(allLogs, fmt.Sprintf("[%s] ▶ START", scriptName))
 		execCtx := se.buildExecutionContext(specCopy, globals, environment)
 		preResult := se.scriptExecutor.RunPreRequestScript(ctx, preScriptContent, execCtx, globalSetter)
 
-		allLogs = append(allLogs, fmt.Sprintf("[Pre-Script %d]", i+1))
 		allLogs = append(allLogs, preResult.Logs...)
 		for k, v := range preResult.GlobalUpdates {
 			if allGlobalUpdates == nil {
@@ -79,8 +88,9 @@ func (se *ScriptableExecutor) ExecuteWithScriptsContext(
 		}
 
 		if !preResult.Success {
+			allLogs = append(allLogs, fmt.Sprintf("[%s] ✗ FAILED: %s", scriptName, preResult.Error))
 			resp := &models.CurlResponse{
-				Error:      fmt.Sprintf("Pre-request script %d failed: %s", i+1, preResult.Error),
+				Error:      fmt.Sprintf("Pre-request script failed: %s", preResult.Error),
 				ScriptLogs: allLogs,
 				Tests:      []models.TestResult{},
 			}
@@ -95,6 +105,7 @@ func (se *ScriptableExecutor) ExecuteWithScriptsContext(
 			return resp, nil
 		}
 
+		allLogs = append(allLogs, fmt.Sprintf("[%s] ✓ SUCCESS", scriptName))
 		if preResult.ModifiedSpec != nil {
 			se.applyScriptModifications(specCopy, preResult.ModifiedSpec)
 		}
@@ -119,10 +130,15 @@ func (se *ScriptableExecutor) ExecuteWithScriptsContext(
 		if postScriptContent == "" {
 			continue
 		}
+		scriptName := fmt.Sprintf("Post-Script %d", i+1)
+		if i < len(postScriptNames) && postScriptNames[i] != "" {
+			scriptName = postScriptNames[i]
+		}
+
+		curlResp.ScriptLogs = append(curlResp.ScriptLogs, fmt.Sprintf("[%s] ▶ START", scriptName))
 		execCtx := se.buildPostExecutionContext(specCopy, curlResp, globals, environment)
 		postResult := se.scriptExecutor.RunTestScript(ctx, postScriptContent, execCtx, globalSetter)
 
-		curlResp.ScriptLogs = append(curlResp.ScriptLogs, fmt.Sprintf("[Post-Script %d]", i+1))
 		curlResp.ScriptLogs = append(curlResp.ScriptLogs, postResult.Logs...)
 		for k, v := range postResult.GlobalUpdates {
 			if allGlobalUpdates == nil {
@@ -137,6 +153,11 @@ func (se *ScriptableExecutor) ExecuteWithScriptsContext(
 				Message:  t.Message,
 				Duration: t.Duration,
 			})
+		}
+		if postResult.Success {
+			curlResp.ScriptLogs = append(curlResp.ScriptLogs, fmt.Sprintf("[%s] ✓ SUCCESS", scriptName))
+		} else {
+			curlResp.ScriptLogs = append(curlResp.ScriptLogs, fmt.Sprintf("[%s] ✗ FAILED: %s", scriptName, postResult.Error))
 		}
 	}
 

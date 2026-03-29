@@ -259,6 +259,7 @@ func (s *Service) ExecuteHTTPRequestWithScripts(
 	postScriptIDs []string,
 ) (*models.CurlResponse, error) {
 	var preScriptContents, postScriptContents []string
+	var preScriptNames, postScriptNames []string
 
 	if len(preScriptIDs) > 0 {
 		scripts, err := s.ProjectMgr.ListProjectScripts(projectID)
@@ -270,6 +271,13 @@ func (s *Service) ExecuteHTTPRequestWithScripts(
 			for _, id := range preScriptIDs {
 				if content, ok := scriptMap[id]; ok {
 					preScriptContents = append(preScriptContents, content)
+					// Find script name
+					for _, scr := range scripts {
+						if scr.ID == id {
+							preScriptNames = append(preScriptNames, scr.Name)
+							break
+						}
+					}
 				}
 			}
 		}
@@ -285,6 +293,13 @@ func (s *Service) ExecuteHTTPRequestWithScripts(
 			for _, id := range postScriptIDs {
 				if content, ok := scriptMap[id]; ok {
 					postScriptContents = append(postScriptContents, content)
+					// Find script name
+					for _, scr := range scripts {
+						if scr.ID == id {
+							postScriptNames = append(postScriptNames, scr.Name)
+							break
+						}
+					}
 				}
 			}
 		}
@@ -340,6 +355,8 @@ func (s *Service) ExecuteHTTPRequestWithScripts(
 		proxyOpts,
 		preScriptContents,
 		postScriptContents,
+		preScriptNames,
+		postScriptNames,
 		globals,
 		environment,
 		globalSetter,
@@ -411,6 +428,8 @@ func (s *Service) ExecuteHTTPRequestWithScriptsInline(
 		proxyOpts,
 		[]string{preScript},
 		[]string{postScript},
+		[]string{"Inline Pre-Script"},
+		[]string{"Inline Post-Script"},
 		globals,
 		environment,
 		globalSetter,

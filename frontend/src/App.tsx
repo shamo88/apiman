@@ -4011,15 +4011,78 @@ function App() {
                                                         label: '脚本结果',
                                                         children: (
                                                             <div className="script-results-panel">
-                                                                {response.script_logs && response.script_logs.length > 0 && (
-                                                                    <div className="script-logs-section">
-                                                                        <div className="script-logs-title">Console Logs</div>
-                                                                        <div className="script-logs-content">
-                                                                            {response.script_logs.map((log: string, index: number) => (
-                                                                                <div key={index} className="script-log-entry">
-                                                                                    {log}
+                                                                {response.script_logs && response.script_logs.length > 0 && (() => {
+                                                                    // Parse workflow items from logs
+                                                                    const workflowItems: { name: string; type: 'pre' | 'post' | 'http'; status: 'running' | 'success' | 'failed'; duration?: number }[] = [];
+                                                                    const logs = response.script_logs;
+                                                                    let currentScript = '';
+                                                                    let currentType: 'pre' | 'post' | 'http' = 'pre';
+                                                                    let currentStatus: 'running' | 'success' | 'failed' = 'running';
+
+                                                                    for (const log of logs) {
+                                                                        const startMatch = log.match(/\[([^\]]+)\] ▶ START/);
+                                                                        if (startMatch) {
+                                                                            currentScript = startMatch[1];
+                                                                            currentType = currentScript.toLowerCase().includes('pre') ? 'pre' : 'post';
+                                                                            currentStatus = 'running';
+                                                                            workflowItems.push({ name: currentScript, type: currentType, status: currentStatus });
+                                                                            continue;
+                                                                        }
+                                                                        const successMatch = log.match(/\[([^\]]+)\] ✓ SUCCESS/);
+                                                                        if (successMatch) {
+                                                                            currentStatus = 'success';
+                                                                            if (workflowItems.length > 0 && workflowItems[workflowItems.length - 1].status === 'running') {
+                                                                                workflowItems[workflowItems.length - 1].status = 'success';
+                                                                            } else {
+                                                                                workflowItems.push({ name: successMatch[1], type: 'http', status: 'success' });
+                                                                            }
+                                                                            continue;
+                                                                        }
+                                                                        const failedMatch = log.match(/\[([^\]]+)\] ✗ FAILED/);
+                                                                        if (failedMatch) {
+                                                                            currentStatus = 'failed';
+                                                                            if (workflowItems.length > 0 && workflowItems[workflowItems.length - 1].status === 'running') {
+                                                                                workflowItems[workflowItems.length - 1].status = 'failed';
+                                                                            } else {
+                                                                                workflowItems.push({ name: failedMatch[1], type: 'http', status: 'failed' });
+                                                                            }
+                                                                            continue;
+                                                                        }
+                                                                    }
+
+                                                                    return (
+                                                                        <div className="script-workflow">
+                                                                            {workflowItems.map((item, idx) => (
+                                                                                <div key={idx} className={`script-workflow-item ${item.type === 'pre' ? 'pre-script' : 'post-script'} ${item.status}`}>
+                                                                                    <div className="script-workflow-icon">
+                                                                                        {item.status === 'success' ? '✓' : item.status === 'failed' ? '✗' : '▶'}
+                                                                                    </div>
+                                                                                    <div className="script-workflow-content">
+                                                                                        <div className="script-workflow-name">{item.name}</div>
+                                                                                        <div className="script-workflow-status">
+                                                                                            {item.status === 'success' ? '执行成功' : item.status === 'failed' ? '执行失败' : '执行中...'}
+                                                                                        </div>
+                                                                                    </div>
                                                                                 </div>
                                                                             ))}
+                                                                        </div>
+                                                                    );
+                                                                })()}
+                                                                {response.script_logs && response.script_logs.length > 0 && (
+                                                                    <div className="script-logs-section" style={{ marginTop: 16 }}>
+                                                                        <div className="script-logs-title">Console Logs</div>
+                                                                        <div className="script-logs-content">
+                                                                            {response.script_logs.map((log: string, index: number) => {
+                                                                                let className = 'script-log-entry';
+                                                                                if (log.includes('▶ START')) className += ' script-start';
+                                                                                else if (log.includes('✓ SUCCESS')) className += ' script-success';
+                                                                                else if (log.includes('✗ FAILED')) className += ' script-failed';
+                                                                                return (
+                                                                                    <div key={index} className={className}>
+                                                                                        {log}
+                                                                                    </div>
+                                                                                );
+                                                                            })}
                                                                         </div>
                                                                     </div>
                                                                 )}
