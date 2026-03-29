@@ -19,14 +19,26 @@ import (
 
 type ProjectManager struct {
 	configManager *config.ConfigManager
+	projectsDir    string
 }
 
 func NewProjectManager(cfg *config.ConfigManager) *ProjectManager {
-	pm := &ProjectManager{configManager: cfg}
-	if err := os.MkdirAll(cfg.GetProjectsDir(), 0755); err != nil {
+	workDir := cfg.GetWorkDir()
+	pm := &ProjectManager{configManager: cfg, projectsDir: workDir}
+	if err := os.MkdirAll(workDir, 0755); err != nil {
 		panic(err)
 	}
 	return pm
+}
+
+// SetProjectsDir 动态设置工作目录
+func (pm *ProjectManager) SetProjectsDir(dir string) {
+	pm.projectsDir = dir
+}
+
+// GetProjectsDir 获取当前工作目录
+func (pm *ProjectManager) GetProjectsDir() string {
+	return pm.projectsDir
 }
 
 type ProjectTree struct {
@@ -53,7 +65,7 @@ type ProjectGroupsState struct {
 }
 
 func (pm *ProjectManager) groupsStateFilePath() string {
-	return filepath.Join(pm.configManager.GetProjectsDir(), "projects.json")
+	return filepath.Join(pm.projectsDir, "projects.json")
 }
 
 func (pm *ProjectManager) LoadProjectGroupsState() (*ProjectGroupsState, error) {
@@ -107,7 +119,7 @@ func (pm *ProjectManager) SaveProjectGroupsState(state *ProjectGroupsState) erro
 }
 
 func (pm *ProjectManager) ListProjects() ([]models.Project, error) {
-	projectsDir := pm.configManager.GetProjectsDir()
+	projectsDir := pm.projectsDir
 	entries, err := os.ReadDir(projectsDir)
 	if err != nil {
 		return nil, err
@@ -139,7 +151,7 @@ func (pm *ProjectManager) ListProjects() ([]models.Project, error) {
 func (pm *ProjectManager) CreateProject(name string) (*models.Project, error) {
 	projectID := uuid.New().String()
 	projectDirName := buildSlugUUIDName(name, projectID)
-	projectPath := filepath.Join(pm.configManager.GetProjectsDir(), projectDirName)
+	projectPath := filepath.Join(pm.projectsDir, projectDirName)
 
 	if err := os.MkdirAll(projectPath, 0755); err != nil {
 		return nil, err
@@ -203,7 +215,7 @@ func (pm *ProjectManager) RenameProject(id, newName string) (*models.Project, er
 	}
 
 	projectDirName := buildSlugUUIDName(newName, id)
-	newProjectPath := filepath.Join(pm.configManager.GetProjectsDir(), projectDirName)
+	newProjectPath := filepath.Join(pm.projectsDir, projectDirName)
 	if projectPath != newProjectPath {
 		if _, statErr := os.Stat(newProjectPath); statErr == nil {
 			return nil, errors.New("已存在同名项目")
@@ -243,7 +255,7 @@ func (pm *ProjectManager) RenameProject(id, newName string) (*models.Project, er
 }
 
 func (pm *ProjectManager) findProjectPathByID(id string) (string, error) {
-	projectsDir := pm.configManager.GetProjectsDir()
+	projectsDir := pm.projectsDir
 	entries, err := os.ReadDir(projectsDir)
 	if err != nil {
 		return "", err

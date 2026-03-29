@@ -68,6 +68,25 @@ func (c *ConfigManager) GetProjectsDir() string {
 	return filepath.Join(c.configDir, "projects")
 }
 
+// GetWorkDir 返回当前工作目录，如果配置了 WorkDir 则返回，否则返回默认的 projectsDir
+func (c *ConfigManager) GetWorkDir() string {
+	appCfg, _ := c.LoadAppConfig()
+	if appCfg != nil && appCfg.GitSync.WorkDir != "" {
+		return appCfg.GitSync.WorkDir
+	}
+	return c.GetProjectsDir()
+}
+
+// SaveWorkDir 保存工作目录到配置
+func (c *ConfigManager) SaveWorkDir(dir string) error {
+	appCfg, _ := c.LoadAppConfig()
+	if appCfg == nil {
+		appCfg = &AppConfig{}
+	}
+	appCfg.GitSync.WorkDir = dir
+	return c.SaveAppConfig(appCfg)
+}
+
 func (c *ConfigManager) ensureDir(dir string) error {
 	return os.MkdirAll(dir, 0755)
 }
@@ -248,6 +267,7 @@ type GitSyncConfig struct {
 	Username  string `json:"username,omitempty"`
 	Password  string `json:"password,omitempty"` // obfuscated when authType is "token"
 	AutoSync  bool   `json:"autoSync"`
+	WorkDir   string `json:"workDir,omitempty"` // 当前工作目录路径
 }
 
 type AppConfig struct {

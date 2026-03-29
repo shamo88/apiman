@@ -331,11 +331,41 @@ func (s *Service) SaveAppConfig(cfg *config.AppConfig) error {
 }
 
 func (s *Service) ImportPostmanCollection(jsonData string) (*models.Project, error) {
-	project, err := s.PostmanImporter.ImportCollection(jsonData)
-	if err == nil && s.shouldAutoSync() {
+	// Parse the Postman collection
+	projectName, items, err := s.PostmanImporter.ParseCollection(jsonData)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create project using ProjectManager (which uses the active projectsDir)
+	project, err := s.ProjectMgr.CreateProject(projectName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the project directory path
+	projectDir, err := s.ProjectMgr.ProjectPathByID(project.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Load the collection and update it with imported items
+	coll, err := postman.LoadCollection(projectDir)
+	if err != nil {
+		// If no collection exists, create a new one
+		coll = postman.NewCollection(projectName)
+	}
+	coll.Item = items
+
+	// Save the collection to the project directory
+	if err := postman.SaveCollection(projectDir, coll); err != nil {
+		return nil, err
+	}
+
+	if s.shouldAutoSync() {
 		go s.SyncProjectToGit(project.ID)
 	}
-	return project, err
+	return project, nil
 }
 
 func (s *Service) LoadProjectGroupsState() (*project.ProjectGroupsState, error) {
@@ -598,7 +628,7 @@ func (s *Service) shouldAutoSync() bool {
 	if err != nil || appCfg == nil {
 		return false
 	}
-	return appCfg.GitSync.Enabled && appCfg.GitSync.AutoSync && appCfg.GitSync.RemoteURL != ""
+	return appCfg.GitSync.Enabled && appCfg.GitSync.RemoteURL != ""
 }
 
 // extractProjectIDFromPath extracts project ID from paths like projectsDir/projectID/... or request|projectID|requestID
@@ -635,7 +665,7 @@ func (s *Service) SyncAllProjectsToGit() error {
 		return nil
 	}
 
-	return s.GitSyncMgr.SyncAllProjects(s.ConfigManager.GetProjectsDir(), appCfg.GitSync.RemoteURL, appCfg.GitSync.Branch, appCfg.GitSync.Username, appCfg.GitSync.Password)
+	return s.GitSyncMgr.SyncAllProjects(s.ProjectMgr.GetProjectsDir(), appCfg.GitSync.RemoteURL, appCfg.GitSync.Branch, appCfg.GitSync.Username, appCfg.GitSync.Password)
 }
 
 // InitGitRepo initializes the local Git repository
@@ -649,4 +679,85 @@ func (s *Service) InitGitRepo() error {
 	}
 
 	return s.GitSyncMgr.CloneOrPull(appCfg.GitSync.RemoteURL, appCfg.GitSync.Branch, appCfg.GitSync.Username, appCfg.GitSync.Password)
+}
+
+// InitProjectsDir 根据配置决定工作目录，App 启动时调用
+func (s *Service) InitProjectsDir() error {
+	appCfg, err := s.ConfigManager.LoadAppConfig()
+	if err != nil || appCfg == nil {
+		// 默认使用本地目录
+		s.ProjectMgr.SetProjectsDir(s.ConfigManager.GetProjectsDir())
+		return nil
+	}
+
+	if appCfg.GitSync.Enabled && appCfg.GitSync.RemoteURL != "" {
+		// Git Sync 模式：确保 git-sync 目录存在（clone 或 pull）
+		if err := s.GitSyncMgr.CloneOrPull(appCfg.GitSync.RemoteURL, appCfg.GitSync.Branch,
+			appCfg.GitSync.Username, appCfg.GitSync.Password); err != nil {
+			// 如果拉取失败，切换到本地模式
+			s.ProjectMgr.SetProjectsDir(s.ConfigManager.GetProjectsDir())
+			return err
+		}
+		// 切换工作目录到 git-sync/projects
+		workDir := s.GitSyncMgr.GetProjectsPath()
+		s.ProjectMgr.SetProjectsDir(workDir)
+		s.ConfigManager.SaveWorkDir(workDir)
+	} else {
+		// 本地模式
+		workDir := s.ConfigManager.GetProjectsDir()
+		s.ProjectMgr.SetProjectsDir(workDir)
+	}
+	return nil
+}
+
+// EnableGitSync 启用 Git Sync 功能
+func (s *Service) EnableGitSync(remoteURL, branch, username, password string) error {
+	// 1. Clone 远程仓库到 git-sync
+	if err := s.GitSyncMgr.CloneOrPull(remoteURL, branch, username, password); err != nil {
+		return err
+	}
+
+	// 2. 保存配置
+	appCfg, _ := s.ConfigManager.LoadAppConfig()
+	if appCfg == nil {
+		appCfg = &config.AppConfig{}
+	}
+	appCfg.GitSync.Enabled = true
+	appCfg.GitSync.RemoteURL = remoteURL
+	appCfg.GitSync.Branch = branch
+	appCfg.GitSync.Username = username
+	appCfg.GitSync.Password = password
+	if err := s.ConfigManager.SaveAppConfig(appCfg); err != nil {
+		return err
+	}
+
+	// 3. 切换工作目录
+	workDir := s.GitSyncMgr.GetProjectsPath()
+	s.ProjectMgr.SetProjectsDir(workDir)
+	s.ConfigManager.SaveWorkDir(workDir)
+
+	return nil
+}
+
+// DisableGitSync 禁用 Git Sync 功能
+func (s *Service) DisableGitSync() error {
+	// 1. 删除 git-sync 目录
+	if err := s.GitSyncMgr.RemoveRepo(); err != nil {
+		// 日志记录但继续执行
+	}
+
+	// 2. 更新配置
+	appCfg, _ := s.ConfigManager.LoadAppConfig()
+	if appCfg != nil {
+		appCfg.GitSync.Enabled = false
+		appCfg.GitSync.RemoteURL = ""
+		appCfg.GitSync.WorkDir = ""
+		appCfg.GitSync.Password = ""
+		s.ConfigManager.SaveAppConfig(appCfg)
+	}
+
+	// 3. 切换回本地目录
+	s.ProjectMgr.SetProjectsDir(s.ConfigManager.GetProjectsDir())
+
+	return nil
 }

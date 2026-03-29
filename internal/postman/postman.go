@@ -106,6 +106,21 @@ func (pi *PostmanImporter) ImportCollection(jsonData string) (*models.Project, e
 	return project, nil
 }
 
+// ParseCollection parses a Postman collection JSON and returns the project name and collection items
+func (pi *PostmanImporter) ParseCollection(jsonData string) (string, []CollectionItem, error) {
+	var raw importCollection
+	if err := json.Unmarshal([]byte(jsonData), &raw); err != nil {
+		return "", nil, err
+	}
+
+	projectName := raw.Info.Name
+	if projectName == "" {
+		projectName = "Imported from Postman"
+	}
+
+	return projectName, convertImportItems(raw.Item), nil
+}
+
 func convertImportItems(items []importItem) []CollectionItem {
 	out := make([]CollectionItem, 0, len(items))
 	for _, it := range items {

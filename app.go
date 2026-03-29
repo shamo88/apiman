@@ -222,3 +222,15 @@ func (a *App) SyncAllProjectsToGit() error {
 func (a *App) InitGitRepo() error {
 	return a.service.InitGitRepo()
 }
+
+func (a *App) InitProjectsDir() error {
+	return a.service.InitProjectsDir()
+}
+
+func (a *App) EnableGitSync(remoteURL, branch, username, password string) error {
+	return a.service.EnableGitSync(remoteURL, branch, username, password)
+}
+
+func (a *App) DisableGitSync() error {
+	return a.service.DisableGitSync()
+}

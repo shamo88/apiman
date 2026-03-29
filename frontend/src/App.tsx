@@ -5,7 +5,7 @@ import type { UploadProps } from 'antd';
 import { Button, Card, Checkbox, Col, Dropdown, Empty, Input, InputRef, message, Modal, Radio, Row, Select, Space, Spin, Tabs, Tooltip, Upload } from 'antd';
 import type { DataNode } from 'antd/es/tree';
 import React, { useEffect, useState } from 'react';
-import { AddRequestCase, CopyRequest, CreateEnvironment, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteEnvironment, DeleteFolder, DeleteProject, DeleteProjectScript, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts, GetProjectTree, GetRequest, ImportPostmanCollection, ListProjects, ListProjectScripts, LoadAppConfig, LoadEnvironments, MoveFolder, MoveRequest, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, SaveAppConfig, UpdateEnvironment, UpdateProjectScript, UpdateRequest, UpdateRequestScripts } from '../wailsjs/go/main/App';
+import { AddRequestCase, CopyRequest, CreateEnvironment, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteEnvironment, DeleteFolder, DeleteProject, DeleteProjectScript, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, ListProjectScripts, LoadAppConfig, LoadEnvironments, MoveFolder, MoveRequest, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, SaveAppConfig, UpdateEnvironment, UpdateProjectScript, UpdateRequest, UpdateRequestScripts } from '../wailsjs/go/main/App';
 import { models } from '../wailsjs/go/models';
 import './App.css';
 import { ScriptHelpWindow } from './components/ScriptHelpWindow';
@@ -1720,9 +1720,17 @@ function App() {
     };
 
     useEffect(() => {
-        loadProjects();
-        loadUiConfig();
-        loadProjectGroupsState();
+        const init = async () => {
+            try {
+                await InitProjectsDir();
+            } catch (e) {
+                console.error('Failed to init projects dir:', e);
+            }
+            loadProjects();
+            loadUiConfig();
+            loadProjectGroupsState();
+        };
+        init();
     }, []);
 
     useEffect(() => {
@@ -3008,6 +3016,7 @@ function App() {
             <TitleBar
                 activeTab={activeTab}
                 onListAnimationChange={setListAnimationEnabled}
+                onSettingsSave={loadProjects}
                 onTabChange={(key) => {
                     switchProjectTab(key);
                 }}

@@ -8,6 +8,7 @@ export namespace config {
 	    username?: string;
 	    password?: string;
 	    autoSync: boolean;
+	    workDir?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new GitSyncConfig(source);
@@ -22,6 +23,7 @@ export namespace config {
 	        this.username = source["username"];
 	        this.password = source["password"];
 	        this.autoSync = source["autoSync"];
+	        this.workDir = source["workDir"];
 	    }
 	}
 	export class UIConfig {

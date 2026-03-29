@@ -30,7 +30,11 @@ export function DeleteRequest(arg1:string):Promise<void>;
 
 export function DeleteRequestCase(arg1:string,arg2:string):Promise<models.CurlRequest>;
 
+export function DisableGitSync():Promise<void>;
+
 export function DuplicateRequestCase(arg1:string,arg2:string):Promise<models.CurlRequest>;
+
+export function EnableGitSync(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
 export function ExecuteCurl(arg1:string):Promise<models.CurlResponse>;
 
@@ -55,6 +59,8 @@ export function GetRequest(arg1:string):Promise<models.CurlRequest>;
 export function ImportPostmanCollection(arg1:string):Promise<models.Project>;
 
 export function InitGitRepo():Promise<void>;
+
+export function InitProjectsDir():Promise<void>;
 
 export function ListProjectScripts(arg1:string):Promise<Array<models.ProjectScript>>;
 

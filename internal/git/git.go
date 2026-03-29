@@ -75,6 +75,16 @@ func (g *GitSyncManager) GetRepoPath() string {
 	return g.repoPath
 }
 
+// GetProjectsPath returns the projects directory path within the git-sync repo
+func (g *GitSyncManager) GetProjectsPath() string {
+	return filepath.Join(g.repoPath, "projects")
+}
+
+// RemoveRepo deletes the entire git-sync repository directory
+func (g *GitSyncManager) RemoveRepo() error {
+	return os.RemoveAll(g.repoPath)
+}
+
 // CloneOrPull clones the repository if it doesn't exist, otherwise pulls the latest changes
 func (g *GitSyncManager) CloneOrPull(remoteURL, branch, username, password string) error {
 	log.Printf("[GitSync] CloneOrPull called: repoPath=%s, remoteURL=%s, branch=%s", g.repoPath, remoteURL, branch)
@@ -113,7 +123,7 @@ func (g *GitSyncManager) CloneOrPull(remoteURL, branch, username, password strin
 }
 
 func (g *GitSyncManager) cloneRepo(remoteURL, branch, username, password string) error {
-	log.Printf("[GitSync] cloneRepo: URL=%s, branch=%s, username=%s", remoteURL, branch, username)
+	log.Printf("[GitSync] cloneRepo: URL=%s, branch=%s, username='%s', password='%s'", remoteURL, branch, username, strings.Repeat("*", len(password)))
 	auth := ensureAuth(username, password)
 
 	_, err := git.PlainClone(g.repoPath, false, &git.CloneOptions{
@@ -497,127 +507,43 @@ func (g *GitSyncManager) CommitAndPush(files []string, message, branch, username
 func (g *GitSyncManager) SyncProject(projectPath, projectID, message, branch, username, password string) error {
 	log.Printf("[GitSync] SyncProject: projectPath=%s, projectID=%s, repoPath=%s", projectPath, projectID, g.repoPath)
 
-	// Copy project files to repo
-	projectDest := filepath.Join(g.repoPath, "projects", projectID)
-
-	// Remove existing project directory first to handle deletions
-	if err := os.RemoveAll(projectDest); err != nil {
-		log.Printf("[GitSync] Warning: failed to remove existing project directory: %v", err)
+	// Compute relative path from repo root (e.g., "projects/slug__uuid")
+	relPath, err := filepath.Rel(g.repoPath, projectPath)
+	if err != nil {
+		return fmt.Errorf("failed to compute relative path: %w", err)
 	}
 
-	if err := os.MkdirAll(projectDest, 0755); err != nil {
-		return fmt.Errorf("failed to create project directory: %w", err)
-	}
-
-	// Check scripts directory
-	scriptsSrc := filepath.Join(projectPath, "scripts")
-	scriptsDst := filepath.Join(projectDest, "scripts")
-	log.Printf("[GitSync] Checking scripts: src=%s, dst=%s", scriptsSrc, scriptsDst)
-	if info, err := os.Stat(scriptsSrc); err == nil && info.IsDir() {
-		log.Printf("[GitSync] Scripts dir exists, file count: %d", len(readDirNames(scriptsSrc)))
-	}
-
-	// Files to sync
+	// Stage project files for commit
 	files := []string{
 		"collection.postman.json",
 		"environments.json",
 		"meta.json",
 		"variables.json",
 	}
-
 	var syncFiles []string
 	for _, file := range files {
-		src := filepath.Join(projectPath, file)
-		dst := filepath.Join(projectDest, file)
-
-		if data, err := os.ReadFile(src); err == nil {
-			if err := os.WriteFile(dst, data, 0644); err != nil {
-				return fmt.Errorf("failed to copy %s: %w", file, err)
-			}
-			syncFiles = append(syncFiles, filepath.Join("projects", projectID, file))
+		fullPath := filepath.Join(projectPath, file)
+		if _, err := os.Stat(fullPath); err == nil {
+			syncFiles = append(syncFiles, filepath.Join(relPath, file))
 		}
 	}
-
-	// Copy scripts directory
-	if info, err := os.Stat(scriptsSrc); err == nil && info.IsDir() {
-		log.Printf("[GitSync] About to copy scripts: src=%s, dst=%s, srcFiles=%d", scriptsSrc, scriptsDst, len(readDirNames(scriptsSrc)))
-		if err := copyDirectory(scriptsSrc, scriptsDst); err != nil {
-			return fmt.Errorf("failed to copy scripts: %w", err)
-		}
-		syncFiles = append(syncFiles, filepath.Join("projects", projectID, "scripts"))
-		log.Printf("[GitSync] Scripts copied, dstFiles=%d", len(readDirNames(scriptsDst)))
-	} else {
-		log.Printf("[GitSync] Scripts directory does not exist at src: %s", scriptsSrc)
+	// Check scripts
+	scriptsPath := filepath.Join(projectPath, "scripts")
+	if _, err := os.Stat(scriptsPath); err == nil {
+		syncFiles = append(syncFiles, filepath.Join(relPath, "scripts"))
 	}
-
 	if len(syncFiles) == 0 {
 		return nil
 	}
-
-	// Generate commit message if empty
 	if message == "" {
 		message = fmt.Sprintf("Sync project %s at %s", projectID, time.Now().Format(time.RFC3339))
 	}
-
 	return g.CommitAndPush(syncFiles, message, branch, username, password)
 }
 
 // SyncAllProjects syncs all projects to the repository
 func (g *GitSyncManager) SyncAllProjects(projectsDir, remoteURL, branch, username, password string) error {
-	// First ensure the repo is cloned/updated
-	if remoteURL != "" {
-		if err := g.CloneOrPull(remoteURL, branch, username, password); err != nil {
-			return fmt.Errorf("failed to sync repository: %w", err)
-		}
-	}
-
-	// Clear and recreate the projects directory
-	projectsSyncDir := filepath.Join(g.repoPath, "projects")
-	if err := os.RemoveAll(projectsSyncDir); err != nil {
-		log.Printf("[GitSync] Warning: failed to remove projects directory: %v", err)
-	}
-	if err := os.MkdirAll(projectsSyncDir, 0755); err != nil {
-		return fmt.Errorf("failed to create projects directory: %w", err)
-	}
-
-	// Copy all projects
-	entries, err := os.ReadDir(projectsDir)
-	if err != nil {
-		return fmt.Errorf("failed to read projects directory: %w", err)
-	}
-
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		metaFile := filepath.Join(projectsDir, entry.Name(), "meta.json")
-		if _, err := os.Stat(metaFile); err != nil {
-			continue
-		}
-
-		src := filepath.Join(projectsDir, entry.Name())
-		dst := filepath.Join(projectsSyncDir, entry.Name())
-		log.Printf("[GitSync] Copying project: %s", entry.Name())
-
-		if err := copyDirectory(src, dst); err != nil {
-			log.Printf("[GitSync] Failed to copy project %s: %v", entry.Name(), err)
-			continue
-		}
-	}
-
-	// Copy projects.json (project groups state) if it exists
-	projectsJsonSrc := filepath.Join(projectsDir, "projects.json")
-	if data, err := os.ReadFile(projectsJsonSrc); err == nil {
-		projectsJsonDst := filepath.Join(projectsSyncDir, "projects.json")
-		if err := os.WriteFile(projectsJsonDst, data, 0644); err != nil {
-			log.Printf("[GitSync] Warning: failed to copy projects.json: %v", err)
-		} else {
-			log.Printf("[GitSync] projects.json copied")
-		}
-	}
-
-	// Commit and push all changes
+	// Commit and push all changes (projects are already in the git repo directory)
 	commitMsg := fmt.Sprintf("Sync all projects at %s", time.Now().Format(time.RFC3339))
 	return g.CommitAndPush([]string{"projects"}, commitMsg, branch, username, password)
 }
@@ -626,43 +552,6 @@ func (g *GitSyncManager) SyncAllProjects(projectsDir, remoteURL, branch, usernam
 func (g *GitSyncManager) HasLocalRepo() bool {
 	_, err := os.Stat(filepath.Join(g.repoPath, ".git"))
 	return err == nil
-}
-
-func copyDirectory(src, dst string) error {
-	info, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-
-	if err := os.MkdirAll(dst, info.Mode()); err != nil {
-		return err
-	}
-
-	entries, err := os.ReadDir(src)
-	if err != nil {
-		return err
-	}
-
-	for _, entry := range entries {
-		srcPath := filepath.Join(src, entry.Name())
-		dstPath := filepath.Join(dst, entry.Name())
-
-		if entry.IsDir() {
-			if err := copyDirectory(srcPath, dstPath); err != nil {
-				return err
-			}
-		} else {
-			data, err := os.ReadFile(srcPath)
-			if err != nil {
-				return err
-			}
-			if err := os.WriteFile(dstPath, data, 0644); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
 }
 
 // GetAuth returns the auth credentials for Git operations
@@ -681,16 +570,4 @@ func extractProjectID(dirName string) string {
 	}
 	// Otherwise return the whole name (might be just the UUID)
 	return dirName
-}
-
-func readDirNames(path string) []string {
-	entries, err := os.ReadDir(path)
-	if err != nil {
-		return nil
-	}
-	names := make([]string, 0, len(entries))
-	for _, e := range entries {
-		names = append(names, e.Name())
-	}
-	return names
 }

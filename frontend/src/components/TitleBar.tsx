@@ -1,7 +1,7 @@
 import { AppstoreOutlined, CloseOutlined, GithubOutlined, GlobalOutlined, InfoCircleOutlined, MinusOutlined, SettingOutlined } from '@ant-design/icons';
 import { Button, Col, Divider, Form, Input, InputNumber, message, Modal, Row, Select, Space, Switch, Tabs } from 'antd';
 import React from 'react';
-import { InitGitRepo, LoadAppConfig, SaveAppConfig, SyncAllProjectsToGit } from '../../wailsjs/go/main/App';
+import { DisableGitSync, EnableGitSync, InitGitRepo, InitProjectsDir, LoadAppConfig, SaveAppConfig, SyncAllProjectsToGit } from '../../wailsjs/go/main/App';
 import { config as wailsConfig } from '../../wailsjs/go/models';
 import { Quit, WindowMinimise, WindowToggleMaximise } from '../../wailsjs/runtime/runtime';
 
@@ -12,6 +12,7 @@ interface TitleBarProps {
     onTabEdit?: (targetKey: React.MouseEvent | React.KeyboardEvent | string, action: 'add' | 'remove') => void;
     tabItems?: any[];
     onListAnimationChange?: (enabled: boolean) => void;
+    onSettingsSave?: () => void;
 }
 
 const parsePort = (value: unknown): number | undefined => {
@@ -38,7 +39,8 @@ export const TitleBar: React.FC<TitleBarProps> = ({
     onTabChange,
     onTabEdit,
     tabItems,
-    onListAnimationChange
+    onListAnimationChange,
+    onSettingsSave
 }) => {
     const [settingsVisible, setSettingsVisible] = React.useState(false);
     const [activeSettingsTab, setActiveSettingsTab] = React.useState('general');
@@ -103,7 +105,13 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 
     const handleSaveSettings = async () => {
         try {
+            // 获取当前配置，比较 git sync 状态变化
+            const currentConfig = await LoadAppConfig();
+            const wasGitSyncEnabled = currentConfig?.gitSync?.enabled && !!currentConfig?.gitSync?.remoteUrl;
+
             const values = await form.validateFields();
+            const newGitSyncEnabled = Boolean(values?.gitSync?.enabled) && !!values?.gitSync?.remoteUrl;
+
             const configToSave = new wailsConfig.AppConfig({
                 proxy: {
                     enabled: Boolean(values?.proxy?.enabled),
@@ -124,17 +132,36 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                     authType: values?.gitSync?.authType || 'token',
                     username: values?.gitSync?.username || '',
                     password: values?.gitSync?.password || '',
-                    autoSync: Boolean(values?.gitSync?.autoSync),
                 },
             });
 
             await SaveAppConfig(configToSave);
+
+            // 处理 git sync 状态切换
+            if (!wasGitSyncEnabled && newGitSyncEnabled) {
+                // 从禁用变为启用
+                await EnableGitSync(
+                    values?.gitSync?.remoteUrl || '',
+                    values?.gitSync?.branch || 'main',
+                    values?.gitSync?.username || '',
+                    values?.gitSync?.password || ''
+                );
+            } else if (wasGitSyncEnabled && !newGitSyncEnabled) {
+                // 从启用变为禁用
+                await DisableGitSync();
+            }
+
+            // 重新初始化项目目录
+            await InitProjectsDir();
+
             onListAnimationChange?.(Boolean(values?.ui?.enableListAnimation));
+            onSettingsSave?.();
             console.log('Config saved successfully');
             setSettingsVisible(false);
         } catch (error) {
             console.error('Failed to save config:', error);
-            alert('保存失败: ' + (error as Error).message);
+            const errorMsg = (error as Error)?.message || String(error) || '未知错误';
+            alert('保存失败: ' + errorMsg);
         }
     };
 
@@ -444,7 +471,6 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                                             authType: 'token',
                                             username: '',
                                             password: '',
-                                            autoSync: true,
                                         }
                                     }}
                                 >
@@ -529,43 +555,6 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                                             </tbody>
                                         </table>
                                     </div>
-
-                                    <Form.Item
-                                        name={['gitSync', 'autoSync']}
-                                        valuePropName="checked"
-                                        label="保存时自动同步"
-                                    >
-                                        <Switch />
-                                    </Form.Item>
-
-                                    <Divider style={{ marginTop: 24 }} />
-
-                                    <Space>
-                                        <Button
-                                            type="default"
-                                            onClick={async () => {
-                                                const values = form.getFieldsValue();
-                                                if (!values?.gitSync?.remoteUrl) {
-                                                    message.error('请先填写仓库地址');
-                                                    return;
-                                                }
-                                                setGitSyncing(true);
-                                                try {
-                                                    await InitGitRepo();
-                                                    await SyncAllProjectsToGit();
-                                                    message.success('同步成功');
-                                                } catch (error) {
-                                                    console.error('Sync failed:', error);
-                                                    message.error('同步失败: ' + String(error));
-                                                } finally {
-                                                    setGitSyncing(false);
-                                                }
-                                            }}
-                                            loading={gitSyncing}
-                                        >
-                                            立即同步
-                                        </Button>
-                                    </Space>
 
                                     <Divider style={{ marginTop: 32 }} />
 
