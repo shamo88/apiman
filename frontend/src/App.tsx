@@ -14,7 +14,6 @@ import { TitleBar } from './components/TitleBar';
 interface Project {
     id: string;
     name: string;
-    path: string;
 }
 
 interface ProjectTree {
@@ -881,8 +880,8 @@ function App() {
     };
 
     const getChildrenByFolderPath = (folderPath: string): ProjectTree[] => {
-        if (!currentTree || !currentProject?.path) return [];
-        if (folderPath === currentProject.path) {
+        if (!currentTree || !currentTree?.path) return [];
+        if (folderPath === currentTree.path) {
             return currentTree.children || [];
         }
         const node = findTreeNode(currentTree, folderPath);
@@ -896,7 +895,7 @@ function App() {
     };
 
     const getParentFolderPath = (path: string): string | null => {
-        if (!currentTree || !currentProject?.path) return null;
+        if (!currentTree || !currentTree?.path) return null;
 
         let foundParent: string | null = null;
         const walk = (node: ProjectTree, parentPath: string) => {
@@ -914,13 +913,13 @@ function App() {
             }
         };
 
-        walk(currentTree, currentProject.path);
+        walk(currentTree, currentTree.path);
         return foundParent;
     };
 
     /** 拖入某文件夹（或根）末尾 */
     const checkDropAppendIntoFolder = (dragNode: { type: 'request' | 'folder'; path: string }, targetFolderPath: string): { ok: boolean; reason?: string } => {
-        if (!currentProject?.path) return { ok: false, reason: 'invalid-target' };
+        if (!currentTree?.path) return { ok: false, reason: 'invalid-target' };
         if (dragNode.path === targetFolderPath) return { ok: false, reason: 'self' };
 
         if (dragNode.type === 'folder') {
@@ -971,7 +970,7 @@ function App() {
         parentContainerPath: string,
         beforeID: string
     ): { ok: boolean; reason?: string } => {
-        if (!currentProject?.path) return { ok: false, reason: 'invalid-target' };
+        if (!currentTree?.path) return { ok: false, reason: 'invalid-target' };
 
         const dragParent = getParentFolderPath(dragNode.path);
         if (dragParent === null) return { ok: false, reason: 'missing-source' };
@@ -1665,8 +1664,8 @@ function App() {
                         <Dropdown
                             menu={{
                                 items: [
-                                    { key: 'add-request', icon: <PlusOutlined />, label: '新建请求', onClick: () => { setSelectedFolder(folder.path || currentProject?.path || ''); setCreateRequestModal(true); } },
-                                    { key: 'add-folder', icon: <FolderOutlined />, label: '新建文件夹', onClick: () => { setSelectedFolder(folder.path || currentProject?.path || ''); setCreateFolderModal(true); } },
+                                    { key: 'add-request', icon: <PlusOutlined />, label: '新建请求', onClick: () => { setSelectedFolder(folder.path || currentTree?.path || ''); setCreateRequestModal(true); } },
+                                    { key: 'add-folder', icon: <FolderOutlined />, label: '新建文件夹', onClick: () => { setSelectedFolder(folder.path || currentTree?.path || ''); setCreateFolderModal(true); } },
                                     { key: 'rename', icon: <EditOutlined />, label: '重命名', onClick: () => openRenameModal('folder', folder.path!, folder.name) },
                                     { type: 'divider' },
                                     { key: 'delete', icon: <CloseOutlined />, label: '删除文件夹', danger: true, onClick: () => handleDeleteFolder(folder.path!) }
@@ -1969,7 +1968,7 @@ function App() {
             const renamed = await RenameProject(renameProjectId, newName);
             setProjectTabs(prev => prev.map(tab => (
                 tab.project.id === renameProjectId
-                    ? { ...tab, title: renamed.name, project: { ...tab.project, name: renamed.name, path: renamed.path } }
+                    ? { ...tab, title: renamed.name, project: { ...tab.project, name: renamed.name } }
                     : tab
             )));
             setRenameProjectModal(false);
@@ -2211,7 +2210,7 @@ function App() {
             return;
         }
 
-        const parentPath = selectedFolder || currentProject.path;
+        const parentPath = selectedFolder || "";
         try {
             await CreateFolder(currentProject.id, parentPath, newFolderName);
             message.success('文件夹创建成功');
@@ -2317,7 +2316,7 @@ function App() {
             return;
         }
 
-        const parentPath = selectedFolder || currentProject.path;
+        const parentPath = selectedFolder || "";
         try {
             await CreateRequest(currentProject.id, parentPath, newRequestName, toWailsHttpSpec(createDefaultApiConfig()));
             message.success('请求创建成功');
@@ -3298,10 +3297,10 @@ function App() {
                                     </div>
 
                                     <div
-                                        className={`sidebar-content${(listAnimationEnabled || forceListAnimation) ? ' list-animations-enabled' : ''}${dropTargetFolderPath === currentProject?.path ? ' root-drop-target' : ''}`}
+                                        className={`sidebar-content${(listAnimationEnabled || forceListAnimation) ? ' list-animations-enabled' : ''}${dropTargetFolderPath === currentTree?.path ? ' root-drop-target' : ''}`}
                                         onDragOver={(e) => {
-                                            if (!draggingNode || !currentProject?.path) return;
-                                            const check = checkDropAppendIntoFolder(draggingNode, currentProject.path);
+                                            if (!draggingNode || !currentTree?.path) return;
+                                            const check = checkDropAppendIntoFolder(draggingNode, currentTree.path);
                                             if (!check.ok) {
                                                 e.dataTransfer.dropEffect = 'none';
                                                 setDropTargetFolderPath(null);
@@ -3314,21 +3313,21 @@ function App() {
                                             }
                                             e.preventDefault();
                                             e.dataTransfer.dropEffect = 'move';
-                                            setDropTargetFolderPath(currentProject.path);
+                                            setDropTargetFolderPath(currentTree.path);
                                             setInvalidDropHint(null);
                                         }}
                                         onDrop={async (e) => {
                                             e.preventDefault();
-                                            if (!draggingNode || !currentProject?.path) return;
-                                            const check = checkDropAppendIntoFolder(draggingNode, currentProject.path);
+                                            if (!draggingNode || !currentTree?.path) return;
+                                            const check = checkDropAppendIntoFolder(draggingNode, currentTree.path);
                                             if (!check.ok) {
                                                 clearDragState();
                                                 return;
                                             }
                                             if (draggingNode.type === 'request') {
-                                                await moveRequestNode(draggingNode.path, currentProject.path, '');
+                                                await moveRequestNode(draggingNode.path, currentTree.path, '');
                                             } else {
-                                                await moveFolderNode(draggingNode.path, currentProject.path, '');
+                                                await moveFolderNode(draggingNode.path, currentTree.path, '');
                                             }
                                             clearDragState();
                                         }}

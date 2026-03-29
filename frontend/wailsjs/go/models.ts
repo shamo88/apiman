@@ -429,7 +429,6 @@ export namespace models {
 	export class Project {
 	    id: string;
 	    name: string;
-	    path: string;
 	    // Go type: time
 	    created_at: any;
 	    // Go type: time
@@ -443,7 +442,6 @@ export namespace models {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.name = source["name"];
-	        this.path = source["path"];
 	        this.created_at = this.convertValues(source["created_at"], null);
 	        this.updated_at = this.convertValues(source["updated_at"], null);
 	    }

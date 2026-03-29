@@ -1,10 +1,12 @@
 package git
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -158,14 +160,29 @@ func (g *GitSyncManager) createNewRepo(remoteURL, branch, username, password str
 
 	// Create a README file for initial commit
 	readmePath := filepath.Join(g.repoPath, "README.md")
+	log.Printf("[GitSync] Creating README at: %s", readmePath)
 	if err := os.WriteFile(readmePath, []byte("# Apiman Sync\n"), 0644); err != nil {
 		return fmt.Errorf("failed to create README: %w", err)
 	}
+
+	// Verify file exists
+	if _, err := os.Stat(readmePath); err != nil {
+		return fmt.Errorf("README file not found after creation: %w", err)
+	}
+	log.Printf("[GitSync] README file created successfully")
 
 	_, err = worktree.Add("README.md")
 	if err != nil {
 		return fmt.Errorf("failed to add README: %w", err)
 	}
+	log.Printf("[GitSync] README added to worktree")
+
+	// Get status before commit
+	status, err := worktree.Status()
+	if err != nil {
+		return fmt.Errorf("failed to get status: %w", err)
+	}
+	log.Printf("[GitSync] Status before commit: %v", status)
 
 	_, err = worktree.Commit("Initial commit", &git.CommitOptions{})
 	if err != nil {
@@ -227,68 +244,174 @@ func (g *GitSyncManager) pullRepo(branch, username, password string) error {
 }
 
 func (g *GitSyncManager) pushRepo(branch, username, password string) error {
+	auth := ensureAuth(username, password)
+
+	// First try with go-git
 	repo, err := git.PlainOpen(g.repoPath)
 	if err != nil {
 		return fmt.Errorf("failed to open repository: %w", err)
 	}
-
-	auth := ensureAuth(username, password)
 
 	err = repo.Push(&git.PushOptions{
 		RemoteName: "origin",
 		Auth:       auth,
 		RefSpecs:   []config.RefSpec{config.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%s", branch, branch))},
 	})
-	if err != nil {
-		errMsg := strings.ToLower(err.Error())
-		// If there's nothing to push (already up-to-date), create an initial commit first
-		if strings.Contains(errMsg, "already up-to-date") {
-			log.Printf("[GitSync] Nothing to push, creating initial commit")
-			if initErr := g.createInitialCommit(repo); initErr != nil {
-				return fmt.Errorf("failed to create initial commit: %w", initErr)
-			}
-			// Retry push after creating initial commit
-			return g.pushRepo(branch, username, password)
-		}
-		return fmt.Errorf("failed to push: %w", err)
+	if err == nil {
+		log.Printf("[GitSync] Push successful")
+		return nil
 	}
-	log.Printf("[GitSync] Push successful")
+
+	errMsg := strings.ToLower(err.Error())
+	log.Printf("[GitSync] go-git push failed: %v", err)
+
+	// If there's nothing to push, create an initial commit first
+	if strings.Contains(errMsg, "already up-to-date") || strings.Contains(errMsg, "nothing to push") {
+		log.Printf("[GitSync] Nothing to push, creating initial commit")
+		if initErr := g.createInitialCommit(branch, username, password); initErr != nil {
+			return fmt.Errorf("failed to create initial commit: %w", initErr)
+		}
+		// Push using git command after commit
+		log.Printf("[GitSync] Pushing after initial commit using git command")
+		return g.gitPush(branch, username, password)
+	}
+
+	// Try git command as fallback
+	log.Printf("[GitSync] Trying git command push as fallback")
+	return g.gitPush(branch, username, password)
+}
+
+func (g *GitSyncManager) gitPush(branch, username, password string) error {
+	// Use ensureAuth to get proper username (oauth2 if token auth)
+	auth := ensureAuth(username, password)
+	actualUsername := auth.Username
+	actualPassword := auth.Password
+
+	log.Printf("[GitSync] gitPush with username='%s', password='%s'", actualUsername, strings.Repeat("*", len(actualPassword)))
+
+	// Get the remote URL
+	repo, err := git.PlainOpen(g.repoPath)
+	if err != nil {
+		return fmt.Errorf("failed to open repository: %w", err)
+	}
+
+	remote, err := repo.Remote("origin")
+	if err != nil {
+		return fmt.Errorf("failed to get remote: %w", err)
+	}
+
+	remoteURL := remote.Config().URLs[0]
+	log.Printf("[GitSync] Remote URL: %s", remoteURL)
+
+	// Check if URL already has credentials embedded
+	hasCreds := strings.Contains(remoteURL, "@")
+	if !hasCreds && actualUsername != "" && actualPassword != "" {
+		// Embed credentials in URL
+		credURL := strings.Replace(remoteURL, "https://", fmt.Sprintf("https://%s:%s@", actualUsername, actualPassword), 1)
+		log.Printf("[GitSync] Embedding credentials in URL")
+
+		// Set the remote URL with credentials
+		cmd := exec.Command("git", "remote", "set-url", "origin", credURL)
+		cmd.Dir = g.repoPath
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("failed to set remote URL: %w", err)
+		}
+		remoteURL = credURL
+	} else if hasCreds {
+		log.Printf("[GitSync] URL already has credentials embedded")
+	}
+
+	log.Printf("[GitSync] Using URL: %s", maskURL(remoteURL))
+
+	// Push
+	cmd := exec.Command("git", "push", "-u", "origin", branch)
+	cmd.Dir = g.repoPath
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		errMsg := string(stderr.Bytes())
+		log.Printf("[GitSync] Git push failed: %v, stderr: %s", err, errMsg)
+
+		// If branch does not exist, create it from current HEAD and push
+		if strings.Contains(errMsg, "src refspec") && strings.Contains(errMsg, "does not match any") {
+			log.Printf("[GitSync] Branch %s does not exist, creating it", branch)
+			// Create the branch
+			cmd = exec.Command("git", "checkout", "-b", branch)
+			cmd.Dir = g.repoPath
+			if err := cmd.Run(); err != nil {
+				return fmt.Errorf("failed to create branch: %w", err)
+			}
+			// Retry push
+			cmd = exec.Command("git", "push", "-u", "origin", branch)
+			cmd.Dir = g.repoPath
+			cmd.Stderr = &stderr
+			if err := cmd.Run(); err != nil {
+				return fmt.Errorf("git push failed after creating branch: %s", string(stderr.Bytes()))
+			}
+			log.Printf("[GitSync] Git push successful after creating branch")
+			return nil
+		}
+		return fmt.Errorf("git push failed: %s", errMsg)
+	}
+	log.Printf("[GitSync] Git push successful")
 	return nil
 }
 
-func (g *GitSyncManager) createInitialCommit(repo *git.Repository) error {
-	worktree, err := repo.Worktree()
-	if err != nil {
-		return fmt.Errorf("failed to get worktree: %w", err)
+func maskURL(url string) string {
+	// Mask password in URL for logging
+	if strings.Contains(url, "@") {
+		parts := strings.Split(url, "@")
+		if len(parts) >= 2 {
+			return parts[0] + "@" + parts[len(parts)-1]
+		}
 	}
+	return url
+}
 
+func (g *GitSyncManager) createInitialCommit(branch, username, password string) error {
 	// Create a README file for initial commit
 	readmePath := filepath.Join(g.repoPath, "README.md")
+	log.Printf("[GitSync] README path: %s", readmePath)
 	if err := os.WriteFile(readmePath, []byte("# Apiman Sync\n"), 0644); err != nil {
 		return fmt.Errorf("failed to create README: %w", err)
 	}
 
-	log.Printf("[GitSync] README created, adding to index")
+	// Verify README was created
+	info, err := os.Stat(readmePath)
+	log.Printf("[GitSync] README stat: size=%d, err=%v", info.Size(), err)
 
-	// Add the README file
-	_, err = worktree.Add("README.md")
-	if err != nil {
-		return fmt.Errorf("failed to add README: %w", err)
+	// Use git exec to add and commit directly
+	cmd := exec.Command("git", "add", "README.md")
+	cmd.Dir = g.repoPath
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to git add: %w", err)
+	}
+	log.Printf("[GitSync] git add succeeded")
+
+	// Check git status before commit
+	cmd = exec.Command("git", "status")
+	cmd.Dir = g.repoPath
+	out, _ := cmd.Output()
+	log.Printf("[GitSync] git status before commit: %s", string(out))
+
+	// Check if there's already a commit
+	cmd = exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = g.repoPath
+	if err := cmd.Run(); err != nil {
+		log.Printf("[GitSync] No HEAD commit exists, will create initial commit")
+	} else {
+		log.Printf("[GitSync] HEAD already exists, skipping commit")
+		return nil // Already have a commit, no need to create new one
 	}
 
-	// Verify status after adding
-	status, err := worktree.Status()
-	if err != nil {
-		return fmt.Errorf("failed to get status: %w", err)
+	// Create commit
+	cmd = exec.Command("git", "commit", "-m", "Initial commit")
+	cmd.Dir = g.repoPath
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to git commit: %w", err)
 	}
-	log.Printf("[GitSync] Status after add: %v", status)
+	log.Printf("[GitSync] git commit succeeded")
 
-	_, err = worktree.Commit("Initial commit", &git.CommitOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to create initial commit: %w", err)
-	}
-
-	log.Printf("[GitSync] Created initial commit")
 	return nil
 }
 
@@ -305,11 +428,22 @@ func (g *GitSyncManager) CommitAndPush(files []string, message, branch, username
 		return fmt.Errorf("failed to get worktree: %w", err)
 	}
 
-	// Add files
+	// Add files - for directories, recursively add all files
 	for _, file := range files {
-		_, err := worktree.Add(file)
-		if err != nil {
-			return fmt.Errorf("failed to add file %s: %w", file, err)
+		// Check if it's a directory
+		if info, err := os.Stat(filepath.Join(g.repoPath, file)); err == nil && info.IsDir() {
+			log.Printf("[GitSync] Adding directory recursively: %s", file)
+			// Use git add for directory to ensure all files are staged
+			cmd := exec.Command("git", "add", "-A", file)
+			cmd.Dir = g.repoPath
+			if err := cmd.Run(); err != nil {
+				return fmt.Errorf("failed to add directory %s: %w", file, err)
+			}
+		} else {
+			_, err := worktree.Add(file)
+			if err != nil {
+				return fmt.Errorf("failed to add file %s: %w", file, err)
+			}
 		}
 	}
 
@@ -318,6 +452,8 @@ func (g *GitSyncManager) CommitAndPush(files []string, message, branch, username
 	if err != nil {
 		return fmt.Errorf("failed to get status: %w", err)
 	}
+
+	log.Printf("[GitSync] Status after add: IsClean=%v", status.IsClean())
 
 	if status.IsClean() {
 		log.Printf("[GitSync] No changes to commit")
@@ -336,10 +472,17 @@ func (g *GitSyncManager) CommitAndPush(files []string, message, branch, username
 	// Push
 	auth := ensureAuth(username, password)
 
+	// First check current branch using Head
+	head, err := repo.Head()
+	if err == nil {
+		log.Printf("[GitSync] HEAD: %s, target branch: %s", head.Name(), branch)
+	}
+
 	err = repo.Push(&git.PushOptions{
 		RemoteName: "origin",
 		Auth:       auth,
 		RefSpecs:   []config.RefSpec{config.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%s", branch, branch))},
+		Force:      true, // Use force to overwrite remote
 	})
 	if err != nil {
 		log.Printf("[GitSync] Push failed: %v", err)
@@ -352,10 +495,26 @@ func (g *GitSyncManager) CommitAndPush(files []string, message, branch, username
 
 // SyncProject syncs a single project to the repository
 func (g *GitSyncManager) SyncProject(projectPath, projectID, message, branch, username, password string) error {
+	log.Printf("[GitSync] SyncProject: projectPath=%s, projectID=%s, repoPath=%s", projectPath, projectID, g.repoPath)
+
 	// Copy project files to repo
 	projectDest := filepath.Join(g.repoPath, "projects", projectID)
+
+	// Remove existing project directory first to handle deletions
+	if err := os.RemoveAll(projectDest); err != nil {
+		log.Printf("[GitSync] Warning: failed to remove existing project directory: %v", err)
+	}
+
 	if err := os.MkdirAll(projectDest, 0755); err != nil {
 		return fmt.Errorf("failed to create project directory: %w", err)
+	}
+
+	// Check scripts directory
+	scriptsSrc := filepath.Join(projectPath, "scripts")
+	scriptsDst := filepath.Join(projectDest, "scripts")
+	log.Printf("[GitSync] Checking scripts: src=%s, dst=%s", scriptsSrc, scriptsDst)
+	if info, err := os.Stat(scriptsSrc); err == nil && info.IsDir() {
+		log.Printf("[GitSync] Scripts dir exists, file count: %d", len(readDirNames(scriptsSrc)))
 	}
 
 	// Files to sync
@@ -380,13 +539,15 @@ func (g *GitSyncManager) SyncProject(projectPath, projectID, message, branch, us
 	}
 
 	// Copy scripts directory
-	scriptsSrc := filepath.Join(projectPath, "scripts")
-	scriptsDst := filepath.Join(projectDest, "scripts")
 	if info, err := os.Stat(scriptsSrc); err == nil && info.IsDir() {
+		log.Printf("[GitSync] About to copy scripts: src=%s, dst=%s, srcFiles=%d", scriptsSrc, scriptsDst, len(readDirNames(scriptsSrc)))
 		if err := copyDirectory(scriptsSrc, scriptsDst); err != nil {
 			return fmt.Errorf("failed to copy scripts: %w", err)
 		}
 		syncFiles = append(syncFiles, filepath.Join("projects", projectID, "scripts"))
+		log.Printf("[GitSync] Scripts copied, dstFiles=%d", len(readDirNames(scriptsDst)))
+	} else {
+		log.Printf("[GitSync] Scripts directory does not exist at src: %s", scriptsSrc)
 	}
 
 	if len(syncFiles) == 0 {
@@ -410,6 +571,16 @@ func (g *GitSyncManager) SyncAllProjects(projectsDir, remoteURL, branch, usernam
 		}
 	}
 
+	// Clear and recreate the projects directory
+	projectsSyncDir := filepath.Join(g.repoPath, "projects")
+	if err := os.RemoveAll(projectsSyncDir); err != nil {
+		log.Printf("[GitSync] Warning: failed to remove projects directory: %v", err)
+	}
+	if err := os.MkdirAll(projectsSyncDir, 0755); err != nil {
+		return fmt.Errorf("failed to create projects directory: %w", err)
+	}
+
+	// Copy all projects
 	entries, err := os.ReadDir(projectsDir)
 	if err != nil {
 		return fmt.Errorf("failed to read projects directory: %w", err)
@@ -425,15 +596,19 @@ func (g *GitSyncManager) SyncAllProjects(projectsDir, remoteURL, branch, usernam
 			continue
 		}
 
-		// Extract project ID from path
-		projectID := entry.Name()
-		if err := g.SyncProject(filepath.Join(projectsDir, entry.Name()), projectID, "", branch, username, password); err != nil {
-			// Log error but continue with other projects
+		src := filepath.Join(projectsDir, entry.Name())
+		dst := filepath.Join(projectsSyncDir, entry.Name())
+		log.Printf("[GitSync] Copying project: %s", entry.Name())
+
+		if err := copyDirectory(src, dst); err != nil {
+			log.Printf("[GitSync] Failed to copy project %s: %v", entry.Name(), err)
 			continue
 		}
 	}
 
-	return nil
+	// Commit and push all changes
+	commitMsg := fmt.Sprintf("Sync all projects at %s", time.Now().Format(time.RFC3339))
+	return g.CommitAndPush([]string{"projects"}, commitMsg, branch, username, password)
 }
 
 // HasLocalRepo checks if the local repository exists
@@ -485,4 +660,26 @@ func GetAuth(username, password string) *http.BasicAuth {
 		Username: username,
 		Password: password,
 	}
+}
+
+// extractProjectID extracts the UUID from a directory name like "项目名__uuid" or just "uuid"
+func extractProjectID(dirName string) string {
+	// Try to find UUID after "__"
+	if idx := strings.LastIndex(dirName, "__"); idx >= 0 && idx < len(dirName)-2 {
+		return dirName[idx+2:]
+	}
+	// Otherwise return the whole name (might be just the UUID)
+	return dirName
+}
+
+func readDirNames(path string) []string {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return nil
+	}
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	return names
 }

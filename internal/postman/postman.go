@@ -87,7 +87,7 @@ func (pi *PostmanImporter) ImportCollection(jsonData string) (*models.Project, e
 		return nil, err
 	}
 
-	project, err := pi.createProject(projectName)
+	project, projectPath, err := pi.createProject(projectName)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func (pi *PostmanImporter) ImportCollection(jsonData string) (*models.Project, e
 	}
 	coll.Item = convertImportItems(raw.Item)
 
-	if err := SaveCollection(project.Path, coll); err != nil {
+	if err := SaveCollection(projectPath, coll); err != nil {
 		return nil, err
 	}
 
@@ -216,22 +216,21 @@ func extractImportURL(urlInterface interface{}) string {
 	return ""
 }
 
-func (pi *PostmanImporter) createProject(name string) (*models.Project, error) {
+func (pi *PostmanImporter) createProject(name string) (*models.Project, string, error) {
 	projectID := uuid.New().String()
 	projectDirName := buildSlugUUIDName(name, projectID)
 	projectPath := filepath.Join(pi.configManager.GetProjectsDir(), projectDirName)
 
 	if err := os.MkdirAll(projectPath, 0755); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if err := os.MkdirAll(filepath.Join(projectPath, "scripts"), 0755); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	project := &models.Project{
 		ID:        projectID,
 		Name:      name,
-		Path:      projectPath,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -239,14 +238,14 @@ func (pi *PostmanImporter) createProject(name string) (*models.Project, error) {
 	metaFile := filepath.Join(projectPath, "meta.json")
 	data, err := json.MarshalIndent(project, "", "  ")
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	if err := os.WriteFile(metaFile, data, 0644); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return project, nil
+	return project, projectPath, nil
 }
 
 func (pi *PostmanImporter) ensureUniqueProjectName(baseName string) (string, error) {

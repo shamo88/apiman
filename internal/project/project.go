@@ -151,7 +151,6 @@ func (pm *ProjectManager) CreateProject(name string) (*models.Project, error) {
 	project := &models.Project{
 		ID:        projectID,
 		Name:      name,
-		Path:      projectPath,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -224,7 +223,6 @@ func (pm *ProjectManager) RenameProject(id, newName string) (*models.Project, er
 		project.CreatedAt = time.Now()
 	}
 	project.Name = newName
-	project.Path = newProjectPath
 	project.UpdatedAt = time.Now()
 
 	data, err := json.MarshalIndent(project, "", "  ")
