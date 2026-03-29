@@ -10,6 +10,7 @@ import (
 	"apiman/internal/script"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -21,6 +22,7 @@ type Service struct {
 	ScriptableExecutor  *curl.ScriptableExecutor
 	GlobalVarStore      *script.GlobalVariableStore
 	GitSyncMgr          *git.GitSyncManager
+	gitSyncMu           sync.Mutex // 防止并发 Git 操作
 }
 
 func NewService() *Service {
@@ -607,6 +609,10 @@ func (s *Service) ExecuteHTTPRequestWithScriptsInline(
 
 // SyncProjectToGit syncs a single project to Git repository
 func (s *Service) SyncProjectToGit(projectID string) error {
+	// 获取锁，防止并发 Git 操作
+	s.gitSyncMu.Lock()
+	defer s.gitSyncMu.Unlock()
+
 	appCfg, err := s.ConfigManager.LoadAppConfig()
 	if err != nil || appCfg == nil {
 		return nil
