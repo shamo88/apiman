@@ -3609,7 +3609,17 @@ function App() {
                                                     children: (
                                                         <div className="kv-editor">
                                                             {apiConfig.headers.map((header, index) => (
-                                                                <div key={index} className="kv-row">
+                                                                <div key={index} className="kv-row kv-row-params">
+                                                                    <Checkbox
+                                                                        className="kv-param-enabled"
+                                                                        checked={header.enabled !== false}
+                                                                        onChange={(e) => {
+                                                                            const newHeaders = [...apiConfig.headers];
+                                                                            newHeaders[index].enabled = e.target.checked;
+                                                                            setApiConfig({ ...apiConfig, headers: newHeaders });
+                                                                        }}
+                                                                        title="发送请求时包含该header"
+                                                                    />
                                                                     <Input
                                                                         placeholder="Key"
                                                                         value={header.key}
@@ -3958,7 +3968,12 @@ function App() {
                                                                         for (const parsedHeader of parsed.headers) {
                                                                             const idx = mergedHeaders.findIndex(h => h.key.toLowerCase() === parsedHeader.key.toLowerCase());
                                                                             if (idx >= 0) {
-                                                                                mergedHeaders[idx] = parsedHeader;
+                                                                                // 保留原有的enabled状态，只更新key和value
+                                                                                mergedHeaders[idx] = {
+                                                                                    ...mergedHeaders[idx],
+                                                                                    key: parsedHeader.key,
+                                                                                    value: parsedHeader.value,
+                                                                                };
                                                                             } else {
                                                                                 mergedHeaders.push(parsedHeader);
                                                                             }
@@ -3970,7 +3985,12 @@ function App() {
                                                                         for (const parsedParam of parsed.params) {
                                                                             const idx = mergedParams.findIndex(p => p.key.toLowerCase() === parsedParam.key.toLowerCase());
                                                                             if (idx >= 0) {
-                                                                                mergedParams[idx] = parsedParam;
+                                                                                // 保留原有的enabled状态，只更新key和value
+                                                                                mergedParams[idx] = {
+                                                                                    ...mergedParams[idx],
+                                                                                    key: parsedParam.key,
+                                                                                    value: parsedParam.value,
+                                                                                };
                                                                             } else {
                                                                                 mergedParams.push(parsedParam);
                                                                             }
