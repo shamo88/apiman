@@ -1278,6 +1278,7 @@ function App() {
         const m = (method || 'GET').toUpperCase();
         if (m === 'DELETE') return 'DEL';
         if (m === 'PATCH') return 'PAT';
+        if (m === 'OPTIONS') return 'OPT';
         return m.substring(0, 7);
     };
 
@@ -3582,6 +3583,8 @@ function App() {
                                                 { value: 'PUT', label: 'PUT' },
                                                 { value: 'DELETE', label: 'DELETE' },
                                                 { value: 'PATCH', label: 'PATCH' },
+                                                { value: 'OPTIONS', label: 'OPTIONS' },
+                                                { value: 'HEAD', label: 'HEAD' },
                                             ]}
                                         />
                                         {renderVariableAwareInput(
