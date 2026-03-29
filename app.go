@@ -107,8 +107,8 @@ func (a *App) RenameRequestCase(requestPath, caseID, newName string) (*models.Cu
 	return a.service.RenameRequestCase(requestPath, caseID, newName)
 }
 
-func (a *App) UpdateRequestScripts(requestPath, preScriptID, postScriptID string) error {
-	return a.service.UpdateRequestScripts(requestPath, preScriptID, postScriptID)
+func (a *App) UpdateRequestScripts(requestPath string, preScripts, postScripts []string) error {
+	return a.service.UpdateRequestScripts(requestPath, preScripts, postScripts)
 }
 
 func (a *App) DeleteRequest(requestPath string) error {
@@ -195,10 +195,10 @@ func (a *App) ExecuteHTTPRequestWithScripts(
 	projectID string,
 	environmentID string,
 	spec models.HttpRequestSpec,
-	preScriptID string,
-	postScriptID string,
+	preScriptIDs []string,
+	postScriptIDs []string,
 ) (*models.CurlResponse, error) {
-	return a.service.ExecuteHTTPRequestWithScripts(projectID, environmentID, spec, preScriptID, postScriptID)
+	return a.service.ExecuteHTTPRequestWithScripts(projectID, environmentID, spec, preScriptIDs, postScriptIDs)
 }
 
 func (a *App) ExecuteHTTPRequestWithScriptsInline(

@@ -626,20 +626,20 @@ func (pm *ProjectManager) UpdateRequest(requestPath string, spec models.HttpRequ
 		return os.ErrNotExist
 	}
 	if cases == nil || len(cases) == 0 {
-		pre, post := item.PreScriptID, item.PostScriptID
+		pre, post := item.PreScripts, item.PostScripts
 		item.ApimanCases = nil
 		item.ApimanActiveCaseID = ""
 		postman.ApplyHTTPRequestSpecToItem(item, &spec)
-		item.PreScriptID, item.PostScriptID = pre, post
+		item.PreScripts, item.PostScripts = pre, post
 		return postman.SaveCollection(projectPath, coll)
 	}
 	activeCaseID = strings.TrimSpace(activeCaseID)
 
-	pre, post := item.PreScriptID, item.PostScriptID
+	pre, post := item.PreScripts, item.PostScripts
 	postman.ApplyHTTPRequestSpecToItem(item, &spec)
 	item.ApimanCases = postman.CloneHttpRequestCases(cases)
 	item.ApimanActiveCaseID = activeCaseID
-	item.PreScriptID, item.PostScriptID = pre, post
+	item.PreScripts, item.PostScripts = pre, post
 	return postman.SaveCollection(projectPath, coll)
 }
 
@@ -664,7 +664,7 @@ func (pm *ProjectManager) AddRequestCase(requestPath, caseName string) (*models.
 	if item == nil || item.Request == nil {
 		return nil, os.ErrNotExist
 	}
-	pre, postScr := item.PreScriptID, item.PostScriptID
+	pre, postScr := item.PreScripts, item.PostScripts
 	specDup := cloneHTTPRequestSpec(activeCaseSpec(item, projectID))
 	var cases []models.HttpRequestCase
 	var newActive string
@@ -682,7 +682,7 @@ func (pm *ProjectManager) AddRequestCase(requestPath, caseName string) (*models.
 	}
 	item.ApimanCases = cases
 	item.ApimanActiveCaseID = newActive
-	item.PreScriptID, item.PostScriptID = pre, postScr
+	item.PreScripts, item.PostScripts = pre, postScr
 	if err := postman.SaveCollection(projectPath, coll); err != nil {
 		return nil, err
 	}
@@ -714,7 +714,7 @@ func (pm *ProjectManager) DuplicateRequestCase(requestPath, caseID string) (*mod
 	if idx < 0 {
 		return nil, os.ErrNotExist
 	}
-	pre, postScr := item.PreScriptID, item.PostScriptID
+	pre, postScr := item.PreScripts, item.PostScripts
 	newID := uuid.New().String()
 	baseName := strings.TrimSpace(cases[idx].Name)
 	dupName := baseName + " 副本"
@@ -728,7 +728,7 @@ func (pm *ProjectManager) DuplicateRequestCase(requestPath, caseID string) (*mod
 	})
 	item.ApimanCases = cases
 	item.ApimanActiveCaseID = newID
-	item.PreScriptID, item.PostScriptID = pre, postScr
+	item.PreScripts, item.PostScripts = pre, postScr
 	if err := postman.SaveCollection(projectPath, coll); err != nil {
 		return nil, err
 	}
@@ -760,7 +760,7 @@ func (pm *ProjectManager) DeleteRequestCase(requestPath, caseID string) (*models
 	if idx < 0 {
 		return nil, os.ErrNotExist
 	}
-	pre, postScr := item.PreScriptID, item.PostScriptID
+	pre, postScr := item.PreScripts, item.PostScripts
 	cases = append(cases[:idx], cases[idx+1:]...)
 	item.ApimanCases = cases
 	if len(cases) == 0 {
@@ -770,7 +770,7 @@ func (pm *ProjectManager) DeleteRequestCase(requestPath, caseID string) (*models
 			item.ApimanActiveCaseID = cases[0].ID
 		}
 	}
-	item.PreScriptID, item.PostScriptID = pre, postScr
+	item.PreScripts, item.PostScripts = pre, postScr
 	if err := postman.SaveCollection(projectPath, coll); err != nil {
 		return nil, err
 	}
@@ -811,7 +811,7 @@ func (pm *ProjectManager) RenameRequestCase(requestPath, caseID, newName string)
 	return postman.CurlRequestFromCollectionItem(projectID, postman.FindItemRef(coll.Item, requestID)), nil
 }
 
-func (pm *ProjectManager) UpdateRequestScripts(requestPath, preScriptID, postScriptID string) error {
+func (pm *ProjectManager) UpdateRequestScripts(requestPath string, preScripts, postScripts []string) error {
 	projectID, requestID, ok := postman.ParseRequestRef(requestPath)
 	if !ok {
 		return os.ErrInvalid
@@ -828,8 +828,8 @@ func (pm *ProjectManager) UpdateRequestScripts(requestPath, preScriptID, postScr
 	if item == nil {
 		return os.ErrNotExist
 	}
-	item.PreScriptID = strings.TrimSpace(preScriptID)
-	item.PostScriptID = strings.TrimSpace(postScriptID)
+	item.PreScripts = preScripts
+	item.PostScripts = postScripts
 	return postman.SaveCollection(projectPath, coll)
 }
 
@@ -1369,13 +1369,27 @@ func clearScriptBindingsWalk(items *[]postman.CollectionItem, scriptID string) b
 	changed := false
 	for i := range *items {
 		it := &(*items)[i]
-		if it.PreScriptID == scriptID {
-			it.PreScriptID = ""
-			changed = true
+		if it.PreScripts != nil {
+			newPre := make([]string, 0, len(it.PreScripts))
+			for _, sid := range it.PreScripts {
+				if sid != scriptID {
+					newPre = append(newPre, sid)
+				} else {
+					changed = true
+				}
+			}
+			it.PreScripts = newPre
 		}
-		if it.PostScriptID == scriptID {
-			it.PostScriptID = ""
-			changed = true
+		if it.PostScripts != nil {
+			newPost := make([]string, 0, len(it.PostScripts))
+			for _, sid := range it.PostScripts {
+				if sid != scriptID {
+					newPost = append(newPost, sid)
+				} else {
+					changed = true
+				}
+			}
+			it.PostScripts = newPost
 		}
 		if clearScriptBindingsWalk(&it.Item, scriptID) {
 			changed = true

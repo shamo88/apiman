@@ -43,8 +43,8 @@ interface CurlRequest {
     path: string;
     name: string;
     content?: string;
-    pre_script_id?: string;
-    post_script_id?: string;
+    pre_scripts?: string[];
+    post_scripts?: string[];
     method?: string;
     http_url?: string;
     headers?: { key: string; value: string; enabled?: boolean }[];
@@ -115,8 +115,8 @@ interface ApiConfig {
     bodyType: 'none' | 'form-data' | 'x-www-form-urlencoded' | 'json' | 'xml' | 'raw' | 'binary';
     formData: { key: string; value: string; enabled: boolean }[];
     urlencoded: { key: string; value: string; enabled: boolean }[];
-    preScriptId?: string;
-    postScriptId?: string;
+    preScripts: string[];
+    postScripts: string[];
 }
 
 interface ProjectWorkspaceState {
@@ -151,8 +151,8 @@ const createDefaultApiConfig = (): ApiConfig => ({
     bodyType: 'none',
     formData: [],
     urlencoded: [],
-    preScriptId: '',
-    postScriptId: '',
+    preScripts: [],
+    postScripts: [],
 });
 
 const createEmptyWorkspaceState = (): ProjectWorkspaceState => ({
@@ -208,8 +208,8 @@ const apiConfigFromRequest = (r: CurlRequest, fallbackName: string): ApiConfig =
                 enabled: u.enabled !== false,
             }))
             : [],
-        preScriptId: r.pre_script_id || '',
-        postScriptId: r.post_script_id || '',
+        preScripts: r.pre_scripts || [],
+        postScripts: r.post_scripts || [],
     };
 };
 
@@ -412,8 +412,8 @@ const apiConfigFromHttpSpec = (spec: models.HttpRequestSpec, requestName: string
         bodyType,
         formData: mapPair(spec.form_data),
         urlencoded: mapPair(spec.url_encoded),
-        preScriptId: '',
-        postScriptId: '',
+        preScripts: [],
+        postScripts: [],
     };
 };
 
@@ -1139,13 +1139,13 @@ function App() {
                     await loadProjectScriptsData(currentProject.id);
                     setApiConfig((prev) => ({
                         ...prev,
-                        preScriptId: prev.preScriptId === editingScriptId ? '' : prev.preScriptId,
-                        postScriptId: prev.postScriptId === editingScriptId ? '' : prev.postScriptId,
+                        preScripts: prev.preScripts.filter(id => id !== editingScriptId),
+                        postScripts: prev.postScripts.filter(id => id !== editingScriptId),
                     }));
                     setInterfaceApiConfig((prev) => ({
                         ...prev,
-                        preScriptId: prev.preScriptId === editingScriptId ? '' : prev.preScriptId,
-                        postScriptId: prev.postScriptId === editingScriptId ? '' : prev.postScriptId,
+                        preScripts: prev.preScripts.filter(id => id !== editingScriptId),
+                        postScripts: prev.postScripts.filter(id => id !== editingScriptId),
                     }));
                 } catch (error: any) {
                     message.error(`删除脚本失败: ${error?.message || error}`);
@@ -2342,14 +2342,14 @@ function App() {
 
     const hydrateRequestEditor = (request: any, preferredCaseId?: string) => {
         const name = request.name || '';
-        const scriptPre = request.pre_script_id || '';
-        const scriptPost = request.post_script_id || '';
+        const preScripts = request.pre_scripts || [];
+        const postScripts = request.post_scripts || [];
         setCurrentRequest(request as CurlRequest);
         const reqCases = request.cases as models.HttpRequestCase[] | undefined;
         const attachScripts = (cfg: ApiConfig): ApiConfig => ({
             ...cfg,
-            preScriptId: scriptPre,
-            postScriptId: scriptPost,
+            preScripts: [...preScripts],
+            postScripts: [...postScripts],
         });
         if (reqCases && reqCases.length > 0) {
             const rows: RequestCaseState[] = reqCases.map((c) => ({
@@ -2615,13 +2615,13 @@ function App() {
         setResponse(null);
         try {
             let result;
-            if (projectId && (apiConfig.preScriptId || apiConfig.postScriptId)) {
+            if (projectId && (apiConfig.preScripts.length > 0 || apiConfig.postScripts.length > 0)) {
                 result = await ExecuteHTTPRequestWithScripts(
                     projectId,
                     selectedEnvironmentId,
                     toWailsHttpSpec(resolvedConfig),
-                    apiConfig.preScriptId || '',
-                    apiConfig.postScriptId || ''
+                    apiConfig.preScripts,
+                    apiConfig.postScripts
                 );
             } else {
                 result = await ExecuteHTTPRequest(toWailsHttpSpec(resolvedConfig));
@@ -2732,7 +2732,7 @@ function App() {
                     setInterfaceApiConfig(cloneApiConfig({ ...apiConfig, name: currentRequest.name }));
                 }
             }
-            await UpdateRequestScripts(currentRequest.path, apiConfig.preScriptId || '', apiConfig.postScriptId || '');
+            await UpdateRequestScripts(currentRequest.path, apiConfig.preScripts, apiConfig.postScripts);
             message.success('请求已保存');
             setStatus('请求已保存');
 
@@ -3780,15 +3780,73 @@ function App() {
                                                     label: '前置脚本',
                                                     children: (
                                                         <div className="script-binding-panel">
-                                                            <div className="script-binding-row">
-                                                                <span>选择项目脚本</span>
+                                                            <div className="script-list-container">
+                                                                {apiConfig.preScripts.length === 0 && (
+                                                                    <div className="script-list-empty">暂无前置脚本</div>
+                                                                )}
+                                                                {apiConfig.preScripts.map((scriptId, index) => {
+                                                                    const script = projectScripts.find(s => s.id === scriptId);
+                                                                    return (
+                                                                        <div key={scriptId} className="script-list-item">
+                                                                            <span className="script-list-index">{index + 1}</span>
+                                                                            <span className="script-list-name">{script?.name || '未知脚本'}</span>
+                                                                            <div className="script-list-actions">
+                                                                                <Button
+                                                                                    type="text"
+                                                                                    size="small"
+                                                                                    disabled={index === 0}
+                                                                                    onClick={() => {
+                                                                                        if (index > 0) {
+                                                                                            const newScripts = [...apiConfig.preScripts];
+                                                                                            [newScripts[index - 1], newScripts[index]] = [newScripts[index], newScripts[index - 1]];
+                                                                                            setApiConfig({ ...apiConfig, preScripts: newScripts });
+                                                                                        }
+                                                                                    }}
+                                                                                >↑</Button>
+                                                                                <Button
+                                                                                    type="text"
+                                                                                    size="small"
+                                                                                    disabled={index === apiConfig.preScripts.length - 1}
+                                                                                    onClick={() => {
+                                                                                        if (index < apiConfig.preScripts.length - 1) {
+                                                                                            const newScripts = [...apiConfig.preScripts];
+                                                                                            [newScripts[index], newScripts[index + 1]] = [newScripts[index + 1], newScripts[index]];
+                                                                                            setApiConfig({ ...apiConfig, preScripts: newScripts });
+                                                                                        }
+                                                                                    }}
+                                                                                >↓</Button>
+                                                                                <Button
+                                                                                    type="text"
+                                                                                    danger
+                                                                                    size="small"
+                                                                                    onClick={() => {
+                                                                                        setApiConfig({
+                                                                                            ...apiConfig,
+                                                                                            preScripts: apiConfig.preScripts.filter(id => id !== scriptId)
+                                                                                        });
+                                                                                    }}
+                                                                                >×</Button>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
                                                                 <Select
-                                                                    value={apiConfig.preScriptId || '__none__'}
-                                                                    onChange={(value) => setApiConfig({ ...apiConfig, preScriptId: value === '__none__' ? '' : value })}
-                                                                    style={{ width: 320 }}
+                                                                    placeholder="+ 添加前置脚本"
+                                                                    value=""
+                                                                    onChange={(value: string) => {
+                                                                        if (value && !apiConfig.preScripts.includes(value)) {
+                                                                            setApiConfig({
+                                                                                ...apiConfig,
+                                                                                preScripts: [...apiConfig.preScripts, value]
+                                                                            });
+                                                                        }
+                                                                    }}
+                                                                    style={{ width: '100%', marginTop: 8 }}
                                                                     options={[
-                                                                        { label: '不使用前置脚本', value: '__none__' },
-                                                                        ...projectScripts.map(script => ({ label: script.name, value: script.id }))
+                                                                        { label: '+ 添加前置脚本', value: '' },
+                                                                        ...projectScripts
+                                                                            .filter(s => !apiConfig.preScripts.includes(s.id))
+                                                                            .map(s => ({ label: s.name, value: s.id }))
                                                                     ]}
                                                                 />
                                                             </div>
@@ -3800,15 +3858,73 @@ function App() {
                                                     label: '后置脚本',
                                                     children: (
                                                         <div className="script-binding-panel">
-                                                            <div className="script-binding-row">
-                                                                <span>选择项目脚本</span>
+                                                            <div className="script-list-container">
+                                                                {apiConfig.postScripts.length === 0 && (
+                                                                    <div className="script-list-empty">暂无后置脚本</div>
+                                                                )}
+                                                                {apiConfig.postScripts.map((scriptId, index) => {
+                                                                    const script = projectScripts.find(s => s.id === scriptId);
+                                                                    return (
+                                                                        <div key={scriptId} className="script-list-item">
+                                                                            <span className="script-list-index">{index + 1}</span>
+                                                                            <span className="script-list-name">{script?.name || '未知脚本'}</span>
+                                                                            <div className="script-list-actions">
+                                                                                <Button
+                                                                                    type="text"
+                                                                                    size="small"
+                                                                                    disabled={index === 0}
+                                                                                    onClick={() => {
+                                                                                        if (index > 0) {
+                                                                                            const newScripts = [...apiConfig.postScripts];
+                                                                                            [newScripts[index - 1], newScripts[index]] = [newScripts[index], newScripts[index - 1]];
+                                                                                            setApiConfig({ ...apiConfig, postScripts: newScripts });
+                                                                                        }
+                                                                                    }}
+                                                                                >↑</Button>
+                                                                                <Button
+                                                                                    type="text"
+                                                                                    size="small"
+                                                                                    disabled={index === apiConfig.postScripts.length - 1}
+                                                                                    onClick={() => {
+                                                                                        if (index < apiConfig.postScripts.length - 1) {
+                                                                                            const newScripts = [...apiConfig.postScripts];
+                                                                                            [newScripts[index], newScripts[index + 1]] = [newScripts[index + 1], newScripts[index]];
+                                                                                            setApiConfig({ ...apiConfig, postScripts: newScripts });
+                                                                                        }
+                                                                                    }}
+                                                                                >↓</Button>
+                                                                                <Button
+                                                                                    type="text"
+                                                                                    danger
+                                                                                    size="small"
+                                                                                    onClick={() => {
+                                                                                        setApiConfig({
+                                                                                            ...apiConfig,
+                                                                                            postScripts: apiConfig.postScripts.filter(id => id !== scriptId)
+                                                                                        });
+                                                                                    }}
+                                                                                >×</Button>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
                                                                 <Select
-                                                                    value={apiConfig.postScriptId || '__none__'}
-                                                                    onChange={(value) => setApiConfig({ ...apiConfig, postScriptId: value === '__none__' ? '' : value })}
-                                                                    style={{ width: 320 }}
+                                                                    placeholder="+ 添加后置脚本"
+                                                                    value=""
+                                                                    onChange={(value: string) => {
+                                                                        if (value && !apiConfig.postScripts.includes(value)) {
+                                                                            setApiConfig({
+                                                                                ...apiConfig,
+                                                                                postScripts: [...apiConfig.postScripts, value]
+                                                                            });
+                                                                        }
+                                                                    }}
+                                                                    style={{ width: '100%', marginTop: 8 }}
                                                                     options={[
-                                                                        { label: '不使用后置脚本', value: '__none__' },
-                                                                        ...projectScripts.map(script => ({ label: script.name, value: script.id }))
+                                                                        { label: '+ 添加后置脚本', value: '' },
+                                                                        ...projectScripts
+                                                                            .filter(s => !apiConfig.postScripts.includes(s.id))
+                                                                            .map(s => ({ label: s.name, value: s.id }))
                                                                     ]}
                                                                 />
                                                             </div>

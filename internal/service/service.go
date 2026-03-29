@@ -139,8 +139,8 @@ func (s *Service) RenameRequestCase(requestPath, caseID, newName string) (*model
 	return s.ProjectMgr.RenameRequestCase(requestPath, caseID, newName)
 }
 
-func (s *Service) UpdateRequestScripts(requestPath, preScriptID, postScriptID string) error {
-	return s.ProjectMgr.UpdateRequestScripts(requestPath, preScriptID, postScriptID)
+func (s *Service) UpdateRequestScripts(requestPath string, preScripts, postScripts []string) error {
+	return s.ProjectMgr.UpdateRequestScripts(requestPath, preScripts, postScripts)
 }
 
 func (s *Service) DeleteRequest(requestPath string) error {
@@ -255,30 +255,36 @@ func (s *Service) ExecuteHTTPRequestWithScripts(
 	projectID string,
 	environmentID string,
 	spec models.HttpRequestSpec,
-	preScriptID string,
-	postScriptID string,
+	preScriptIDs []string,
+	postScriptIDs []string,
 ) (*models.CurlResponse, error) {
-	var preScriptContent, postScriptContent string
+	var preScriptContents, postScriptContents []string
 
-	if preScriptID != "" {
+	if len(preScriptIDs) > 0 {
 		scripts, err := s.ProjectMgr.ListProjectScripts(projectID)
 		if err == nil {
+			scriptMap := make(map[string]string)
 			for _, scr := range scripts {
-				if scr.ID == preScriptID {
-					preScriptContent = scr.Content
-					break
+				scriptMap[scr.ID] = scr.Content
+			}
+			for _, id := range preScriptIDs {
+				if content, ok := scriptMap[id]; ok {
+					preScriptContents = append(preScriptContents, content)
 				}
 			}
 		}
 	}
 
-	if postScriptID != "" {
+	if len(postScriptIDs) > 0 {
 		scripts, err := s.ProjectMgr.ListProjectScripts(projectID)
 		if err == nil {
+			scriptMap := make(map[string]string)
 			for _, scr := range scripts {
-				if scr.ID == postScriptID {
-					postScriptContent = scr.Content
-					break
+				scriptMap[scr.ID] = scr.Content
+			}
+			for _, id := range postScriptIDs {
+				if content, ok := scriptMap[id]; ok {
+					postScriptContents = append(postScriptContents, content)
 				}
 			}
 		}
@@ -332,8 +338,8 @@ func (s *Service) ExecuteHTTPRequestWithScripts(
 	resp, err := s.ScriptableExecutor.ExecuteWithScripts(
 		&spec,
 		proxyOpts,
-		preScriptContent,
-		postScriptContent,
+		preScriptContents,
+		postScriptContents,
 		globals,
 		environment,
 		globalSetter,
@@ -403,8 +409,8 @@ func (s *Service) ExecuteHTTPRequestWithScriptsInline(
 	resp, err := s.ScriptableExecutor.ExecuteWithScripts(
 		&spec,
 		proxyOpts,
-		preScript,
-		postScript,
+		[]string{preScript},
+		[]string{postScript},
 		globals,
 		environment,
 		globalSetter,

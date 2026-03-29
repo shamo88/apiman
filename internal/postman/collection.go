@@ -19,13 +19,13 @@ type Collection struct {
 }
 
 type CollectionItem struct {
-	ID           string             `json:"id,omitempty"`
-	Name         string             `json:"name"`
-	Item         []CollectionItem   `json:"item,omitempty"`
-	Request      *CollectionRequest `json:"request,omitempty"`
-	Event        []PostmanEvent     `json:"event,omitempty"`
-	PreScriptID  string             `json:"_apiman_pre_script_id,omitempty"`
-	PostScriptID string             `json:"_apiman_post_script_id,omitempty"`
+	ID          string             `json:"id,omitempty"`
+	Name        string             `json:"name"`
+	Item        []CollectionItem   `json:"item,omitempty"`
+	Request     *CollectionRequest `json:"request,omitempty"`
+	Event       []PostmanEvent     `json:"event,omitempty"`
+	PreScripts  []string           `json:"_apiman_pre_scripts,omitempty"`
+	PostScripts []string           `json:"_apiman_post_scripts,omitempty"`
 
 	ApimanCases        []models.HttpRequestCase `json:"_apiman_cases,omitempty"`
 	ApimanActiveCaseID string                   `json:"_apiman_active_case_id,omitempty"`

@@ -90,8 +90,8 @@ type CurlRequest struct {
 	FolderID     string    `json:"folder_id"`
 	Path         string    `json:"path"`
 	Content      string    `json:"content,omitempty"`
-	PreScriptID  string    `json:"pre_script_id,omitempty"`
-	PostScriptID string    `json:"post_script_id,omitempty"`
+	PreScripts   []string  `json:"pre_scripts,omitempty"`
+	PostScripts  []string  `json:"post_scripts,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 

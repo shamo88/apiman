@@ -36,7 +36,7 @@ export function ExecuteCurl(arg1:string):Promise<models.CurlResponse>;
 
 export function ExecuteHTTPRequest(arg1:models.HttpRequestSpec):Promise<models.CurlResponse>;
 
-export function ExecuteHTTPRequestWithScripts(arg1:string,arg2:string,arg3:models.HttpRequestSpec,arg4:string,arg5:string):Promise<models.CurlResponse>;
+export function ExecuteHTTPRequestWithScripts(arg1:string,arg2:string,arg3:models.HttpRequestSpec,arg4:Array<string>,arg5:Array<string>):Promise<models.CurlResponse>;
 
 export function ExecuteHTTPRequestWithScriptsInline(arg1:string,arg2:string,arg3:models.HttpRequestSpec,arg4:string,arg5:string):Promise<models.CurlResponse>;
 
@@ -90,4 +90,4 @@ export function UpdateProjectScript(arg1:string,arg2:string,arg3:string,arg4:str
 
 export function UpdateRequest(arg1:string,arg2:models.HttpRequestSpec,arg3:Array<models.HttpRequestCase>,arg4:string):Promise<void>;
 
-export function UpdateRequestScripts(arg1:string,arg2:string,arg3:string):Promise<void>;
+export function UpdateRequestScripts(arg1:string,arg2:Array<string>,arg3:Array<string>):Promise<void>;

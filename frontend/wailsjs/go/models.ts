@@ -191,8 +191,8 @@ export namespace models {
 	    folder_id: string;
 	    path: string;
 	    content?: string;
-	    pre_script_id?: string;
-	    post_script_id?: string;
+	    pre_scripts?: string[];
+	    post_scripts?: string[];
 	    // Go type: time
 	    created_at: any;
 	    // Go type: time
@@ -221,8 +221,8 @@ export namespace models {
 	        this.folder_id = source["folder_id"];
 	        this.path = source["path"];
 	        this.content = source["content"];
-	        this.pre_script_id = source["pre_script_id"];
-	        this.post_script_id = source["post_script_id"];
+	        this.pre_scripts = source["pre_scripts"];
+	        this.post_scripts = source["post_scripts"];
 	        this.created_at = this.convertValues(source["created_at"], null);
 	        this.updated_at = this.convertValues(source["updated_at"], null);
 	        this.method = source["method"];

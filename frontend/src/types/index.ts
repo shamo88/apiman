@@ -31,8 +31,8 @@ export interface CurlRequest {
     folder_id?: string;
     path: string;
     content?: string;
-    pre_script_id?: string;
-    post_script_id?: string;
+    pre_scripts?: string[];
+    post_scripts?: string[];
     created_at?: string;
     updated_at?: string;
     method?: string;

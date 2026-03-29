@@ -2092,3 +2092,73 @@ body,
 .title-bar-button.maximize .anticon {
     font-size: 12px;
 }
+
+/* Script List Styles */
+.script-list-container {
+    padding: 4px 0;
+}
+
+.script-list-empty {
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 8px 0;
+    text-align: center;
+}
+
+.script-list-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    margin-bottom: 4px;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    gap: 8px;
+    transition: background 0.15s ease;
+}
+
+.script-list-item:hover {
+    background: var(--bg-hover);
+}
+
+.script-list-index {
+    width: 20px;
+    height: 20px;
+    line-height: 20px;
+    text-align: center;
+    background: var(--accent-primary);
+    color: white;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 500;
+    flex-shrink: 0;
+}
+
+.script-list-name {
+    flex: 1;
+    font-size: 13px;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.script-list-actions {
+    display: flex;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.script-list-item:hover .script-list-actions {
+    opacity: 1;
+}
+
+.script-list-actions .ant-btn {
+    padding: 0 4px;
+    height: 24px;
+    width: 24px;
+}
+
+.script-list-actions .ant-btn:disabled {
+    opacity: 0.3;
+}

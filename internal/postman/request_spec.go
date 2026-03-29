@@ -12,12 +12,12 @@ func ItemToCurlRequestModel(projectID string, item *CollectionItem) *models.Curl
 		return nil
 	}
 	cr := &models.CurlRequest{
-		ID:           item.ID,
-		Name:         item.Name,
-		ProjectID:    projectID,
-		Path:         RequestRefPath(projectID, item.ID),
-		PreScriptID:  item.PreScriptID,
-		PostScriptID: item.PostScriptID,
+		ID:          item.ID,
+		Name:        item.Name,
+		ProjectID:   projectID,
+		Path:        RequestRefPath(projectID, item.ID),
+		PreScripts:  item.PreScripts,
+		PostScripts: item.PostScripts,
 	}
 	req := item.Request
 	cr.Method = strings.ToUpper(strings.TrimSpace(req.Method))
