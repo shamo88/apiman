@@ -5,7 +5,6 @@ export namespace config {
 	    remoteUrl?: string;
 	    branch?: string;
 	    authType?: string;
-	    username?: string;
 	    password?: string;
 	    autoSync: boolean;
 	    workDir?: string;
@@ -20,7 +19,6 @@ export namespace config {
 	        this.remoteUrl = source["remoteUrl"];
 	        this.branch = source["branch"];
 	        this.authType = source["authType"];
-	        this.username = source["username"];
 	        this.password = source["password"];
 	        this.autoSync = source["autoSync"];
 	        this.workDir = source["workDir"];

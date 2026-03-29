@@ -264,7 +264,6 @@ type GitSyncConfig struct {
 	RemoteURL string `json:"remoteUrl,omitempty"`
 	Branch    string `json:"branch,omitempty"`
 	AuthType  string `json:"authType,omitempty"` // "password" or "token"
-	Username  string `json:"username,omitempty"`
 	Password  string `json:"password,omitempty"` // obfuscated when authType is "token"
 	AutoSync  bool   `json:"autoSync"`
 	WorkDir   string `json:"workDir,omitempty"` // 当前工作目录路径

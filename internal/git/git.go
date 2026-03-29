@@ -50,11 +50,9 @@ func deobfuscate(input string) string {
 }
 
 // ensureAuth ensures username is not empty when password is provided
-func ensureAuth(username, password string) *http.BasicAuth {
-	if username == "" && password != "" {
-		// For Gitee/GitHub with Access Token, username can be any non-empty value
-		username = "oauth2"
-	}
+func ensureAuth(password string) *http.BasicAuth {
+	// For Gitee/GitHub with Access Token, username is set to "oauth2"
+	username := "oauth2"
 	return &http.BasicAuth{
 		Username: username,
 		Password: password,
@@ -86,7 +84,7 @@ func (g *GitSyncManager) RemoveRepo() error {
 }
 
 // CloneOrPull clones the repository if it doesn't exist, otherwise pulls the latest changes
-func (g *GitSyncManager) CloneOrPull(remoteURL, branch, username, password string) error {
+func (g *GitSyncManager) CloneOrPull(remoteURL, branch, password string) error {
 	log.Printf("[GitSync] CloneOrPull called: repoPath=%s, remoteURL=%s, branch=%s", g.repoPath, remoteURL, branch)
 
 	if err := os.MkdirAll(g.repoPath, 0755); err != nil {
@@ -101,7 +99,7 @@ func (g *GitSyncManager) CloneOrPull(remoteURL, branch, username, password strin
 	if os.IsNotExist(err) {
 		// Clone the repository
 		log.Printf("[GitSync] Repository does not exist, cloning from %s", remoteURL)
-		err = g.cloneRepo(remoteURL, branch, username, password)
+		err = g.cloneRepo(remoteURL, branch, password)
 		if err != nil {
 			errMsg := strings.ToLower(err.Error())
 			log.Printf("[GitSync] Clone failed: %v", err)
@@ -110,7 +108,7 @@ func (g *GitSyncManager) CloneOrPull(remoteURL, branch, username, password strin
 				strings.Contains(errMsg, "repository not found") ||
 				strings.Contains(errMsg, "couldn't find remote ref") {
 				log.Printf("[GitSync] Remote repo is empty or not found, creating new local repo")
-				return g.createNewRepo(remoteURL, branch, username, password)
+				return g.createNewRepo(remoteURL, branch, password)
 			}
 			return err
 		}
@@ -119,12 +117,12 @@ func (g *GitSyncManager) CloneOrPull(remoteURL, branch, username, password strin
 
 	log.Printf("[GitSync] Repository exists, pulling latest changes")
 	// Pull latest changes
-	return g.pullRepo(branch, username, password)
+	return g.pullRepo(branch, password)
 }
 
-func (g *GitSyncManager) cloneRepo(remoteURL, branch, username, password string) error {
-	log.Printf("[GitSync] cloneRepo: URL=%s, branch=%s, username='%s', password='%s'", remoteURL, branch, username, strings.Repeat("*", len(password)))
-	auth := ensureAuth(username, password)
+func (g *GitSyncManager) cloneRepo(remoteURL, branch, password string) error {
+	log.Printf("[GitSync] cloneRepo: URL=%s, branch=%s, password='%s'", remoteURL, branch, strings.Repeat("*", len(password)))
+	auth := ensureAuth(password)
 
 	_, err := git.PlainClone(g.repoPath, false, &git.CloneOptions{
 		URL:           remoteURL,
@@ -141,7 +139,7 @@ func (g *GitSyncManager) cloneRepo(remoteURL, branch, username, password string)
 	return nil
 }
 
-func (g *GitSyncManager) createNewRepo(remoteURL, branch, username, password string) error {
+func (g *GitSyncManager) createNewRepo(remoteURL, branch, password string) error {
 	log.Printf("[GitSync] createNewRepo: URL=%s, branch=%s", remoteURL, branch)
 
 	// Remove the existing (broken) directory if any
@@ -200,7 +198,7 @@ func (g *GitSyncManager) createNewRepo(remoteURL, branch, username, password str
 	}
 
 	// Push to set upstream
-	auth := ensureAuth(username, password)
+	auth := ensureAuth(password)
 
 	err = repo.Push(&git.PushOptions{
 		RemoteName: "origin",
@@ -216,7 +214,7 @@ func (g *GitSyncManager) createNewRepo(remoteURL, branch, username, password str
 	return nil
 }
 
-func (g *GitSyncManager) pullRepo(branch, username, password string) error {
+func (g *GitSyncManager) pullRepo(branch, password string) error {
 	repo, err := git.PlainOpen(g.repoPath)
 	if err != nil {
 		return fmt.Errorf("failed to open repository: %w", err)
@@ -227,7 +225,7 @@ func (g *GitSyncManager) pullRepo(branch, username, password string) error {
 		return fmt.Errorf("failed to get worktree: %w", err)
 	}
 
-	auth := ensureAuth(username, password)
+	auth := ensureAuth(password)
 
 	pullOpts := &git.PullOptions{
 		RemoteName:     "origin",
@@ -244,7 +242,7 @@ func (g *GitSyncManager) pullRepo(branch, username, password string) error {
 		if strings.Contains(errMsg, "remote repository is empty") ||
 			strings.Contains(errMsg, "repository is empty") {
 			log.Printf("[GitSync] Remote is empty, pushing local content instead")
-			return g.pushRepo(branch, username, password)
+			return g.pushRepo(branch, password)
 		}
 		if err != git.NoErrAlreadyUpToDate {
 			return fmt.Errorf("failed to pull: %w", err)
@@ -253,8 +251,8 @@ func (g *GitSyncManager) pullRepo(branch, username, password string) error {
 	return nil
 }
 
-func (g *GitSyncManager) pushRepo(branch, username, password string) error {
-	auth := ensureAuth(username, password)
+func (g *GitSyncManager) pushRepo(branch, password string) error {
+	auth := ensureAuth(password)
 
 	// First try with go-git
 	repo, err := git.PlainOpen(g.repoPath)
@@ -278,22 +276,22 @@ func (g *GitSyncManager) pushRepo(branch, username, password string) error {
 	// If there's nothing to push, create an initial commit first
 	if strings.Contains(errMsg, "already up-to-date") || strings.Contains(errMsg, "nothing to push") {
 		log.Printf("[GitSync] Nothing to push, creating initial commit")
-		if initErr := g.createInitialCommit(branch, username, password); initErr != nil {
+		if initErr := g.createInitialCommit(branch, password); initErr != nil {
 			return fmt.Errorf("failed to create initial commit: %w", initErr)
 		}
 		// Push using git command after commit
 		log.Printf("[GitSync] Pushing after initial commit using git command")
-		return g.gitPush(branch, username, password)
+		return g.gitPush(branch, password)
 	}
 
 	// Try git command as fallback
 	log.Printf("[GitSync] Trying git command push as fallback")
-	return g.gitPush(branch, username, password)
+	return g.gitPush(branch, password)
 }
 
-func (g *GitSyncManager) gitPush(branch, username, password string) error {
+func (g *GitSyncManager) gitPush(branch, password string) error {
 	// Use ensureAuth to get proper username (oauth2 if token auth)
-	auth := ensureAuth(username, password)
+	auth := ensureAuth(password)
 	actualUsername := auth.Username
 	actualPassword := auth.Password
 
@@ -378,7 +376,7 @@ func maskURL(url string) string {
 	return url
 }
 
-func (g *GitSyncManager) createInitialCommit(branch, username, password string) error {
+func (g *GitSyncManager) createInitialCommit(branch, password string) error {
 	// Create a README file for initial commit
 	readmePath := filepath.Join(g.repoPath, "README.md")
 	log.Printf("[GitSync] README path: %s", readmePath)
@@ -426,7 +424,7 @@ func (g *GitSyncManager) createInitialCommit(branch, username, password string) 
 }
 
 // CommitAndPush commits changes and pushes to remote
-func (g *GitSyncManager) CommitAndPush(files []string, message, branch, username, password string) error {
+func (g *GitSyncManager) CommitAndPush(files []string, message, branch, password string) error {
 	log.Printf("[GitSync] CommitAndPush: files=%v, message=%s, branch=%s", files, message, branch)
 	repo, err := git.PlainOpen(g.repoPath)
 	if err != nil {
@@ -480,7 +478,7 @@ func (g *GitSyncManager) CommitAndPush(files []string, message, branch, username
 	log.Printf("[GitSync] Committed: %s", commit.String())
 
 	// Push
-	auth := ensureAuth(username, password)
+	auth := ensureAuth(password)
 
 	// First check current branch using Head
 	head, err := repo.Head()
@@ -504,7 +502,7 @@ func (g *GitSyncManager) CommitAndPush(files []string, message, branch, username
 }
 
 // SyncProject syncs a single project to the repository
-func (g *GitSyncManager) SyncProject(projectPath, projectID, message, branch, username, password string) error {
+func (g *GitSyncManager) SyncProject(projectPath, projectID, message, branch, password string) error {
 	log.Printf("[GitSync] SyncProject: projectPath=%s, projectID=%s, repoPath=%s", projectPath, projectID, g.repoPath)
 
 	// Compute relative path from repo root (e.g., "projects/slug__uuid")
@@ -538,14 +536,14 @@ func (g *GitSyncManager) SyncProject(projectPath, projectID, message, branch, us
 	if message == "" {
 		message = fmt.Sprintf("Sync project %s at %s", projectID, time.Now().Format(time.RFC3339))
 	}
-	return g.CommitAndPush(syncFiles, message, branch, username, password)
+	return g.CommitAndPush(syncFiles, message, branch, password)
 }
 
 // SyncAllProjects syncs all projects to the repository
-func (g *GitSyncManager) SyncAllProjects(projectsDir, remoteURL, branch, username, password string) error {
+func (g *GitSyncManager) SyncAllProjects(projectsDir, remoteURL, branch, password string) error {
 	// Commit and push all changes (projects are already in the git repo directory)
 	commitMsg := fmt.Sprintf("Sync all projects at %s", time.Now().Format(time.RFC3339))
-	return g.CommitAndPush([]string{"projects"}, commitMsg, branch, username, password)
+	return g.CommitAndPush([]string{"projects"}, commitMsg, branch, password)
 }
 
 // HasLocalRepo checks if the local repository exists
@@ -554,13 +552,6 @@ func (g *GitSyncManager) HasLocalRepo() bool {
 	return err == nil
 }
 
-// GetAuth returns the auth credentials for Git operations
-func GetAuth(username, password string) *http.BasicAuth {
-	return &http.BasicAuth{
-		Username: username,
-		Password: password,
-	}
-}
 
 // extractProjectID extracts the UUID from a directory name like "项目名__uuid" or just "uuid"
 func extractProjectID(dirName string) string {

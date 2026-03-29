@@ -227,8 +227,8 @@ func (a *App) InitProjectsDir() error {
 	return a.service.InitProjectsDir()
 }
 
-func (a *App) EnableGitSync(remoteURL, branch, username, password string) error {
-	return a.service.EnableGitSync(remoteURL, branch, username, password)
+func (a *App) EnableGitSync(remoteURL, branch, password string) error {
+	return a.service.EnableGitSync(remoteURL, branch, password)
 }
 
 func (a *App) DisableGitSync() error {

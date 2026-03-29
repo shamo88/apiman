@@ -339,6 +339,12 @@ func (s *Service) ImportPostmanCollection(jsonData string) (*models.Project, err
 		return nil, err
 	}
 
+	// Ensure unique project name
+	projectName, err = s.PostmanImporter.EnsureUniqueProjectName(projectName)
+	if err != nil {
+		return nil, err
+	}
+
 	// Create project using ProjectManager (which uses the active projectsDir)
 	project, err := s.ProjectMgr.CreateProject(projectName)
 	if err != nil {
@@ -626,7 +632,7 @@ func (s *Service) SyncProjectToGit(projectID string) error {
 		return err
 	}
 
-	return s.GitSyncMgr.SyncProject(projectPath, projectID, "", appCfg.GitSync.Branch, appCfg.GitSync.Username, appCfg.GitSync.Password)
+	return s.GitSyncMgr.SyncProject(projectPath, projectID, "", appCfg.GitSync.Branch, appCfg.GitSync.Password)
 }
 
 func (s *Service) shouldAutoSync() bool {
@@ -671,7 +677,7 @@ func (s *Service) SyncAllProjectsToGit() error {
 		return nil
 	}
 
-	return s.GitSyncMgr.SyncAllProjects(s.ProjectMgr.GetProjectsDir(), appCfg.GitSync.RemoteURL, appCfg.GitSync.Branch, appCfg.GitSync.Username, appCfg.GitSync.Password)
+	return s.GitSyncMgr.SyncAllProjects(s.ProjectMgr.GetProjectsDir(), appCfg.GitSync.RemoteURL, appCfg.GitSync.Branch, appCfg.GitSync.Password)
 }
 
 // InitGitRepo initializes the local Git repository
@@ -684,7 +690,7 @@ func (s *Service) InitGitRepo() error {
 		return nil
 	}
 
-	return s.GitSyncMgr.CloneOrPull(appCfg.GitSync.RemoteURL, appCfg.GitSync.Branch, appCfg.GitSync.Username, appCfg.GitSync.Password)
+	return s.GitSyncMgr.CloneOrPull(appCfg.GitSync.RemoteURL, appCfg.GitSync.Branch, appCfg.GitSync.Password)
 }
 
 // InitProjectsDir 根据配置决定工作目录，App 启动时调用
@@ -699,7 +705,7 @@ func (s *Service) InitProjectsDir() error {
 	if appCfg.GitSync.Enabled && appCfg.GitSync.RemoteURL != "" {
 		// Git Sync 模式：确保 git-sync 目录存在（clone 或 pull）
 		if err := s.GitSyncMgr.CloneOrPull(appCfg.GitSync.RemoteURL, appCfg.GitSync.Branch,
-			appCfg.GitSync.Username, appCfg.GitSync.Password); err != nil {
+			appCfg.GitSync.Password); err != nil {
 			// 如果拉取失败，切换到本地模式
 			s.ProjectMgr.SetProjectsDir(s.ConfigManager.GetProjectsDir())
 			return err
@@ -717,9 +723,9 @@ func (s *Service) InitProjectsDir() error {
 }
 
 // EnableGitSync 启用 Git Sync 功能
-func (s *Service) EnableGitSync(remoteURL, branch, username, password string) error {
+func (s *Service) EnableGitSync(remoteURL, branch, password string) error {
 	// 1. Clone 远程仓库到 git-sync
-	if err := s.GitSyncMgr.CloneOrPull(remoteURL, branch, username, password); err != nil {
+	if err := s.GitSyncMgr.CloneOrPull(remoteURL, branch, password); err != nil {
 		return err
 	}
 
@@ -731,7 +737,6 @@ func (s *Service) EnableGitSync(remoteURL, branch, username, password string) er
 	appCfg.GitSync.Enabled = true
 	appCfg.GitSync.RemoteURL = remoteURL
 	appCfg.GitSync.Branch = branch
-	appCfg.GitSync.Username = username
 	appCfg.GitSync.Password = password
 	if err := s.ConfigManager.SaveAppConfig(appCfg); err != nil {
 		return err

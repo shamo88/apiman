@@ -91,10 +91,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                     enabled: config.gitSync?.enabled ?? false,
                     remoteUrl: config.gitSync?.remoteUrl || '',
                     branch: config.gitSync?.branch || 'main',
-                    authType: config.gitSync?.authType || 'token',
-                    username: config.gitSync?.username || '',
                     password: config.gitSync?.password || '',
-                    autoSync: config.gitSync?.autoSync ?? true,
                 },
             });
             setSettingsVisible(true);
@@ -129,8 +126,6 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                     enabled: Boolean(values?.gitSync?.enabled),
                     remoteUrl: values?.gitSync?.remoteUrl || '',
                     branch: values?.gitSync?.branch || 'main',
-                    authType: values?.gitSync?.authType || 'token',
-                    username: values?.gitSync?.username || '',
                     password: values?.gitSync?.password || '',
                 },
             });
@@ -143,7 +138,6 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                 await EnableGitSync(
                     values?.gitSync?.remoteUrl || '',
                     values?.gitSync?.branch || 'main',
-                    values?.gitSync?.username || '',
                     values?.gitSync?.password || ''
                 );
             } else if (wasGitSyncEnabled && !newGitSyncEnabled) {
@@ -468,8 +462,6 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                                             enabled: false,
                                             remoteUrl: '',
                                             branch: 'main',
-                                            authType: 'token',
-                                            username: '',
                                             password: '',
                                         }
                                     }}
@@ -506,52 +498,13 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                                                     </td>
                                                 </tr>
                                                 <tr>
-                                                    <td style={{ padding: '8px 12px', color: '#666', fontWeight: 500, borderBottom: '1px solid #f0f0f0' }}>认证方式</td>
+                                                    <td style={{ padding: '8px 12px', color: '#666', fontWeight: 500, borderBottom: '1px solid #f0f0f0' }}>Access Token</td>
                                                     <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
-                                                        <Form.Item name={['gitSync', 'authType']} style={{ marginBottom: 0 }}>
-                                                            <Select
-                                                                options={[
-                                                                    { label: 'Access Token（推荐）', value: 'token' },
-                                                                    { label: '用户名 + 密码', value: 'password' },
-                                                                ]}
-                                                            />
+                                                        <Form.Item name={['gitSync', 'password']} style={{ marginBottom: 0 }}>
+                                                            <Input type="password" placeholder="粘贴你的 Access Token" />
                                                         </Form.Item>
                                                     </td>
                                                 </tr>
-                                                <Form.Item noStyle shouldUpdate={(prev, curr) => prev.gitSync?.authType !== curr.gitSync?.authType}>
-                                                    {({ getFieldValue }) => {
-                                                        const authType = getFieldValue(['gitSync', 'authType']);
-                                                        return authType === 'token' ? (
-                                                            <tr>
-                                                                <td style={{ padding: '8px 12px', color: '#666', fontWeight: 500, borderBottom: '1px solid #f0f0f0' }}>Access Token</td>
-                                                                <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
-                                                                    <Form.Item name={['gitSync', 'password']} style={{ marginBottom: 0 }}>
-                                                                        <Input type="password" placeholder="粘贴你的 Access Token" />
-                                                                    </Form.Item>
-                                                                </td>
-                                                            </tr>
-                                                        ) : (
-                                                            <>
-                                                                <tr>
-                                                                    <td style={{ padding: '8px 12px', color: '#666', fontWeight: 500, borderBottom: '1px solid #f0f0f0' }}>用户名</td>
-                                                                    <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
-                                                                        <Form.Item name={['gitSync', 'username']} style={{ marginBottom: 0 }}>
-                                                                            <Input placeholder="Gitee 用户名" />
-                                                                        </Form.Item>
-                                                                    </td>
-                                                                </tr>
-                                                                <tr>
-                                                                    <td style={{ padding: '8px 12px', color: '#666', fontWeight: 500 }}>密码</td>
-                                                                    <td style={{ padding: '8px 12px' }}>
-                                                                        <Form.Item name={['gitSync', 'password']} style={{ marginBottom: 0 }}>
-                                                                            <Input.Password placeholder="密码" />
-                                                                        </Form.Item>
-                                                                    </td>
-                                                                </tr>
-                                                            </>
-                                                        );
-                                                    }}
-                                                </Form.Item>
                                             </tbody>
                                         </table>
                                     </div>

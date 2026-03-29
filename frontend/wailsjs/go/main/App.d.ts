@@ -34,7 +34,7 @@ export function DisableGitSync():Promise<void>;
 
 export function DuplicateRequestCase(arg1:string,arg2:string):Promise<models.CurlRequest>;
 
-export function EnableGitSync(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+export function EnableGitSync(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function ExecuteCurl(arg1:string):Promise<models.CurlResponse>;
 

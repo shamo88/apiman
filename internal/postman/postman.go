@@ -82,7 +82,7 @@ func (pi *PostmanImporter) ImportCollection(jsonData string) (*models.Project, e
 	if projectName == "" {
 		projectName = "Imported from Postman"
 	}
-	projectName, err := pi.ensureUniqueProjectName(projectName)
+	projectName, err := pi.EnsureUniqueProjectName(projectName)
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +263,7 @@ func (pi *PostmanImporter) createProject(name string) (*models.Project, string, 
 	return project, projectPath, nil
 }
 
-func (pi *PostmanImporter) ensureUniqueProjectName(baseName string) (string, error) {
+func (pi *PostmanImporter) EnsureUniqueProjectName(baseName string) (string, error) {
 	baseName = strings.TrimSpace(baseName)
 	if baseName == "" {
 		baseName = "Imported from Postman"
@@ -288,7 +288,7 @@ func (pi *PostmanImporter) ensureUniqueProjectName(baseName string) (string, err
 
 func (pi *PostmanImporter) loadExistingProjectNames() (map[string]struct{}, error) {
 	result := make(map[string]struct{})
-	projectsDir := pi.configManager.GetProjectsDir()
+	projectsDir := pi.configManager.GetWorkDir()
 	entries, err := os.ReadDir(projectsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
