@@ -276,7 +276,8 @@ type AppConfig struct {
 }
 
 type UIConfig struct {
-	EnableListAnimation bool `json:"enableListAnimation"`
+	EnableListAnimation bool   `json:"enableListAnimation"`
+	Theme               string `json:"theme"`
 }
 
 func (c *ConfigManager) LoadAppConfig() (*AppConfig, error) {

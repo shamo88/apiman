@@ -794,6 +794,7 @@ function App() {
     const [searchVersion, setSearchVersion] = useState(0);
     const [projectWorkspaceStates, setProjectWorkspaceStates] = useState<Record<string, ProjectWorkspaceState>>({});
     const [listAnimationEnabled, setListAnimationEnabled] = useState(false);
+    const [appTheme, setAppTheme] = useState('light');
     const [forceListAnimation, setForceListAnimation] = useState(false);
     const [projectSearchKeyword, setProjectSearchKeyword] = useState('');
     const [projectGroups, setProjectGroups] = useState<string[]>([]);
@@ -1832,6 +1833,7 @@ function App() {
         try {
             const cfg = await LoadAppConfig() as any;
             setListAnimationEnabled(Boolean(cfg?.ui?.enableListAnimation));
+            setAppTheme(cfg?.ui?.theme || 'light');
         } catch (error) {
             console.error('Failed to load UI config:', error);
         }
@@ -3013,10 +3015,11 @@ function App() {
     ];
 
     return (
-        <div className="app-container">
+        <div className={`app-container ${appTheme === 'dark' ? 'theme-dark' : ''}`}>
             <TitleBar
                 activeTab={activeTab}
                 onListAnimationChange={setListAnimationEnabled}
+                onThemeChange={setAppTheme}
                 onSettingsSave={loadProjects}
                 onTabChange={(key) => {
                     switchProjectTab(key);
@@ -3553,7 +3556,7 @@ function App() {
                                                 <CodeMirror
                                                     value={scriptFormContent}
                                                     height="100%"
-                                                    theme="light"
+                                                    theme={appTheme === 'dark' ? 'dark' : 'light'}
                                                     extensions={[javascript()]}
                                                     onChange={(value) => setScriptFormContent(value)}
                                                 />

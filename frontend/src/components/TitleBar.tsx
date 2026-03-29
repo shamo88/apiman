@@ -12,6 +12,7 @@ interface TitleBarProps {
     onTabEdit?: (targetKey: React.MouseEvent | React.KeyboardEvent | string, action: 'add' | 'remove') => void;
     tabItems?: any[];
     onListAnimationChange?: (enabled: boolean) => void;
+    onThemeChange?: (theme: string) => void;
     onSettingsSave?: () => void;
 }
 
@@ -40,6 +41,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
     onTabEdit,
     tabItems,
     onListAnimationChange,
+    onThemeChange,
     onSettingsSave
 }) => {
     const [settingsVisible, setSettingsVisible] = React.useState(false);
@@ -86,6 +88,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                 },
                 ui: {
                     enableListAnimation: config.ui?.enableListAnimation ?? false,
+                    theme: config.ui?.theme ?? 'light',
                 },
                 gitSync: {
                     enabled: config.gitSync?.enabled ?? false,
@@ -102,15 +105,25 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 
     const handleSaveSettings = async () => {
         try {
-            // 获取当前配置，比较 git sync 状态变化
+            // 获取当前配置
             const currentConfig = await LoadAppConfig();
             const wasGitSyncEnabled = currentConfig?.gitSync?.enabled && !!currentConfig?.gitSync?.remoteUrl;
 
-            const values = await form.validateFields();
-            const newGitSyncEnabled = Boolean(values?.gitSync?.enabled) && !!values?.gitSync?.remoteUrl;
+            // 只验证当前激活的 Tab 的字段
+            let fieldsToValidate: string[] = [];
+            if (activeSettingsTab === 'general') {
+                fieldsToValidate = ['ui'];
+            } else if (activeSettingsTab === 'proxy') {
+                fieldsToValidate = ['proxy'];
+            } else if (activeSettingsTab === 'git') {
+                fieldsToValidate = ['gitSync'];
+            }
 
+            const values = await form.validateFields(fieldsToValidate);
+
+            // 以 currentConfig 为基础，只用表单值覆盖当前 Tab 的部分
             const configToSave = new wailsConfig.AppConfig({
-                proxy: {
+                proxy: activeSettingsTab === 'proxy' ? {
                     enabled: Boolean(values?.proxy?.enabled),
                     httpHost: values?.proxy?.httpHost || '',
                     httpPort: parsePort(values?.proxy?.httpPort),
@@ -118,37 +131,54 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                     httpsPort: parsePort(values?.proxy?.httpsPort),
                     socks5Host: values?.proxy?.socks5Host || '',
                     socks5Port: parsePort(values?.proxy?.socks5Port),
+                } : {
+                    enabled: currentConfig?.proxy?.enabled ?? false,
+                    httpHost: currentConfig?.proxy?.httpHost || '',
+                    httpPort: parsePort(currentConfig?.proxy?.httpPort),
+                    httpsHost: currentConfig?.proxy?.httpsHost || '',
+                    httpsPort: parsePort(currentConfig?.proxy?.httpsPort),
+                    socks5Host: currentConfig?.proxy?.socks5Host || '',
+                    socks5Port: parsePort(currentConfig?.proxy?.socks5Port),
                 },
-                ui: {
+                ui: activeSettingsTab === 'general' ? {
                     enableListAnimation: Boolean(values?.ui?.enableListAnimation),
+                    theme: values?.ui?.theme || 'light',
+                } : {
+                    enableListAnimation: currentConfig?.ui?.enableListAnimation ?? false,
+                    theme: currentConfig?.ui?.theme || 'light',
                 },
-                gitSync: {
+                gitSync: activeSettingsTab === 'git' ? {
                     enabled: Boolean(values?.gitSync?.enabled),
                     remoteUrl: values?.gitSync?.remoteUrl || '',
                     branch: values?.gitSync?.branch || 'main',
                     password: values?.gitSync?.password || '',
+                } : {
+                    enabled: currentConfig?.gitSync?.enabled ?? false,
+                    remoteUrl: currentConfig?.gitSync?.remoteUrl || '',
+                    branch: currentConfig?.gitSync?.branch || 'main',
+                    password: currentConfig?.gitSync?.password || '',
                 },
             });
+
+            const newGitSyncEnabled = configToSave.gitSync.enabled && !!configToSave.gitSync.remoteUrl;
 
             await SaveAppConfig(configToSave);
 
             // 处理 git sync 状态切换
             if (!wasGitSyncEnabled && newGitSyncEnabled) {
-                // 从禁用变为启用
                 await EnableGitSync(
                     values?.gitSync?.remoteUrl || '',
                     values?.gitSync?.branch || 'main',
                     values?.gitSync?.password || ''
                 );
             } else if (wasGitSyncEnabled && !newGitSyncEnabled) {
-                // 从启用变为禁用
                 await DisableGitSync();
             }
 
-            // 重新初始化项目目录
             await InitProjectsDir();
 
-            onListAnimationChange?.(Boolean(values?.ui?.enableListAnimation));
+            onListAnimationChange?.(configToSave.ui.enableListAnimation);
+            onThemeChange?.(configToSave.ui.theme);
             onSettingsSave?.();
             console.log('Config saved successfully');
             setSettingsVisible(false);
@@ -319,6 +349,20 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                                         style={{ marginTop: '16px' }}
                                     >
                                         <Switch />
+                                    </Form.Item>
+
+                                    <Form.Item
+                                        name={['ui', 'theme']}
+                                        label="主题"
+                                        style={{ marginTop: '16px' }}
+                                    >
+                                        <Select
+                                            options={[
+                                                { value: 'light', label: '浅色' },
+                                                { value: 'dark', label: '深色' },
+                                            ]}
+                                            style={{ width: 120 }}
+                                        />
                                     </Form.Item>
 
                                     <Divider style={{ marginTop: 24 }} />

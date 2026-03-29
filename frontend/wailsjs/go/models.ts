@@ -26,6 +26,7 @@ export namespace config {
 	}
 	export class UIConfig {
 	    enableListAnimation: boolean;
+	    theme: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new UIConfig(source);
@@ -34,6 +35,7 @@ export namespace config {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.enableListAnimation = source["enableListAnimation"];
+	        this.theme = source["theme"];
 	    }
 	}
 	export class ProxyConfig {
