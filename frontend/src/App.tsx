@@ -1,4 +1,4 @@
-import { ApiOutlined, CloseOutlined, CopyOutlined, DownOutlined, EditOutlined, ExperimentOutlined, FileOutlined, FolderOutlined, HomeOutlined, ImportOutlined, MoreOutlined, PlusOutlined, ProjectOutlined, QuestionCircleOutlined, RightOutlined, SearchOutlined } from '@ant-design/icons';
+import { ApiOutlined, CloseOutlined, CopyOutlined, DownOutlined, EditOutlined, ExperimentOutlined, FileOutlined, FolderOutlined, HomeOutlined, ImportOutlined, MoreOutlined, PlusOutlined, ProjectOutlined, QuestionCircleOutlined, RightOutlined, SearchOutlined, EnvironmentOutlined, CodeOutlined } from '@ant-design/icons';
 import { javascript } from '@codemirror/lang-javascript';
 import CodeMirror from '@uiw/react-codemirror';
 import type { UploadProps } from 'antd';
@@ -3306,6 +3306,9 @@ function App() {
                                                     className={`environment-list-item ${editingEnvironmentId === env.id ? 'active' : ''}`}
                                                     onClick={() => openEnvironmentEditor(env)}
                                                 >
+                                                    <span className="environment-list-item-icon">
+                                                        <EnvironmentOutlined />
+                                                    </span>
                                                     <span className="environment-list-item-name">{env.name}</span>
                                                 </button>
                                             ))}
@@ -3325,6 +3328,9 @@ function App() {
                                                     className={`environment-list-item ${editingScriptId === script.id ? 'active' : ''}`}
                                                     onClick={() => handleSelectScriptEditor(script)}
                                                 >
+                                                    <span className="environment-list-item-icon">
+                                                        <CodeOutlined />
+                                                    </span>
                                                     <span className="environment-list-item-name">{script.name}</span>
                                                 </button>
                                             ))}

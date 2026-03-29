@@ -144,6 +144,27 @@ func convertImportRequest(req *importReq) *CollectionRequest {
 	if cr.Method == "" {
 		cr.Method = "GET"
 	}
+
+	// 提取URL对象中的query参数
+	if urlObj, ok := req.URL.(map[string]interface{}); ok {
+		if queryArr, ok := urlObj["query"].([]interface{}); ok {
+			for _, q := range queryArr {
+				if qMap, ok := q.(map[string]interface{}); ok {
+					key, _ := qMap["key"].(string)
+					value, _ := qMap["value"].(string)
+					disabled, _ := qMap["disabled"].(bool)
+					if strings.TrimSpace(key) != "" {
+						cr.URL.Query = append(cr.URL.Query, PostmanQueryParam{
+							Key:      key,
+							Value:    value,
+							Disabled: disabled,
+						})
+					}
+				}
+			}
+		}
+	}
+
 	for _, h := range req.Header {
 		if strings.TrimSpace(h.Key) == "" {
 			continue
