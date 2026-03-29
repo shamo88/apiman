@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -11,6 +12,35 @@ import (
 
 	"github.com/google/uuid"
 )
+
+// Simple obfuscation key - not true encryption but better than plain text
+var obfuscationKey = []byte("apiman-git-sync-key-2024")
+
+func obfuscate(input string) string {
+	if input == "" {
+		return ""
+	}
+	result := make([]byte, len(input))
+	for i, c := range input {
+		result[i] = byte(c) ^ obfuscationKey[i%len(obfuscationKey)]
+	}
+	return base64.StdEncoding.EncodeToString(result)
+}
+
+func deobfuscate(input string) string {
+	if input == "" {
+		return ""
+	}
+	data, err := base64.StdEncoding.DecodeString(input)
+	if err != nil {
+		return input // Not obfuscated, return as-is
+	}
+	result := make([]byte, len(data))
+	for i, c := range data {
+		result[i] = c ^ obfuscationKey[i%len(obfuscationKey)]
+	}
+	return string(result)
+}
 
 type ConfigManager struct {
 	configDir string
@@ -210,9 +240,20 @@ type ProxyConfig struct {
 	SOCKS5Port int    `json:"socks5Port,omitempty"`
 }
 
+type GitSyncConfig struct {
+	Enabled   bool   `json:"enabled"`
+	RemoteURL string `json:"remoteUrl,omitempty"`
+	Branch    string `json:"branch,omitempty"`
+	AuthType  string `json:"authType,omitempty"` // "password" or "token"
+	Username  string `json:"username,omitempty"`
+	Password  string `json:"password,omitempty"` // obfuscated when authType is "token"
+	AutoSync  bool   `json:"autoSync"`
+}
+
 type AppConfig struct {
-	Proxy ProxyConfig `json:"proxy"`
-	UI    UIConfig    `json:"ui"`
+	Proxy    ProxyConfig    `json:"proxy"`
+	UI       UIConfig      `json:"ui"`
+	GitSync  GitSyncConfig `json:"gitSync"`
 }
 
 type UIConfig struct {
@@ -231,6 +272,10 @@ func (c *ConfigManager) LoadAppConfig() (*AppConfig, error) {
 				UI: UIConfig{
 					EnableListAnimation: false,
 				},
+				GitSync: GitSyncConfig{
+					Branch:   "main",
+					AutoSync: true,
+				},
 			}, nil
 		}
 		return nil, err
@@ -245,6 +290,14 @@ func (c *ConfigManager) LoadAppConfig() (*AppConfig, error) {
 	if !config.UI.EnableListAnimation {
 		config.UI.EnableListAnimation = false
 	}
+	if config.GitSync.Branch == "" {
+		config.GitSync.Branch = "main"
+	}
+
+	// Deobfuscate password/token when loading
+	if config.GitSync.AuthType == "token" && config.GitSync.Password != "" {
+		config.GitSync.Password = deobfuscate(config.GitSync.Password)
+	}
 
 	return &config, nil
 }
@@ -253,8 +306,14 @@ func (c *ConfigManager) SaveAppConfig(config *AppConfig) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	// Obfuscate password/token when saving
+	configToSave := *config
+	if configToSave.GitSync.AuthType == "token" && configToSave.GitSync.Password != "" {
+		configToSave.GitSync.Password = obfuscate(configToSave.GitSync.Password)
+	}
+
 	configFile := filepath.Join(c.configDir, "config.json")
-	data, err := json.MarshalIndent(config, "", "  ")
+	data, err := json.MarshalIndent(&configToSave, "", "  ")
 	if err != nil {
 		return err
 	}

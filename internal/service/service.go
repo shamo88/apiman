@@ -3,6 +3,7 @@ package service
 import (
 	"apiman/internal/config"
 	"apiman/internal/curl"
+	"apiman/internal/git"
 	"apiman/internal/models"
 	"apiman/internal/postman"
 	"apiman/internal/project"
@@ -17,6 +18,7 @@ type Service struct {
 	PostmanImporter     *postman.PostmanImporter
 	ScriptableExecutor  *curl.ScriptableExecutor
 	GlobalVarStore      *script.GlobalVariableStore
+	GitSyncMgr          *git.GitSyncManager
 }
 
 func NewService() *Service {
@@ -28,6 +30,7 @@ func NewService() *Service {
 
 	globals, _ := cfgMgr.GetGlobalVariables()
 	globalVarStore := script.NewGlobalVariableStore(globals)
+	gitSyncMgr := git.NewGitSyncManager(cfgMgr.GetConfigDir())
 
 	return &Service{
 		ConfigManager:      cfgMgr,
@@ -36,6 +39,7 @@ func NewService() *Service {
 		PostmanImporter:    postmanImp,
 		ScriptableExecutor: scriptExec,
 		GlobalVarStore:     globalVarStore,
+		GitSyncMgr:         gitSyncMgr,
 	}
 }
 
@@ -442,4 +446,48 @@ func (s *Service) ExecuteHTTPRequestWithScriptsInline(
 	}
 
 	return resp, nil
+}
+
+// SyncProjectToGit syncs a single project to Git repository
+func (s *Service) SyncProjectToGit(projectID string) error {
+	appCfg, err := s.ConfigManager.LoadAppConfig()
+	if err != nil || appCfg == nil {
+		return nil
+	}
+	if !appCfg.GitSync.Enabled || appCfg.GitSync.RemoteURL == "" {
+		return nil
+	}
+
+	projectPath, err := s.ProjectMgr.ProjectPathByID(projectID)
+	if err != nil {
+		return err
+	}
+
+	return s.GitSyncMgr.SyncProject(projectPath, projectID, "", appCfg.GitSync.Branch, appCfg.GitSync.Username, appCfg.GitSync.Password)
+}
+
+// SyncAllProjectsToGit syncs all projects to Git repository
+func (s *Service) SyncAllProjectsToGit() error {
+	appCfg, err := s.ConfigManager.LoadAppConfig()
+	if err != nil || appCfg == nil {
+		return nil
+	}
+	if !appCfg.GitSync.Enabled || appCfg.GitSync.RemoteURL == "" {
+		return nil
+	}
+
+	return s.GitSyncMgr.SyncAllProjects(s.ConfigManager.GetProjectsDir(), appCfg.GitSync.RemoteURL, appCfg.GitSync.Branch, appCfg.GitSync.Username, appCfg.GitSync.Password)
+}
+
+// InitGitRepo initializes the local Git repository
+func (s *Service) InitGitRepo() error {
+	appCfg, err := s.ConfigManager.LoadAppConfig()
+	if err != nil || appCfg == nil {
+		return nil
+	}
+	if !appCfg.GitSync.Enabled || appCfg.GitSync.RemoteURL == "" {
+		return nil
+	}
+
+	return s.GitSyncMgr.CloneOrPull(appCfg.GitSync.RemoteURL, appCfg.GitSync.Branch, appCfg.GitSync.Username, appCfg.GitSync.Password)
 }

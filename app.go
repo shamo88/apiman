@@ -210,3 +210,15 @@ func (a *App) ExecuteHTTPRequestWithScriptsInline(
 ) (*models.CurlResponse, error) {
 	return a.service.ExecuteHTTPRequestWithScriptsInline(projectID, environmentID, spec, preScript, postScript)
 }
+
+func (a *App) SyncProjectToGit(projectID string) error {
+	return a.service.SyncProjectToGit(projectID)
+}
+
+func (a *App) SyncAllProjectsToGit() error {
+	return a.service.SyncAllProjectsToGit()
+}
+
+func (a *App) InitGitRepo() error {
+	return a.service.InitGitRepo()
+}

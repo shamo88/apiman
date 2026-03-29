@@ -1,5 +1,29 @@
 export namespace config {
 	
+	export class GitSyncConfig {
+	    enabled: boolean;
+	    remoteUrl?: string;
+	    branch?: string;
+	    authType?: string;
+	    username?: string;
+	    password?: string;
+	    autoSync: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new GitSyncConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	        this.remoteUrl = source["remoteUrl"];
+	        this.branch = source["branch"];
+	        this.authType = source["authType"];
+	        this.username = source["username"];
+	        this.password = source["password"];
+	        this.autoSync = source["autoSync"];
+	    }
+	}
 	export class UIConfig {
 	    enableListAnimation: boolean;
 	
@@ -39,6 +63,7 @@ export namespace config {
 	export class AppConfig {
 	    proxy: ProxyConfig;
 	    ui: UIConfig;
+	    gitSync: GitSyncConfig;
 	
 	    static createFrom(source: any = {}) {
 	        return new AppConfig(source);
@@ -48,6 +73,7 @@ export namespace config {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.proxy = this.convertValues(source["proxy"], ProxyConfig);
 	        this.ui = this.convertValues(source["ui"], UIConfig);
+	        this.gitSync = this.convertValues(source["gitSync"], GitSyncConfig);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -68,6 +94,7 @@ export namespace config {
 		    return a;
 		}
 	}
+	
 	
 
 }

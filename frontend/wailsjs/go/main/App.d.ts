@@ -54,6 +54,8 @@ export function GetRequest(arg1:string):Promise<models.CurlRequest>;
 
 export function ImportPostmanCollection(arg1:string):Promise<models.Project>;
 
+export function InitGitRepo():Promise<void>;
+
 export function ListProjectScripts(arg1:string):Promise<Array<models.ProjectScript>>;
 
 export function ListProjects():Promise<Array<models.Project>>;
@@ -83,6 +85,10 @@ export function SaveAppConfig(arg1:config.AppConfig):Promise<void>;
 export function SaveGlobalVariables(arg1:Record<string, string>):Promise<void>;
 
 export function SaveProjectGroupsState(arg1:project.ProjectGroupsState):Promise<void>;
+
+export function SyncAllProjectsToGit():Promise<void>;
+
+export function SyncProjectToGit(arg1:string):Promise<void>;
 
 export function UpdateEnvironment(arg1:string,arg2:string,arg3:string,arg4:Record<string, string>):Promise<void>;
 

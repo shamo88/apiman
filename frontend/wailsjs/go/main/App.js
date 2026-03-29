@@ -102,6 +102,10 @@ export function ImportPostmanCollection(arg1) {
   return window['go']['main']['App']['ImportPostmanCollection'](arg1);
 }
 
+export function InitGitRepo() {
+  return window['go']['main']['App']['InitGitRepo']();
+}
+
 export function ListProjectScripts(arg1) {
   return window['go']['main']['App']['ListProjectScripts'](arg1);
 }
@@ -160,6 +164,14 @@ export function SaveGlobalVariables(arg1) {
 
 export function SaveProjectGroupsState(arg1) {
   return window['go']['main']['App']['SaveProjectGroupsState'](arg1);
+}
+
+export function SyncAllProjectsToGit() {
+  return window['go']['main']['App']['SyncAllProjectsToGit']();
+}
+
+export function SyncProjectToGit(arg1) {
+  return window['go']['main']['App']['SyncProjectToGit'](arg1);
 }
 
 export function UpdateEnvironment(arg1, arg2, arg3, arg4) {

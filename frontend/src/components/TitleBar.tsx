@@ -1,9 +1,9 @@
+import { AppstoreOutlined, CloseOutlined, GithubOutlined, GlobalOutlined, InfoCircleOutlined, MinusOutlined, SettingOutlined } from '@ant-design/icons';
+import { Button, Col, Divider, Form, Input, InputNumber, message, Modal, Row, Select, Space, Switch, Tabs } from 'antd';
 import React from 'react';
-import { Tabs, Modal, Form, Input, InputNumber, Button, Switch, Divider, Row, Col } from 'antd';
-import { MinusOutlined, CloseOutlined, AppstoreOutlined, SettingOutlined, InfoCircleOutlined, GlobalOutlined } from '@ant-design/icons';
-import { WindowMinimise, WindowToggleMaximise, Quit } from '../../wailsjs/runtime/runtime';
-import { LoadAppConfig, SaveAppConfig } from '../../wailsjs/go/main/App';
+import { InitGitRepo, LoadAppConfig, SaveAppConfig, SyncAllProjectsToGit } from '../../wailsjs/go/main/App';
 import { config as wailsConfig } from '../../wailsjs/go/models';
+import { Quit, WindowMinimise, WindowToggleMaximise } from '../../wailsjs/runtime/runtime';
 
 interface TitleBarProps {
     title?: string;
@@ -42,6 +42,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 }) => {
     const [settingsVisible, setSettingsVisible] = React.useState(false);
     const [activeSettingsTab, setActiveSettingsTab] = React.useState('general');
+    const [gitSyncing, setGitSyncing] = React.useState(false);
     const [form] = Form.useForm();
 
     const handleMinimize = async () => {
@@ -84,6 +85,15 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                 ui: {
                     enableListAnimation: config.ui?.enableListAnimation ?? false,
                 },
+                gitSync: {
+                    enabled: config.gitSync?.enabled ?? false,
+                    remoteUrl: config.gitSync?.remoteUrl || '',
+                    branch: config.gitSync?.branch || 'main',
+                    authType: config.gitSync?.authType || 'token',
+                    username: config.gitSync?.username || '',
+                    password: config.gitSync?.password || '',
+                    autoSync: config.gitSync?.autoSync ?? true,
+                },
             });
             setSettingsVisible(true);
         } catch (error) {
@@ -107,6 +117,15 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                 ui: {
                     enableListAnimation: Boolean(values?.ui?.enableListAnimation),
                 },
+                gitSync: {
+                    enabled: Boolean(values?.gitSync?.enabled),
+                    remoteUrl: values?.gitSync?.remoteUrl || '',
+                    branch: values?.gitSync?.branch || 'main',
+                    authType: values?.gitSync?.authType || 'token',
+                    username: values?.gitSync?.username || '',
+                    password: values?.gitSync?.password || '',
+                    autoSync: Boolean(values?.gitSync?.autoSync),
+                },
             });
 
             await SaveAppConfig(configToSave);
@@ -122,6 +141,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
     const settingsMenuItems = [
         { key: 'general', label: '通用', icon: <SettingOutlined /> },
         { key: 'proxy', label: '网络代理', icon: <GlobalOutlined /> },
+        { key: 'git', label: 'Git 同步', icon: <GithubOutlined /> },
     ];
 
     const homeTabItem = tabItems?.find((item: any) => item?.key === 'home');
@@ -396,6 +416,156 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                                             </tbody>
                                         </table>
                                     </div>
+
+                                    <Divider style={{ marginTop: 32 }} />
+
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                                        <Button onClick={() => setSettingsVisible(false)}>
+                                            取消
+                                        </Button>
+                                        <Button type="primary" onClick={handleSaveSettings}>
+                                            保存
+                                        </Button>
+                                    </div>
+                                </Form>
+                            </div>
+                        )}
+
+                        {activeSettingsTab === 'git' && (
+                            <div>
+                                <Form
+                                    form={form}
+                                    layout="vertical"
+                                    initialValues={{
+                                        gitSync: {
+                                            enabled: false,
+                                            remoteUrl: '',
+                                            branch: 'main',
+                                            authType: 'token',
+                                            username: '',
+                                            password: '',
+                                            autoSync: true,
+                                        }
+                                    }}
+                                >
+                                    <Form.Item
+                                        name={['gitSync', 'enabled']}
+                                        valuePropName="checked"
+                                        label="启用 Git 同步"
+                                        style={{ marginTop: '16px' }}
+                                    >
+                                        <Switch />
+                                    </Form.Item>
+
+                                    <Divider style={{ margin: '16px 0' }} />
+
+                                    <div style={{ marginBottom: 16 }}>
+                                        <div style={{ fontWeight: 500, marginBottom: 12, color: '#333' }}>仓库配置</div>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                            <tbody>
+                                                <tr>
+                                                    <td style={{ padding: '8px 12px', color: '#666', fontWeight: 500, width: 80, borderBottom: '1px solid #f0f0f0' }}>仓库地址</td>
+                                                    <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
+                                                        <Form.Item name={['gitSync', 'remoteUrl']} style={{ marginBottom: 0 }}>
+                                                            <Input placeholder="https://gitee.com/username/repo.git" />
+                                                        </Form.Item>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td style={{ padding: '8px 12px', color: '#666', fontWeight: 500, borderBottom: '1px solid #f0f0f0' }}>分支</td>
+                                                    <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
+                                                        <Form.Item name={['gitSync', 'branch']} style={{ marginBottom: 0 }}>
+                                                            <Input placeholder="main" />
+                                                        </Form.Item>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td style={{ padding: '8px 12px', color: '#666', fontWeight: 500, borderBottom: '1px solid #f0f0f0' }}>认证方式</td>
+                                                    <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
+                                                        <Form.Item name={['gitSync', 'authType']} style={{ marginBottom: 0 }}>
+                                                            <Select
+                                                                options={[
+                                                                    { label: 'Access Token（推荐）', value: 'token' },
+                                                                    { label: '用户名 + 密码', value: 'password' },
+                                                                ]}
+                                                            />
+                                                        </Form.Item>
+                                                    </td>
+                                                </tr>
+                                                <Form.Item noStyle shouldUpdate={(prev, curr) => prev.gitSync?.authType !== curr.gitSync?.authType}>
+                                                    {({ getFieldValue }) => {
+                                                        const authType = getFieldValue(['gitSync', 'authType']);
+                                                        return authType === 'token' ? (
+                                                            <tr>
+                                                                <td style={{ padding: '8px 12px', color: '#666', fontWeight: 500, borderBottom: '1px solid #f0f0f0' }}>Access Token</td>
+                                                                <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
+                                                                    <Form.Item name={['gitSync', 'password']} style={{ marginBottom: 0 }}>
+                                                                        <Input type="password" placeholder="粘贴你的 Access Token" />
+                                                                    </Form.Item>
+                                                                </td>
+                                                            </tr>
+                                                        ) : (
+                                                            <>
+                                                                <tr>
+                                                                    <td style={{ padding: '8px 12px', color: '#666', fontWeight: 500, borderBottom: '1px solid #f0f0f0' }}>用户名</td>
+                                                                    <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
+                                                                        <Form.Item name={['gitSync', 'username']} style={{ marginBottom: 0 }}>
+                                                                            <Input placeholder="Gitee 用户名" />
+                                                                        </Form.Item>
+                                                                    </td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <td style={{ padding: '8px 12px', color: '#666', fontWeight: 500 }}>密码</td>
+                                                                    <td style={{ padding: '8px 12px' }}>
+                                                                        <Form.Item name={['gitSync', 'password']} style={{ marginBottom: 0 }}>
+                                                                            <Input.Password placeholder="密码" />
+                                                                        </Form.Item>
+                                                                    </td>
+                                                                </tr>
+                                                            </>
+                                                        );
+                                                    }}
+                                                </Form.Item>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <Form.Item
+                                        name={['gitSync', 'autoSync']}
+                                        valuePropName="checked"
+                                        label="保存时自动同步"
+                                    >
+                                        <Switch />
+                                    </Form.Item>
+
+                                    <Divider style={{ marginTop: 24 }} />
+
+                                    <Space>
+                                        <Button
+                                            type="default"
+                                            onClick={async () => {
+                                                const values = form.getFieldsValue();
+                                                if (!values?.gitSync?.remoteUrl) {
+                                                    message.error('请先填写仓库地址');
+                                                    return;
+                                                }
+                                                setGitSyncing(true);
+                                                try {
+                                                    await InitGitRepo();
+                                                    await SyncAllProjectsToGit();
+                                                    message.success('同步成功');
+                                                } catch (error) {
+                                                    console.error('Sync failed:', error);
+                                                    message.error('同步失败: ' + String(error));
+                                                } finally {
+                                                    setGitSyncing(false);
+                                                }
+                                            }}
+                                            loading={gitSyncing}
+                                        >
+                                            立即同步
+                                        </Button>
+                                    </Space>
 
                                     <Divider style={{ marginTop: 32 }} />
 
