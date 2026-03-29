@@ -3952,12 +3952,36 @@ function App() {
                                                                 type="primary"
                                                                 onClick={() => {
                                                                     const parsed = parseCurlToApiConfig(curlPreview);
+                                                                    // 合并headers：保留disabled的，更新parsed中有值的
+                                                                    const mergedHeaders = [...apiConfig.headers];
+                                                                    if (parsed.headers && parsed.headers.length > 0) {
+                                                                        for (const parsedHeader of parsed.headers) {
+                                                                            const idx = mergedHeaders.findIndex(h => h.key.toLowerCase() === parsedHeader.key.toLowerCase());
+                                                                            if (idx >= 0) {
+                                                                                mergedHeaders[idx] = parsedHeader;
+                                                                            } else {
+                                                                                mergedHeaders.push(parsedHeader);
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                    // 合并params：保留disabled的，更新parsed中有值的
+                                                                    const mergedParams = [...apiConfig.params];
+                                                                    if (parsed.params && parsed.params.length > 0) {
+                                                                        for (const parsedParam of parsed.params) {
+                                                                            const idx = mergedParams.findIndex(p => p.key.toLowerCase() === parsedParam.key.toLowerCase());
+                                                                            if (idx >= 0) {
+                                                                                mergedParams[idx] = parsedParam;
+                                                                            } else {
+                                                                                mergedParams.push(parsedParam);
+                                                                            }
+                                                                        }
+                                                                    }
                                                                     setApiConfig({
                                                                         ...apiConfig,
                                                                         method: parsed.method || apiConfig.method,
                                                                         url: parsed.url || apiConfig.url,
-                                                                        headers: parsed.headers || apiConfig.headers,
-                                                                        params: parsed.params || apiConfig.params,
+                                                                        headers: mergedHeaders,
+                                                                        params: mergedParams,
                                                                         body: parsed.body !== undefined ? parsed.body : apiConfig.body,
                                                                         bodyType: parsed.bodyType || apiConfig.bodyType,
                                                                         formData: parsed.formData || apiConfig.formData,
