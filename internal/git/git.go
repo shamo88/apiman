@@ -606,6 +606,17 @@ func (g *GitSyncManager) SyncAllProjects(projectsDir, remoteURL, branch, usernam
 		}
 	}
 
+	// Copy projects.json (project groups state) if it exists
+	projectsJsonSrc := filepath.Join(projectsDir, "projects.json")
+	if data, err := os.ReadFile(projectsJsonSrc); err == nil {
+		projectsJsonDst := filepath.Join(projectsSyncDir, "projects.json")
+		if err := os.WriteFile(projectsJsonDst, data, 0644); err != nil {
+			log.Printf("[GitSync] Warning: failed to copy projects.json: %v", err)
+		} else {
+			log.Printf("[GitSync] projects.json copied")
+		}
+	}
+
 	// Commit and push all changes
 	commitMsg := fmt.Sprintf("Sync all projects at %s", time.Now().Format(time.RFC3339))
 	return g.CommitAndPush([]string{"projects"}, commitMsg, branch, username, password)
