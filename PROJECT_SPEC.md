@@ -33,8 +33,9 @@
 
 - **框架**：Wails v2.11.0 - 使用 Go 和 Web 技术构建桌面应用
 - **UUID**：github.com/google/uuid v1.6.0 - 生成唯一标识符
+- **Git 同步**：github.com/go-git/go-git/v5 v5.17.0 - Git 仓库同步功能
 - **并发安全**：使用 Go 标准库的 sync.RWMutex 保证线程安全
-- **版本**：Go 1.23+
+- **版本**：Go 1.24.0
 
 ### 前端 (React + TypeScript)
 
@@ -58,6 +59,9 @@ apiman/
 ├── internal/                  # 内部业务逻辑包
 │   ├── config/               # 配置管理模块
 │   │   └── config.go        # 配置文件读写（环境变量、全局变量）
+│   │
+│   ├── git/                  # Git 同步模块
+│   │   └── git.go          # Git 仓库克隆/拉取/推送/提交
 │   │
 │   ├── curl/                 # Curl 执行引擎
 │   │   ├── curl.go          # HTTP 请求执行、响应格式化
@@ -83,7 +87,8 @@ apiman/
 ├── frontend/                  # 前端应用
 │   ├── src/
 │   │   ├── components/
-│   │   │   └── TitleBar.tsx # 自定义窗口标题栏组件
+│   │   │   ├── TitleBar.tsx # 自定义窗口标题栏组件
+│   │   │   └── ScriptHelpWindow.tsx # 脚本 API 帮助浮窗组件
 │   │   │
 │   │   ├── types/
 │   │   │   └── index.ts     # TypeScript 类型定义
@@ -150,6 +155,38 @@ GetConfigDir()      // 获取配置目录
 GetProjectsDir()    // 获取项目存储目录
 LoadEnvironments()  // 加载环境变量
 SaveGlobalVariables() // 保存全局变量
+LoadAppConfig()     // 加载应用配置（代理、UI、Git 同步）
+SaveAppConfig()     // 保存应用配置
+```
+
+**AppConfig 结构**：
+
+```go
+type AppConfig struct {
+    Proxy    ProxyConfig    `json:"proxy"`     // 代理配置
+    UI       UIConfig      `json:"ui"`        // UI 配置
+    GitSync  GitSyncConfig `json:"gitSync"`   // Git 同步配置
+}
+
+type ProxyConfig struct {
+    Enabled    bool   `json:"enabled"`
+    HTTPHost   string `json:"httpHost,omitempty"`
+    HTTPPort   int    `json:"httpPort,omitempty"`
+    HTTPSHost  string `json:"httpsHost,omitempty"`
+    HTTPSPort  int    `json:"httpsPort,omitempty"`
+    SOCKS5Host string `json:"socks5Host,omitempty"`
+    SOCKS5Port int    `json:"socks5Port,omitempty"`
+}
+
+type GitSyncConfig struct {
+    Enabled   bool   `json:"enabled"`
+    RemoteURL string `json:"remoteUrl,omitempty"`
+    Branch    string `json:"branch,omitempty"`
+    AuthType  string `json:"authType,omitempty"`
+    Password  string `json:"password,omitempty"`
+    AutoSync  bool   `json:"autoSync"`
+    WorkDir   string `json:"workDir,omitempty"`
+}
 ```
 
 ### 2. **项目管理模块** (`internal/project`)
@@ -183,17 +220,34 @@ type Folder struct {
 }
 
 type CurlRequest struct {
-    ID        string    `json:"id"`
-    Name      string    `json:"name"`
-    ProjectID string    `json:"project_id"`
-    FolderID  string    `json:"folder_id"`
-    Path      string    `json:"path"`
-    Content   string    `json:"content,omitempty"`
-    CreatedAt time.Time `json:"created_at"`
+    ID           string    `json:"id"`
+    Name         string    `json:"name"`
+    ProjectID    string    `json:"project_id"`
+    FolderID     string    `json:"folder_id"`
+    Path         string    `json:"path"`
+    Content      string    `json:"content,omitempty"`
+    PreScripts   []string  `json:"pre_scripts,omitempty"`
+    PostScripts  []string  `json:"post_scripts,omitempty"`
+    CreatedAt    time.Time `json:"created_at"`
+    UpdatedAt    time.Time `json:"updated_at"`
+
+    // 扁平化 HTTP 字段
+    Method     string          `json:"method,omitempty"`
+    HttpURL    string          `json:"http_url,omitempty"`
+    Headers    []RequestKeyVal `json:"headers,omitempty"`
+    Params     []RequestKeyVal `json:"params,omitempty"`
+    Body       string          `json:"body,omitempty"`
+    BodyType   string          `json:"body_type,omitempty"`
+    FormData   []RequestPair   `json:"form_data,omitempty"`
+    UrlEncoded []RequestPair   `json:"url_encoded,omitempty"`
+
+    // 用例支持
+    Cases        []HttpRequestCase `json:"cases,omitempty"`
+    ActiveCaseID string            `json:"active_case_id,omitempty"`
 }
 ```
 
-> 运行时已扩展扁平化 HTTP 字段及 `cases` / `active_case_id`（用例）等，完整定义见 `internal/models/models.go`。
+> 完整定义见 `internal/models/models.go`。
 
 **文件存储格式（当前实现）**：
 
@@ -207,7 +261,7 @@ type CurlRequest struct {
 │       └── ...
 ```
 
-> 历史版本曾按「每请求一个 `.curl` 文件」组织；当前以 **`collection.postman.json`** 为单一事实来源，由 `internal/postman` 读写。
+> 以 **`collection.postman.json`** 为单一事实来源，由 `internal/postman` 读写。
 
 ### 3. **Curl 执行引擎** (`internal/curl`)
 
@@ -227,6 +281,7 @@ type CurlRequest struct {
 - 🔍 **变量提取**：`{{variable}}` 语法支持
 - 🔄 **变量替换**：运行时替换变量为实际值
 - 🔌 **代理支持**：支持 HTTP/HTTPS/SOCKS5 代理
+- ⚡ **动态变量**：支持 `{{$date.timestamp}}`, `{{$date.timestampMs}}`, `{{$date.now}}`, `{{$uuid}}`, `{{$random.int}}`, `{{$random.float}}`, `{{$random.alpha(n)}}`, `{{$random.alphanumeric(n)}}` 等动态生成器
 
 **响应格式**：
 
@@ -243,6 +298,39 @@ type CurlResponse struct {
 ### 4. **服务层** (`internal/service`)
 
 业务逻辑编排层，协调各模块工作。
+
+### 5. **Git 同步模块** (`internal/git`)
+
+负责项目数据与 Git 仓库的同步。
+
+**核心功能**：
+
+- 🌐 **仓库克隆/初始化**：从远程仓库克隆或创建新仓库
+- 🔄 **自动同步**：支持项目的自动拉取和推送
+- 🔒 **认证支持**：支持 Token 和密码认证
+- 📁 **项目隔离**：每个项目存储在 `projects/{slug}__{uuid}/` 目录
+
+**关键方法**：
+
+```go
+CloneOrPull(remoteURL, branch, password) // 克隆或拉取
+CommitAndPush(files, message, branch, password) // 提交并推送
+SyncProject(projectPath, projectID, message, branch, password) // 同步单个项目
+HasLocalRepo() bool // 检查本地仓库是否存在
+```
+
+### 6. **项目脚本管理**
+
+项目级脚本存储在 `scripts/` 目录，支持创建、编辑、删除脚本。
+
+**App 暴露的方法**：
+
+```go
+ListProjectScripts(projectID string)    // 列出项目脚本
+CreateProjectScript(projectID, name, content) // 创建脚本
+UpdateProjectScript(projectID, scriptID, name, content) // 更新脚本
+DeleteProjectScript(projectID, scriptID) // 删除脚本
+```
 
 ***
 
@@ -634,7 +722,7 @@ import { WindowMinimise, WindowMaximise, WindowUnmaximise, WindowToggleMaximise,
 
 ***
 
-## 🧪 前后置脚本设计（方案 B：内嵌 JavaScript 引擎）
+## 🧪 前后置脚本设计（内嵌 JavaScript 引擎）
 
 ### **目标**
 
@@ -645,14 +733,14 @@ import { WindowMinimise, WindowMaximise, WindowUnmaximise, WindowToggleMaximise,
 
 ### **方案选型结论**
 
-采用 **Go 后端内嵌 JavaScript 引擎**（推荐 `goja`）实现脚本运行时：
+采用 **Go 后端内嵌 JavaScript 引擎**（`goja`）实现脚本运行时：
 
 - ✅ 兼容 JavaScript 使用习惯，用户心智接近 Postman
 - ✅ 可在后端统一接入请求执行链路，避免前端绕过
 - ✅ 可控安全边界（超时、内存、API 白名单）
-- ⚠️ 需要设计 `am` 运行时 API 与沙箱机制
+- ✅ `am` 运行时 API 与沙箱机制
 
-不采用外部 Node 子进程作为首版实现，以降低跨平台打包和安全维护复杂度。
+不采用外部 Node 子进程作为实现，以降低跨平台打包和安全维护复杂度。
 
 ### **执行链路设计**
 
@@ -732,7 +820,7 @@ type ScriptExecutionContext struct {
 | --------------------------- | --------- |
 | `am.response.code`          | 获取响应状态码   |
 | `am.response.headers.all()` | 获取所有响应头   |
-| `am.response.text`          | 获取响应文本    |
+| `am.response.text()`        | 获取响应文本    |
 | `am.response.json()`        | 解析响应 JSON |
 
 #### **测试 API**
@@ -772,12 +860,17 @@ type ScriptExecutionContext struct {
 | `am.crypto.base64Decode(str)`           | Base64 解码              | `am.crypto.base64Decode("aGVsbG8=")`                  |
 | `am.crypto.base64URLEncode(str)`        | URL 安全 Base64          | `am.crypto.base64URLEncode("hello world")`            |
 | `am.crypto.hmacSHA256(msg, key)`        | HMAC-SHA256 签名         | `am.crypto.hmacSHA256("msg", "key")`                  |
+| `am.crypto.hmacSHA1(msg, key)`         | HMAC-SHA1 签名          | `am.crypto.hmacSHA1("msg", "key")`                    |
 | `am.crypto.aesEncrypt(str, key)`        | AES 加密（密钥 16/24/32 字节） | `am.crypto.aesEncrypt("data", "1234567890123456")`    |
 | `am.crypto.aesDecrypt(str, key)`        | AES 解密                 | `am.crypto.aesDecrypt(encrypted, "1234567890123456")` |
+| `am.crypto.aesEncryptWithIV(str, key, iv)` | AES 带 IV 加密          | `am.crypto.aesEncryptWithIV("data", "1234567890123456", "initialVec16")` |
+| `am.crypto.aesDecryptWithIV(str, key, iv)` | AES 带 IV 解密          | `am.crypto.aesDecryptWithIV(encrypted, "1234567890123456", "initialVec16")` |
 | `am.crypto.rsaEncrypt(str, pubKey)`     | RSA 公钥加密               | `am.crypto.rsaEncrypt("data", pemPublicKey)`          |
 | `am.crypto.rsaDecrypt(str, privKey)`    | RSA 私钥解密               | `am.crypto.rsaDecrypt(encrypted, pemPrivateKey)`      |
 | `am.crypto.rsaSign(msg, privKey)`       | RSA 签名                 | `am.crypto.rsaSign("message", pemPrivateKey)`         |
 | `am.crypto.rsaVerify(msg, sig, pubKey)` | RSA 验签                 | `am.crypto.rsaVerify("msg", signature, pemPublicKey)` |
+| `am.crypto.rsaEncryptOAEP(str, pubKey)` | RSA OAEP 公钥加密          | `am.crypto.rsaEncryptOAEP("data", pemPublicKey)`      |
+| `am.crypto.rsaDecryptOAEP(str, privKey)` | RSA OAEP 私钥解密        | `am.crypto.rsaDecryptOAEP(encrypted, pemPrivateKey)` |
 | `am.crypto.generateKeyPair(bits)`       | 生成 RSA 密钥对             | `am.crypto.generateKeyPair(2048)`                     |
 | `am.crypto.randomString(len)`           | 生成随机字符串                | `am.crypto.randomString(16)`                          |
 | `am.crypto.formatJSON(str)`             | 格式化 JSON               | `am.crypto.formatJSON('{"a":1}')`                     |
@@ -811,8 +904,8 @@ type ScriptExecutionContext struct {
 ```go
 type CurlRequest struct {
     // ... existing fields
-    PreScript  string `json:"pre_script,omitempty"`
-    TestScript string `json:"test_script,omitempty"`
+    PreScripts  []string `json:"pre_scripts,omitempty"`   // 前置脚本列表
+    PostScripts []string `json:"post_scripts,omitempty"`  // 后置脚本列表
 }
 ```
 
@@ -922,7 +1015,7 @@ Linux:   ~/.config/apiman/
 
 ```
 ~/.apiman/
-├── projects/                 # 项目数据
+├── projects/                 # 项目数据（当未启用 Git 同步时）
 │   ├── projects.json         # 分组状态（groups/assignments/collapsedGroups）
 │   ├── {project-slug}__{uuid}/
 │   │   ├── meta.json
@@ -930,7 +1023,13 @@ Linux:   ~/.config/apiman/
 │   │   └── scripts/                  # 项目脚本（.js + .meta）
 │   └── ...
 │
+├── git-sync/                 # Git 同步目录（启用 Git 同步时）
+│   ├── .git/
+│   ├── projects/            # 同步的项目数据
+│   └── README.md
+│
 ├── environments.json        # 环境变量配置
+├── config.json             # 应用配置（代理、UI、Git 同步）
 └── variables.json          # 全局变量配置
 ```
 
@@ -1137,8 +1236,9 @@ Linux:   ~/.config/apiman/
 - ✅ MD5 / SHA1 / SHA256 / SHA512 哈希
 - ✅ Base64 / Base64URL 编解码
 - ✅ HMAC-SHA256 / HMAC-SHA1 签名
-- ✅ AES 对称加解密
+- ✅ AES 对称加解密（支持 IV 模式）
 - ✅ RSA 密钥生成、公钥加密、私钥解密
+- ✅ RSA OAEP 公钥加密、私钥解密
 - ✅ RSA 签名与验签
 - ✅ RandomString 随机字符串
 - ✅ FormatJSON JSON 格式化
@@ -1149,4 +1249,38 @@ Linux:   ~/.config/apiman/
 - ✅ `internal/curl/exec_with_scripts.go` 脚本执行链路集成
 - ✅ `app.go` / `service.go` 暴露脚本执行方法
 - ✅ 13 个脚本测试用例文件
+
+### v1.5（Git 同步功能）
+
+#### Git 同步核心功能
+
+- ✅ Git 仓库克隆与初始化（支持空仓库处理）
+- ✅ 自动拉取远程更新
+- ✅ 项目变更提交与推送
+- ✅ 单项目同步与全量同步
+- ✅ Token 认证支持（Gitee/GitHub）
+- ✅ 仓库冲突处理与恢复
+
+#### 技术实现
+
+- ✅ `internal/git/git.go` Git 同步模块
+- ✅ `SyncProjectToGit` 单项目同步
+- ✅ `SyncAllProjectsToGit` 全量同步
+- ✅ `EnableGitSync` / `DisableGitSync` 启用/禁用同步
+- ✅ `InitGitRepo` 初始化仓库
+- ✅ `AppConfig.GitSync` 配置持久化
+- ✅ Token 密码混淆存储
+
+#### 动态变量增强
+
+- ✅ `{{$date.timestamp}}` Unix 时间戳（秒）
+- ✅ `{{$date.timestampMs}}` Unix 时间戳（毫秒）
+- ✅ `{{$date.now}}` 当前时间 ISO 格式
+- ✅ `{{$date.now('format')}}` 自定义时间格式
+- ✅ `{{$uuid}}` 随机 UUID
+- ✅ `{{$random.int}}` 随机整数
+- ✅ `{{$random.float}}` 随机浮点数
+- ✅ `{{$random.alpha(n)}}` 随机字母字符串
+- ✅ `{{$random.alphanumeric(n)}}` 随机字母数字字符串
+
 
