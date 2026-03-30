@@ -112,6 +112,7 @@ export namespace models {
 	    body_type: string;
 	    form_data: RequestPair[];
 	    url_encoded: RequestPair[];
+	    cookies: RequestKeyVal[];
 	
 	    static createFrom(source: any = {}) {
 	        return new HttpRequestSpec(source);
@@ -127,6 +128,7 @@ export namespace models {
 	        this.body_type = source["body_type"];
 	        this.form_data = this.convertValues(source["form_data"], RequestPair);
 	        this.url_encoded = this.convertValues(source["url_encoded"], RequestPair);
+	        this.cookies = this.convertValues(source["cookies"], RequestKeyVal);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -285,6 +287,30 @@ export namespace models {
 		    return a;
 		}
 	}
+	export class ResponseCookie {
+	    name: string;
+	    value: string;
+	    domain: string;
+	    path: string;
+	    expires: string;
+	    http_only: boolean;
+	    secure: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ResponseCookie(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.value = source["value"];
+	        this.domain = source["domain"];
+	        this.path = source["path"];
+	        this.expires = source["expires"];
+	        this.http_only = source["http_only"];
+	        this.secure = source["secure"];
+	    }
+	}
 	export class TestResult {
 	    name: string;
 	    passed: boolean;
@@ -311,6 +337,7 @@ export namespace models {
 	    error: string;
 	    script_logs?: string[];
 	    tests?: TestResult[];
+	    cookies?: ResponseCookie[];
 	
 	    static createFrom(source: any = {}) {
 	        return new CurlResponse(source);
@@ -325,6 +352,7 @@ export namespace models {
 	        this.error = source["error"];
 	        this.script_logs = source["script_logs"];
 	        this.tests = this.convertValues(source["tests"], TestResult);
+	        this.cookies = this.convertValues(source["cookies"], ResponseCookie);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -510,6 +538,7 @@ export namespace models {
 		    return a;
 		}
 	}
+	
 	
 	
 

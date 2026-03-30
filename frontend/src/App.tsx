@@ -116,6 +116,7 @@ interface ApiConfig {
     bodyType: 'none' | 'form-data' | 'x-www-form-urlencoded' | 'json' | 'xml' | 'raw' | 'binary';
     formData: { key: string; value: string; enabled: boolean }[];
     urlencoded: { key: string; value: string; enabled: boolean }[];
+    cookies: { key: string; value: string; enabled: boolean }[];
     preScripts: string[];
     postScripts: string[];
 }
@@ -152,6 +153,7 @@ const createDefaultApiConfig = (): ApiConfig => ({
     bodyType: 'none',
     formData: [],
     urlencoded: [],
+    cookies: [],
     preScripts: [],
     postScripts: [],
 });
@@ -175,6 +177,7 @@ const apiConfigFromRequest = (r: CurlRequest, fallbackName: string): ApiConfig =
     const bt = (r.body_type || 'none') as ApiConfig['bodyType'];
     const allowed: ApiConfig['bodyType'][] = ['none', 'form-data', 'x-www-form-urlencoded', 'json', 'xml', 'raw', 'binary'];
     const bodyType = allowed.includes(bt) ? bt : 'none';
+    const cookiesArr = r.interface_spec?.cookies;
     return {
         name: r.name || fallbackName,
         method: (r.method || 'GET').toUpperCase(),
@@ -209,6 +212,13 @@ const apiConfigFromRequest = (r: CurlRequest, fallbackName: string): ApiConfig =
                 enabled: u.enabled !== false,
             }))
             : [],
+        cookies: Array.isArray(cookiesArr)
+            ? cookiesArr.map((c) => ({
+                key: c.key || '',
+                value: c.value || '',
+                enabled: c.enabled !== false,
+            }))
+            : [],
         preScripts: r.pre_scripts || [],
         postScripts: r.post_scripts || [],
     };
@@ -223,15 +233,26 @@ const apiConfigToSpec = (c: ApiConfig) => ({
     body_type: c.bodyType,
     form_data: c.formData.map((f) => ({ key: f.key, value: f.value, enabled: f.enabled })),
     url_encoded: c.urlencoded.map((u) => ({ key: u.key, value: u.value, enabled: u.enabled })),
+    cookies: c.cookies.map((ck) => ({ key: ck.key, value: ck.value, enabled: ck.enabled })),
 });
 
 /** Wails 将 HttpRequestSpec 生成为 class（含 convertValues），需用 createFrom 包装字面量。 */
-const toWailsHttpSpec = (c: ApiConfig) => models.HttpRequestSpec.createFrom(apiConfigToSpec(c));
+const toWailsHttpSpec = (c: ApiConfig) => {
+    const spec = apiConfigToSpec(c);
+    console.log('[DEBUG] toWailsHttpSpec spec:', JSON.stringify(spec, null, 2));
+    // 使用 JSON 序列化/反序列化来确保数据正确
+    const jsonStr = JSON.stringify(spec);
+    console.log('[DEBUG] JSON string:', jsonStr);
+    const result = JSON.parse(jsonStr);
+    console.log('[DEBUG] parsed result.cookies:', result.cookies);
+    return result;
+};
 
 const cloneApiConfig = (c: ApiConfig): ApiConfig => JSON.parse(JSON.stringify(c));
 
 /** 从 apiConfig 生成 curl 命令 */
 const buildCurlCommand = (c: ApiConfig): string => {
+    console.log('[DEBUG] buildCurlCommand called with cookies:', c.cookies);
     const parts: string[] = ['curl'];
 
     // URL with params
@@ -251,6 +272,13 @@ const buildCurlCommand = (c: ApiConfig): string => {
     const enabledHeaders = (c.headers || []).filter(h => h.enabled && h.key);
     for (const h of enabledHeaders) {
         parts.push(`-H '${h.key}: ${h.value}'`);
+    }
+
+    // Cookies
+    const enabledCookies = (c.cookies || []).filter(ck => ck.enabled && ck.key);
+    if (enabledCookies.length > 0) {
+        const cookieValue = enabledCookies.map(ck => `${ck.key}=${ck.value}`).join('; ');
+        parts.push(`-H 'Cookie: ${cookieValue}'`);
     }
 
     // Body
@@ -413,6 +441,7 @@ const apiConfigFromHttpSpec = (spec: models.HttpRequestSpec, requestName: string
         bodyType,
         formData: mapPair(spec.form_data),
         urlencoded: mapPair(spec.url_encoded),
+        cookies: mapKV(spec.cookies),
         preScripts: [],
         postScripts: [],
     };
@@ -1889,8 +1918,9 @@ function App() {
 
     // Update curl preview when apiConfig changes
     useEffect(() => {
+        console.log('[DEBUG] useEffect triggered, apiConfig.cookies:', apiConfig.cookies);
         setCurlPreview(buildCurlCommand(apiConfig));
-    }, [apiConfig.method, apiConfig.url, apiConfig.headers, apiConfig.params, apiConfig.body, apiConfig.bodyType, apiConfig.formData, apiConfig.urlencoded]);
+    }, [apiConfig.method, apiConfig.url, apiConfig.headers, apiConfig.params, apiConfig.body, apiConfig.bodyType, apiConfig.formData, apiConfig.urlencoded, apiConfig.cookies]);
 
     // Calculate response-body height dynamically
     useEffect(() => {
@@ -2698,6 +2728,11 @@ function App() {
                 key: applyEnvironmentVariables(item.key, variables),
                 value: applyEnvironmentVariables(item.value, variables),
             })),
+            cookies: apiConfig.cookies.map(cookie => ({
+                ...cookie,
+                key: applyEnvironmentVariables(cookie.key, variables),
+                value: applyEnvironmentVariables(cookie.value, variables),
+            })),
         };
 
         if (!apiConfig.url?.trim()) {
@@ -2720,7 +2755,9 @@ function App() {
                     apiConfig.postScripts
                 );
             } else {
-                result = await ExecuteHTTPRequest(toWailsHttpSpec(resolvedConfig));
+                const spec = toWailsHttpSpec(resolvedConfig);
+                console.log('[DEBUG] ExecuteHTTPRequest spec.cookies:', spec.cookies);
+                result = await ExecuteHTTPRequest(spec);
             }
             setResponse(result);
             // 格式化响应体
@@ -3907,6 +3944,70 @@ function App() {
                                                     ),
                                                 },
                                                 {
+                                                    key: 'cookies',
+                                                    label: 'Cookie',
+                                                    children: (
+                                                        <div className="kv-editor">
+                                                            {apiConfig.cookies.map((cookie, index) => (
+                                                                <div key={index} className="kv-row kv-row-params">
+                                                                    <Checkbox
+                                                                        className="kv-param-enabled"
+                                                                        checked={cookie.enabled !== false}
+                                                                        onChange={(e) => {
+                                                                            const newCookies = [...apiConfig.cookies];
+                                                                            newCookies[index].enabled = e.target.checked;
+                                                                            setApiConfig({ ...apiConfig, cookies: newCookies });
+                                                                        }}
+                                                                        title="发送请求时包含该 Cookie"
+                                                                    />
+                                                                    {renderVariableAwareInput(
+                                                                        cookie.key,
+                                                                        (value) => {
+                                                                            const newCookies = [...apiConfig.cookies];
+                                                                            newCookies[index].key = value;
+                                                                            setApiConfig({ ...apiConfig, cookies: newCookies });
+                                                                        },
+                                                                        'Name',
+                                                                        { flex: 1 }
+                                                                    )}
+                                                                    {renderVariableAwareInput(
+                                                                        cookie.value,
+                                                                        (value) => {
+                                                                            const newCookies = [...apiConfig.cookies];
+                                                                            newCookies[index].value = value;
+                                                                            setApiConfig({ ...apiConfig, cookies: newCookies });
+                                                                        },
+                                                                        'Value',
+                                                                        { flex: 1 }
+                                                                    )}
+                                                                    <Button
+                                                                        type="text"
+                                                                        danger
+                                                                        onClick={() => {
+                                                                            const newCookies = apiConfig.cookies.filter((_, i) => i !== index);
+                                                                            setApiConfig({ ...apiConfig, cookies: newCookies });
+                                                                        }}
+                                                                    >
+                                                                        ×
+                                                                    </Button>
+                                                                </div>
+                                                            ))}
+                                                            <Button
+                                                                type="link"
+                                                                icon={<PlusOutlined />}
+                                                                onClick={() => {
+                                                                    setApiConfig({
+                                                                        ...apiConfig,
+                                                                        cookies: [...apiConfig.cookies, { key: '', value: '', enabled: true }]
+                                                                    });
+                                                                }}
+                                                            >
+                                                                添加 Cookie
+                                                            </Button>
+                                                        </div>
+                                                    ),
+                                                },
+                                                {
                                                     key: 'pre-script',
                                                     label: '前置脚本',
                                                     children: (
@@ -4209,6 +4310,37 @@ function App() {
                                                                         return <pre className="response-content">{formattedResponse || '非 JSON 格式或无响应内容'}</pre>;
                                                                     }
                                                                 })()}
+                                                            </div>
+                                                        ),
+                                                    },
+                                                    {
+                                                        key: 'cookies',
+                                                        label: 'Cookie',
+                                                        children: (
+                                                            <div className="response-body" style={{ height: responseBodyHeight }}>
+                                                                <div className="response-cookies">
+                                                                    {response.cookies && response.cookies.length > 0 ? (
+                                                                        response.cookies.map((cookie: any, index: number) => (
+                                                                            <div key={index} className="response-cookie-item">
+                                                                                <div className="cookie-header">
+                                                                                    <span className="cookie-name">{cookie.name}</span>
+                                                                                    <span className="cookie-value">{cookie.value}</span>
+                                                                                </div>
+                                                                                <div className="cookie-meta">
+                                                                                    {cookie.domain && <div className="cookie-domain">Domain: {cookie.domain}</div>}
+                                                                                    {cookie.path && <div className="cookie-path">Path: {cookie.path}</div>}
+                                                                                    {cookie.expires && cookie.expires !== '0001-01-01 00:00:00 +0000 UTC' && <div className="cookie-expires">Expires: {cookie.expires}</div>}
+                                                                                    <div className="cookie-flags">
+                                                                                        {cookie.http_only && <span className="cookie-flag">HttpOnly</span>}
+                                                                                        {cookie.secure && <span className="cookie-flag">Secure</span>}
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        ))
+                                                                    ) : (
+                                                                        <div className="response-empty">No cookies in response</div>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         ),
                                                     },
