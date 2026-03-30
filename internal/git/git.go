@@ -445,23 +445,11 @@ func (g *GitSyncManager) CommitAndPush(files []string, message, branch, password
 		return fmt.Errorf("failed to get worktree: %w", err)
 	}
 
-	// Add files - for directories, recursively add all files
-	for _, file := range files {
-		// Check if it's a directory
-		if info, err := os.Stat(filepath.Join(g.repoPath, file)); err == nil && info.IsDir() {
-			log.Printf("[GitSync] Adding directory recursively: %s", file)
-			// Use git add for directory to ensure all files are staged
-			cmd := exec.Command("git", "add", "-A", file)
-			cmd.Dir = g.repoPath
-			if err := cmd.Run(); err != nil {
-				return fmt.Errorf("failed to add directory %s: %w", file, err)
-			}
-		} else {
-			_, err := worktree.Add(file)
-			if err != nil {
-				return fmt.Errorf("failed to add file %s: %w", file, err)
-			}
-		}
+	// Add all files with git add .
+	cmd := exec.Command("git", "add", ".")
+	cmd.Dir = g.repoPath
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to git add: %w", err)
 	}
 
 	// Check if there are staged changes

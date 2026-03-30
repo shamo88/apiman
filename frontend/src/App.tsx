@@ -7,7 +7,7 @@ import type { UploadProps } from 'antd';
 import { Button, Card, Checkbox, Col, Dropdown, Empty, Input, InputRef, message, Modal, Radio, Row, Select, Space, Spin, Tabs, Tooltip, Upload } from 'antd';
 import type { DataNode } from 'antd/es/tree';
 import React, { useEffect, useState } from 'react';
-import { AddRequestCase, CopyRequest, CreateEnvironment, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteEnvironment, DeleteFolder, DeleteProject, DeleteProjectScript, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, ListProjectScripts, LoadAppConfig, LoadEnvironments, MoveFolder, MoveRequest, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, SaveAppConfig, UpdateEnvironment, UpdateProjectScript, UpdateRequest, UpdateRequestScripts } from '../wailsjs/go/main/App';
+import { AddRequestCase, CopyRequest, CreateEnvironment, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteEnvironment, DeleteFolder, DeleteProject, DeleteProjectScript, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, ListProjectScripts, LoadAppConfig, LoadEnvironments, MoveFolder, MoveRequest, PullGitRepo, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, SaveAppConfig, UpdateEnvironment, UpdateProjectScript, UpdateRequest, UpdateRequestScripts } from '../wailsjs/go/main/App';
 import { models } from '../wailsjs/go/models';
 import './App.css';
 import { ScriptHelpWindow } from './components/ScriptHelpWindow';
@@ -2851,6 +2851,9 @@ function App() {
         if (!currentRequest?.path) return;
 
         try {
+            // 保存前先 pull 最新代码
+            await PullGitRepo();
+
             if (requestCases.length === 0) {
                 await UpdateRequest(
                     currentRequest.path,

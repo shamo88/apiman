@@ -3,6 +3,8 @@ package main
 import (
 	"embed"
 
+	"apiman/internal/logger"
+
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
@@ -14,6 +16,11 @@ var assets embed.FS
 
 func main() {
 	app := NewApp()
+
+	// Initialize logger
+	if err := logger.Init(app.service.ConfigManager.GetConfigDir()); err != nil {
+		println("Failed to initialize logger:", err.Error())
+	}
 
 	// Load config to determine theme before app starts
 	cfg, err := app.service.LoadAppConfig()

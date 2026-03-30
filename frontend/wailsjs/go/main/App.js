@@ -146,6 +146,10 @@ export function MoveRequest(arg1, arg2, arg3) {
   return window['go']['main']['App']['MoveRequest'](arg1, arg2, arg3);
 }
 
+export function PullGitRepo() {
+  return window['go']['main']['App']['PullGitRepo']();
+}
+
 export function RenameFolder(arg1, arg2) {
   return window['go']['main']['App']['RenameFolder'](arg1, arg2);
 }
