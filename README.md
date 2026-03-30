@@ -1,37 +1,62 @@
-# apiman
+# Apiman
 
 #### 介绍
-api测试工具
+Apiman 是一个桌面 API 测试工具，基于 Wails v2 (Go + React/TypeScript) 构建，类似于 Postman/Apifox 的功能。
+
+#### 功能特性
+- 多项目管理
+- 文件夹组织
+- 环境变量
+- 请求用例（每个请求多个测试场景）
+- JavaScript 脚本支持（基于 goja）
+- Git 同步备份
+- 深色/浅色主题
 
 #### 软件架构
-软件架构说明
 
+**后端 (Go)** - `internal/`
+- `config/` - 配置管理，处理 `~/.apiman/` 存储
+- `models/` - 数据结构
+- `curl/` - HTTP 请求执行引擎
+- `git/` - Git 同步功能
+- `project/` - 项目管理
+- `service/` - 业务逻辑编排
+
+**前端 (React + TypeScript)** - `frontend/src/`
+- `App.tsx` - 主 UI 组件
+- `components/` - 标题栏、脚本帮助窗口等组件
+- `wailsjs/` - Wails 自动生成的绑定
 
 #### 安装教程
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+1. 安装 Go 1.21+
+2. 安装 Node.js 18+
+3. 安装 Wails CLI: `go install github.com/wailsapp/wails/v2/cmd/wails@latest`
+4. 安装前端依赖: `cd frontend && npm install`
 
-#### 使用说明
+#### 构建命令
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+```bash
+# 开发模式
+wails dev
 
-#### 参与贡献
+# 生产构建
+wails build
 
-1.  Fork 本仓库
-2.  新建 Feat_xxx 分支
-3.  提交代码
-4.  新建 Pull Request
+# 仅前端构建
+cd frontend && npm run build
+```
 
+#### 日志
 
-#### 特技
+日志文件位于: `~/.apiman/logs/apiman.log`
 
-1.  使用 Readme\_XXX.md 来支持不同的语言，例如 Readme\_en.md, Readme\_zh.md
-2.  Gitee 官方博客 [blog.gitee.com](https://blog.gitee.com)
-3.  你可以 [https://gitee.com/explore](https://gitee.com/explore) 这个地址来了解 Gitee 上的优秀开源项目
-4.  [GVP](https://gitee.com/gvp) 全称是 Gitee 最有价值开源项目，是综合评定出的优秀开源项目
-5.  Gitee 官方提供的使用手册 [https://gitee.com/help](https://gitee.com/help)
-6.  Gitee 封面人物是一档用来展示 Gitee 会员风采的栏目 [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+日志支持自动轮转，单文件最大 100MB。
+
+#### 数据存储
+
+项目存储在 `~/.apiman/projects/` 目录下，每个项目包含:
+- `collection.postman.json` - 项目数据
+- `environments.json` - 环境配置
+- `variables.json` - 项目变量
+- `scripts/` - 项目脚本
