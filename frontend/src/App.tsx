@@ -230,6 +230,11 @@ const toWailsHttpSpec = (c: ApiConfig) => models.HttpRequestSpec.createFrom(apiC
 
 const cloneApiConfig = (c: ApiConfig): ApiConfig => JSON.parse(JSON.stringify(c));
 
+/** 检查文本是否包含 {{}} 变量占位符 */
+const containsVariablePlaceholder = (text: string): boolean => {
+    return /\{\{[^}]+\}\}/.test(text);
+};
+
 /** 从 apiConfig 生成 curl 命令 */
 const buildCurlCommand = (c: ApiConfig): string => {
     const parts: string[] = ['curl'];
@@ -238,7 +243,12 @@ const buildCurlCommand = (c: ApiConfig): string => {
     let url = c.url || '';
     const enabledParams = (c.params || []).filter(p => p.enabled && p.key);
     if (enabledParams.length > 0) {
-        const queryParams = enabledParams.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&');
+        const queryParams = enabledParams.map(p => {
+            const encodedKey = encodeURIComponent(p.key);
+            // 如果值包含 {{}} 变量，不进行编码
+            const encodedValue = containsVariablePlaceholder(p.value) ? p.value : encodeURIComponent(p.value);
+            return `${encodedKey}=${encodedValue}`;
+        }).join('&');
         url += (url.includes('?') ? '&' : '?') + queryParams;
     }
 
@@ -272,7 +282,12 @@ const buildCurlCommand = (c: ApiConfig): string => {
     } else if (c.bodyType === 'x-www-form-urlencoded') {
         const enabledFields = (c.urlencoded || []).filter(f => f.enabled && f.key);
         if (enabledFields.length > 0) {
-            const encoded = enabledFields.map(f => `${encodeURIComponent(f.key)}=${encodeURIComponent(f.value)}`).join('&');
+            const encoded = enabledFields.map(f => {
+                const encodedKey = encodeURIComponent(f.key);
+                // 如果值包含 {{}} 变量，不进行编码
+                const encodedValue = containsVariablePlaceholder(f.value) ? f.value : encodeURIComponent(f.value);
+                return `${encodedKey}=${encodedValue}`;
+            }).join('&');
             if (!enabledHeaders.some(h => h.key.toLowerCase() === 'content-type')) {
                 parts.push("-H 'Content-Type: application/x-www-form-urlencoded'");
             }
