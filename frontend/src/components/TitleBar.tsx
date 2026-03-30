@@ -281,313 +281,313 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                 className={`settings-modal ${theme === 'dark' ? 'theme-dark' : ''}`}
             >
                 <div className={theme === 'dark' ? 'theme-dark' : ''} style={{ background: 'var(--bg-secondary)', minHeight: 400 }}>
-                <Row gutter={0} style={{ minHeight: 400 }}>
-                    <Col span={6} style={{ borderRight: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}`, paddingRight: 16 }}>
-                        {settingsMenuItems.map(item => (
+                    <Row gutter={0} style={{ minHeight: 400 }}>
+                        <Col span={6} style={{ borderRight: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}`, paddingRight: 16 }}>
+                            {settingsMenuItems.map(item => (
+                                <div
+                                    key={item.key}
+                                    onClick={() => setActiveSettingsTab(item.key)}
+                                    style={{
+                                        padding: '10px 12px',
+                                        marginBottom: 4,
+                                        cursor: 'pointer',
+                                        borderRadius: 6,
+                                        background: activeSettingsTab === item.key ? (theme === 'dark' ? 'rgba(99,102,241,0.2)' : '#e6f7ff') : 'transparent',
+                                        color: activeSettingsTab === item.key ? (theme === 'dark' ? '#818cf8' : '#1890ff') : (theme === 'dark' ? '#e8e8e8' : '#333'),
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 8,
+                                    }}
+                                >
+                                    {item.icon}
+                                    <span>{item.label}</span>
+                                </div>
+                            ))}
+
+                            <Divider style={{ margin: '16px 0' }} />
+
                             <div
-                                key={item.key}
-                                onClick={() => setActiveSettingsTab(item.key)}
+                                onClick={() => setActiveSettingsTab('about')}
                                 style={{
                                     padding: '10px 12px',
-                                    marginBottom: 4,
                                     cursor: 'pointer',
                                     borderRadius: 6,
-                                    background: activeSettingsTab === item.key ? (theme === 'dark' ? 'rgba(99,102,241,0.2)' : '#e6f7ff') : 'transparent',
-                                    color: activeSettingsTab === item.key ? (theme === 'dark' ? '#818cf8' : '#1890ff') : (theme === 'dark' ? '#e8e8e8' : '#333'),
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: 8,
+                                    color: activeSettingsTab === 'about' ? (theme === 'dark' ? '#818cf8' : '#1890ff') : (theme === 'dark' ? '#e8e8e8' : '#333'),
+                                    background: activeSettingsTab === 'about' ? (theme === 'dark' ? 'rgba(99,102,241,0.2)' : '#e6f7ff') : 'transparent',
                                 }}
                             >
-                                {item.icon}
-                                <span>{item.label}</span>
+                                <InfoCircleOutlined />
+                                <span>关于</span>
                             </div>
-                        ))}
+                        </Col>
 
-                        <Divider style={{ margin: '16px 0' }} />
-
-                        <div
-                            onClick={() => setActiveSettingsTab('about')}
-                            style={{
-                                padding: '10px 12px',
-                                cursor: 'pointer',
-                                borderRadius: 6,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8,
-                                color: activeSettingsTab === 'about' ? (theme === 'dark' ? '#818cf8' : '#1890ff') : (theme === 'dark' ? '#e8e8e8' : '#333'),
-                                background: activeSettingsTab === 'about' ? (theme === 'dark' ? 'rgba(99,102,241,0.2)' : '#e6f7ff') : 'transparent',
-                            }}
-                        >
-                            <InfoCircleOutlined />
-                            <span>关于</span>
-                        </div>
-                    </Col>
-
-                    <Col span={18} style={{ paddingLeft: 24 }}>
-                        {activeSettingsTab === 'general' && (
-                            <div>
-                                <Form
-                                    form={form}
-                                    layout="vertical"
-                                    initialValues={{
-                                        proxy: {
-                                            enabled: false,
-                                            httpHost: '',
-                                            httpPort: undefined,
-                                            httpsHost: '',
-                                            httpsPort: undefined,
-                                            socks5Host: '',
-                                            socks5Port: undefined,
-                                        },
-                                        ui: {
-                                            enableListAnimation: false,
-                                        }
-                                    }}
-                                >
-                                    <Form.Item
-                                        name={['ui', 'enableListAnimation']}
-                                        valuePropName="checked"
-                                        label="动画"
-                                        style={{ marginTop: '16px' }}
+                        <Col span={18} style={{ paddingLeft: 24 }}>
+                            {activeSettingsTab === 'general' && (
+                                <div>
+                                    <Form
+                                        form={form}
+                                        layout="vertical"
+                                        initialValues={{
+                                            proxy: {
+                                                enabled: false,
+                                                httpHost: '',
+                                                httpPort: undefined,
+                                                httpsHost: '',
+                                                httpsPort: undefined,
+                                                socks5Host: '',
+                                                socks5Port: undefined,
+                                            },
+                                            ui: {
+                                                enableListAnimation: false,
+                                            }
+                                        }}
                                     >
-                                        <Switch />
-                                    </Form.Item>
+                                        <Form.Item
+                                            name={['ui', 'enableListAnimation']}
+                                            valuePropName="checked"
+                                            label="动画"
+                                            style={{ marginTop: '16px' }}
+                                        >
+                                            <Switch />
+                                        </Form.Item>
 
-                                    <Form.Item
-                                        name={['ui', 'theme']}
-                                        label="主题"
-                                        style={{ marginTop: '16px' }}
+                                        <Form.Item
+                                            name={['ui', 'theme']}
+                                            label="主题"
+                                            style={{ marginTop: '16px' }}
+                                        >
+                                            <Radio.Group style={{ textAlign: 'left' }}>
+                                                <Radio value="light" style={{ marginRight: 16, color: theme === 'dark' ? 'var(--text-secondary)' : '#333' }}>浅色</Radio>
+                                                <Radio value="dark" style={{ color: theme === 'dark' ? 'var(--text-secondary)' : '#333' }}>深色</Radio>
+                                            </Radio.Group>
+                                        </Form.Item>
+
+                                        <Divider style={{ marginTop: 24, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }} />
+
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                                            <Button onClick={() => setSettingsVisible(false)} style={{ background: theme === 'dark' ? '#303030' : undefined, color: theme === 'dark' ? '#e8e8e8' : undefined, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : undefined }}>
+                                                取消
+                                            </Button>
+                                            <Button type="primary" onClick={handleSaveSettings}>
+                                                保存
+                                            </Button>
+                                        </div>
+                                    </Form>
+                                </div>
+                            )}
+
+                            {activeSettingsTab === 'proxy' && (
+                                <div>
+                                    <Form
+                                        form={form}
+                                        layout="vertical"
+                                        initialValues={{
+                                            proxy: {
+                                                enabled: false,
+                                                httpHost: '',
+                                                httpPort: undefined,
+                                                httpsHost: '',
+                                                httpsPort: undefined,
+                                                socks5Host: '',
+                                                socks5Port: undefined,
+                                            },
+                                            ui: {
+                                                enableListAnimation: false,
+                                            }
+                                        }}
                                     >
-                                        <Radio.Group style={{ textAlign: 'left' }}>
-                                            <Radio value="light" style={{ marginRight: 16, color: theme === 'dark' ? 'var(--text-secondary)' : '#333' }}>浅色</Radio>
-                                            <Radio value="dark" style={{ color: theme === 'dark' ? 'var(--text-secondary)' : '#333' }}>深色</Radio>
-                                        </Radio.Group>
-                                    </Form.Item>
+                                        <Form.Item
+                                            name={['proxy', 'enabled']}
+                                            valuePropName="checked"
+                                            label="启用代理"
+                                            style={{ marginTop: '16px' }}
+                                        >
+                                            <Switch />
+                                        </Form.Item>
 
-                                    <Divider style={{ marginTop: 24, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }} />
+                                        <Divider style={{ margin: '16px 0', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }} />
 
-                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-                                        <Button onClick={() => setSettingsVisible(false)} style={{ background: theme === 'dark' ? '#303030' : undefined, color: theme === 'dark' ? '#e8e8e8' : undefined, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : undefined }}>
-                                            取消
-                                        </Button>
-                                        <Button type="primary" onClick={handleSaveSettings}>
-                                            保存
-                                        </Button>
-                                    </div>
-                                </Form>
-                            </div>
-                        )}
+                                        <div style={{ marginBottom: 24 }}>
+                                            <div style={{ fontWeight: 500, marginBottom: 12, color: theme === 'dark' ? '#e8e8e8' : '#333' }}>代理配置</div>
+                                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                                <thead>
+                                                    <tr style={{ background: theme === 'dark' ? '#303030' : '#fafafa' }}>
+                                                        <th style={{ textAlign: 'left', padding: '10px 12px', width: 80, fontWeight: 500, color: theme === 'dark' ? '#e8e8e8' : '#333', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>协议</th>
+                                                        <th style={{ textAlign: 'left', padding: '10px 12px', fontWeight: 500, color: theme === 'dark' ? '#e8e8e8' : '#333', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>服务器地址</th>
+                                                        <th style={{ textAlign: 'left', padding: '10px 12px', width: 120, fontWeight: 500, color: theme === 'dark' ? '#e8e8e8' : '#333', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>端口</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td style={{ padding: '8px 12px', color: theme === 'dark' ? '#a0a0a0' : '#666', fontWeight: 500, borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>HTTP</td>
+                                                        <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
+                                                            <Form.Item name={['proxy', 'httpHost']} style={{ marginBottom: 0 }}>
+                                                                <Input placeholder="不填则不使用" />
+                                                            </Form.Item>
+                                                        </td>
+                                                        <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
+                                                            <Form.Item name={['proxy', 'httpPort']} style={{ marginBottom: 0 }}>
+                                                                <InputNumber
+                                                                    placeholder="端口"
+                                                                    style={{ width: '100%' }}
+                                                                    min={1}
+                                                                    max={65535}
+                                                                    precision={0}
+                                                                />
+                                                            </Form.Item>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td style={{ padding: '8px 12px', color: theme === 'dark' ? '#a0a0a0' : '#666', fontWeight: 500, borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>HTTPS</td>
+                                                        <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
+                                                            <Form.Item name={['proxy', 'httpsHost']} style={{ marginBottom: 0 }}>
+                                                                <Input placeholder="不填则不使用" />
+                                                            </Form.Item>
+                                                        </td>
+                                                        <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
+                                                            <Form.Item name={['proxy', 'httpsPort']} style={{ marginBottom: 0 }}>
+                                                                <InputNumber
+                                                                    placeholder="端口"
+                                                                    style={{ width: '100%' }}
+                                                                    min={1}
+                                                                    max={65535}
+                                                                    precision={0}
+                                                                />
+                                                            </Form.Item>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td style={{ padding: '8px 12px', color: theme === 'dark' ? '#a0a0a0' : '#666', fontWeight: 500 }}>SOCKS5</td>
+                                                        <td style={{ padding: '8px 12px' }}>
+                                                            <Form.Item name={['proxy', 'socks5Host']} style={{ marginBottom: 0 }}>
+                                                                <Input placeholder="不填则不使用" />
+                                                            </Form.Item>
+                                                        </td>
+                                                        <td style={{ padding: '8px 12px' }}>
+                                                            <Form.Item name={['proxy', 'socks5Port']} style={{ marginBottom: 0 }}>
+                                                                <InputNumber
+                                                                    placeholder="端口"
+                                                                    style={{ width: '100%' }}
+                                                                    min={1}
+                                                                    max={65535}
+                                                                    precision={0}
+                                                                />
+                                                            </Form.Item>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
 
-                        {activeSettingsTab === 'proxy' && (
-                            <div>
-                                <Form
-                                    form={form}
-                                    layout="vertical"
-                                    initialValues={{
-                                        proxy: {
-                                            enabled: false,
-                                            httpHost: '',
-                                            httpPort: undefined,
-                                            httpsHost: '',
-                                            httpsPort: undefined,
-                                            socks5Host: '',
-                                            socks5Port: undefined,
-                                        },
-                                        ui: {
-                                            enableListAnimation: false,
-                                        }
-                                    }}
-                                >
-                                    <Form.Item
-                                        name={['proxy', 'enabled']}
-                                        valuePropName="checked"
-                                        label="启用代理"
-                                        style={{ marginTop: '16px' }}
+                                        <Divider style={{ marginTop: 32, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }} />
+
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                                            <Button onClick={() => setSettingsVisible(false)} style={{ background: theme === 'dark' ? '#303030' : undefined, color: theme === 'dark' ? '#e8e8e8' : undefined, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : undefined }}>
+                                                取消
+                                            </Button>
+                                            <Button type="primary" onClick={handleSaveSettings}>
+                                                保存
+                                            </Button>
+                                        </div>
+                                    </Form>
+                                </div>
+                            )}
+
+                            {activeSettingsTab === 'git' && (
+                                <div>
+                                    <Form
+                                        form={form}
+                                        layout="vertical"
+                                        initialValues={{
+                                            gitSync: {
+                                                enabled: false,
+                                                remoteUrl: '',
+                                                branch: 'main',
+                                                password: '',
+                                            }
+                                        }}
                                     >
-                                        <Switch />
-                                    </Form.Item>
+                                        <Form.Item
+                                            name={['gitSync', 'enabled']}
+                                            valuePropName="checked"
+                                            label="启用 Git 同步"
+                                            style={{ marginTop: '16px' }}
+                                        >
+                                            <Switch />
+                                        </Form.Item>
 
-                                    <Divider style={{ margin: '16px 0', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }} />
+                                        <Divider style={{ margin: '16px 0', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }} />
 
-                                    <div style={{ marginBottom: 24 }}>
-                                        <div style={{ fontWeight: 500, marginBottom: 12, color: theme === 'dark' ? '#e8e8e8' : '#333' }}>代理配置</div>
-                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                            <thead>
-                                                <tr style={{ background: theme === 'dark' ? '#303030' : '#fafafa' }}>
-                                                    <th style={{ textAlign: 'left', padding: '10px 12px', width: 80, fontWeight: 500, color: theme === 'dark' ? '#e8e8e8' : '#333', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>协议</th>
-                                                    <th style={{ textAlign: 'left', padding: '10px 12px', fontWeight: 500, color: theme === 'dark' ? '#e8e8e8' : '#333', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>服务器地址</th>
-                                                    <th style={{ textAlign: 'left', padding: '10px 12px', width: 120, fontWeight: 500, color: theme === 'dark' ? '#e8e8e8' : '#333', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>端口</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr>
-                                                    <td style={{ padding: '8px 12px', color: theme === 'dark' ? '#a0a0a0' : '#666', fontWeight: 500, borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>HTTP</td>
-                                                    <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
-                                                        <Form.Item name={['proxy', 'httpHost']} style={{ marginBottom: 0 }}>
-                                                            <Input placeholder="不填则不使用" />
-                                                        </Form.Item>
-                                                    </td>
-                                                    <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
-                                                        <Form.Item name={['proxy', 'httpPort']} style={{ marginBottom: 0 }}>
-                                                            <InputNumber
-                                                                placeholder="端口"
-                                                                style={{ width: '100%' }}
-                                                                min={1}
-                                                                max={65535}
-                                                                precision={0}
-                                                            />
-                                                        </Form.Item>
-                                                    </td>
-                                                </tr>
-                                                <tr>
-                                                    <td style={{ padding: '8px 12px', color: theme === 'dark' ? '#a0a0a0' : '#666', fontWeight: 500, borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>HTTPS</td>
-                                                    <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
-                                                        <Form.Item name={['proxy', 'httpsHost']} style={{ marginBottom: 0 }}>
-                                                            <Input placeholder="不填则不使用" />
-                                                        </Form.Item>
-                                                    </td>
-                                                    <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
-                                                        <Form.Item name={['proxy', 'httpsPort']} style={{ marginBottom: 0 }}>
-                                                            <InputNumber
-                                                                placeholder="端口"
-                                                                style={{ width: '100%' }}
-                                                                min={1}
-                                                                max={65535}
-                                                                precision={0}
-                                                            />
-                                                        </Form.Item>
-                                                    </td>
-                                                </tr>
-                                                <tr>
-                                                    <td style={{ padding: '8px 12px', color: theme === 'dark' ? '#a0a0a0' : '#666', fontWeight: 500 }}>SOCKS5</td>
-                                                    <td style={{ padding: '8px 12px' }}>
-                                                        <Form.Item name={['proxy', 'socks5Host']} style={{ marginBottom: 0 }}>
-                                                            <Input placeholder="不填则不使用" />
-                                                        </Form.Item>
-                                                    </td>
-                                                    <td style={{ padding: '8px 12px' }}>
-                                                        <Form.Item name={['proxy', 'socks5Port']} style={{ marginBottom: 0 }}>
-                                                            <InputNumber
-                                                                placeholder="端口"
-                                                                style={{ width: '100%' }}
-                                                                min={1}
-                                                                max={65535}
-                                                                precision={0}
-                                                            />
-                                                        </Form.Item>
-                                                    </td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                        <div style={{ marginBottom: 16 }}>
+                                            <div style={{ fontWeight: 500, marginBottom: 12, color: theme === 'dark' ? '#e8e8e8' : '#333' }}>仓库配置</div>
+                                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                                <tbody>
+                                                    <tr>
+                                                        <td style={{ padding: '8px 12px', color: theme === 'dark' ? '#a0a0a0' : '#666', fontWeight: 500, width: 80, borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>仓库地址</td>
+                                                        <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
+                                                            <Form.Item name={['gitSync', 'remoteUrl']} style={{ marginBottom: 0 }}>
+                                                                <Input placeholder="https://gitee.com/username/repo.git" />
+                                                            </Form.Item>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td style={{ padding: '8px 12px', color: theme === 'dark' ? '#a0a0a0' : '#666', fontWeight: 500, borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>分支</td>
+                                                        <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
+                                                            <Form.Item name={['gitSync', 'branch']} style={{ marginBottom: 0 }}>
+                                                                <Input placeholder="main" />
+                                                            </Form.Item>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td style={{ padding: '8px 12px', color: theme === 'dark' ? '#a0a0a0' : '#666', fontWeight: 500, borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>Access Token</td>
+                                                        <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
+                                                            <Form.Item name={['gitSync', 'password']} style={{ marginBottom: 0 }}>
+                                                                <Input type="password" placeholder="粘贴你的 Access Token" />
+                                                            </Form.Item>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
 
-                                    <Divider style={{ marginTop: 32, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }} />
+                                        <Divider style={{ marginTop: 32, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }} />
 
-                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-                                        <Button onClick={() => setSettingsVisible(false)} style={{ background: theme === 'dark' ? '#303030' : undefined, color: theme === 'dark' ? '#e8e8e8' : undefined, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : undefined }}>
-                                            取消
-                                        </Button>
-                                        <Button type="primary" onClick={handleSaveSettings}>
-                                            保存
-                                        </Button>
-                                    </div>
-                                </Form>
-                            </div>
-                        )}
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                                            <Button onClick={() => setSettingsVisible(false)} style={{ background: theme === 'dark' ? '#303030' : undefined, color: theme === 'dark' ? '#e8e8e8' : undefined, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : undefined }}>
+                                                取消
+                                            </Button>
+                                            <Button type="primary" onClick={handleSaveSettings}>
+                                                保存
+                                            </Button>
+                                        </div>
+                                    </Form>
+                                </div>
+                            )}
 
-                        {activeSettingsTab === 'git' && (
-                            <div>
-                                <Form
-                                    form={form}
-                                    layout="vertical"
-                                    initialValues={{
-                                        gitSync: {
-                                            enabled: false,
-                                            remoteUrl: '',
-                                            branch: 'main',
-                                            password: '',
-                                        }
-                                    }}
-                                >
-                                    <Form.Item
-                                        name={['gitSync', 'enabled']}
-                                        valuePropName="checked"
-                                        label="启用 Git 同步"
-                                        style={{ marginTop: '16px' }}
-                                    >
-                                        <Switch />
-                                    </Form.Item>
-
-                                    <Divider style={{ margin: '16px 0', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }} />
-
-                                    <div style={{ marginBottom: 16 }}>
-                                        <div style={{ fontWeight: 500, marginBottom: 12, color: theme === 'dark' ? '#e8e8e8' : '#333' }}>仓库配置</div>
-                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                            <tbody>
-                                                <tr>
-                                                    <td style={{ padding: '8px 12px', color: theme === 'dark' ? '#a0a0a0' : '#666', fontWeight: 500, width: 80, borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>仓库地址</td>
-                                                    <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
-                                                        <Form.Item name={['gitSync', 'remoteUrl']} style={{ marginBottom: 0 }}>
-                                                            <Input placeholder="https://gitee.com/username/repo.git" />
-                                                        </Form.Item>
-                                                    </td>
-                                                </tr>
-                                                <tr>
-                                                    <td style={{ padding: '8px 12px', color: theme === 'dark' ? '#a0a0a0' : '#666', fontWeight: 500, borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>分支</td>
-                                                    <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
-                                                        <Form.Item name={['gitSync', 'branch']} style={{ marginBottom: 0 }}>
-                                                            <Input placeholder="main" />
-                                                        </Form.Item>
-                                                    </td>
-                                                </tr>
-                                                <tr>
-                                                    <td style={{ padding: '8px 12px', color: theme === 'dark' ? '#a0a0a0' : '#666', fontWeight: 500, borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>Access Token</td>
-                                                    <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
-                                                        <Form.Item name={['gitSync', 'password']} style={{ marginBottom: 0 }}>
-                                                            <Input type="password" placeholder="粘贴你的 Access Token" />
-                                                        </Form.Item>
-                                                    </td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    <Divider style={{ marginTop: 32, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }} />
-
-                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-                                        <Button onClick={() => setSettingsVisible(false)} style={{ background: theme === 'dark' ? '#303030' : undefined, color: theme === 'dark' ? '#e8e8e8' : undefined, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : undefined }}>
-                                            取消
-                                        </Button>
-                                        <Button type="primary" onClick={handleSaveSettings}>
-                                            保存
-                                        </Button>
-                                    </div>
-                                </Form>
-                            </div>
-                        )}
-
-                        {activeSettingsTab === 'about' && (
-                            <div>
-                                <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-                                    <img src="/logo.png" alt="Apiman" style={{ width: '200px', marginBottom: '24px', filter: theme === 'dark' ? 'brightness(0) invert(1)' : 'none' }} />
-                                    <p style={{ color: theme === 'dark' ? '#a0a0a0' : '#666', margin: '0 0 24px 0', fontSize: 14 }}>API 管理工具</p>
-                                    <div style={{ background: theme === 'dark' ? '#303030' : '#f5f5f5', padding: '16px 24px', borderRadius: 8, display: 'inline-block' }}>
-                                        <p style={{ color: theme === 'dark' ? '#e8e8e8' : '#333', margin: '0 0 8px 0', fontSize: 14 }}>
-                                            <strong>版本</strong>：1.0.0
-                                        </p>
-                                        <p style={{ color: theme === 'dark' ? '#e8e8e8' : '#333', margin: '0 0 8px 0', fontSize: 14 }}>
-                                            <strong>技术栈</strong>：Wails + React + TypeScript
-                                        </p>
-                                        <p style={{ color: theme === 'dark' ? '#e8e8e8' : '#333', margin: 0, fontSize: 14 }}>
-                                            <strong>作者</strong>：zetaoxie
-                                        </p>
+                            {activeSettingsTab === 'about' && (
+                                <div>
+                                    <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+                                        <img src="/logo.png" alt="Apiman" style={{ width: '200px', marginBottom: '24px', filter: theme === 'dark' ? 'brightness(0) invert(1)' : 'none' }} />
+                                        <p style={{ color: theme === 'dark' ? '#a0a0a0' : '#666', margin: '0 0 24px 0', fontSize: 14 }}>API 管理工具</p>
+                                        <div style={{ background: theme === 'dark' ? '#303030' : '#f5f5f5', padding: '16px 24px', borderRadius: 8, display: 'inline-block' }}>
+                                            <p style={{ color: theme === 'dark' ? '#e8e8e8' : '#333', margin: '0 0 8px 0', fontSize: 14 }}>
+                                                <strong>版本</strong>：1.0.0
+                                            </p>
+                                            <p style={{ color: theme === 'dark' ? '#e8e8e8' : '#333', margin: '0 0 8px 0', fontSize: 14 }}>
+                                                <strong>技术栈</strong>：Wails + React + TypeScript
+                                            </p>
+                                            <p style={{ color: theme === 'dark' ? '#e8e8e8' : '#333', margin: 0, fontSize: 14 }}>
+                                                <strong>作者</strong>：shamo
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        )}
-                    </Col>
-                </Row>
+                            )}
+                        </Col>
+                    </Row>
                 </div>
             </Modal>
         </>
