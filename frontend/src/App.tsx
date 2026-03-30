@@ -116,7 +116,6 @@ interface ApiConfig {
     bodyType: 'none' | 'form-data' | 'x-www-form-urlencoded' | 'json' | 'xml' | 'raw' | 'binary';
     formData: { key: string; value: string; enabled: boolean }[];
     urlencoded: { key: string; value: string; enabled: boolean }[];
-    cookies: { key: string; value: string; enabled: boolean }[];
     preScripts: string[];
     postScripts: string[];
 }
@@ -153,7 +152,6 @@ const createDefaultApiConfig = (): ApiConfig => ({
     bodyType: 'none',
     formData: [],
     urlencoded: [],
-    cookies: [],
     preScripts: [],
     postScripts: [],
 });
@@ -177,7 +175,6 @@ const apiConfigFromRequest = (r: CurlRequest, fallbackName: string): ApiConfig =
     const bt = (r.body_type || 'none') as ApiConfig['bodyType'];
     const allowed: ApiConfig['bodyType'][] = ['none', 'form-data', 'x-www-form-urlencoded', 'json', 'xml', 'raw', 'binary'];
     const bodyType = allowed.includes(bt) ? bt : 'none';
-    const cookiesArr = r.interface_spec?.cookies;
     return {
         name: r.name || fallbackName,
         method: (r.method || 'GET').toUpperCase(),
@@ -212,13 +209,6 @@ const apiConfigFromRequest = (r: CurlRequest, fallbackName: string): ApiConfig =
                 enabled: u.enabled !== false,
             }))
             : [],
-        cookies: Array.isArray(cookiesArr)
-            ? cookiesArr.map((c) => ({
-                key: c.key || '',
-                value: c.value || '',
-                enabled: c.enabled !== false,
-            }))
-            : [],
         preScripts: r.pre_scripts || [],
         postScripts: r.post_scripts || [],
     };
@@ -233,26 +223,15 @@ const apiConfigToSpec = (c: ApiConfig) => ({
     body_type: c.bodyType,
     form_data: c.formData.map((f) => ({ key: f.key, value: f.value, enabled: f.enabled })),
     url_encoded: c.urlencoded.map((u) => ({ key: u.key, value: u.value, enabled: u.enabled })),
-    cookies: c.cookies.map((ck) => ({ key: ck.key, value: ck.value, enabled: ck.enabled })),
 });
 
 /** Wails 将 HttpRequestSpec 生成为 class（含 convertValues），需用 createFrom 包装字面量。 */
-const toWailsHttpSpec = (c: ApiConfig) => {
-    const spec = apiConfigToSpec(c);
-    console.log('[DEBUG] toWailsHttpSpec spec:', JSON.stringify(spec, null, 2));
-    // 使用 JSON 序列化/反序列化来确保数据正确
-    const jsonStr = JSON.stringify(spec);
-    console.log('[DEBUG] JSON string:', jsonStr);
-    const result = JSON.parse(jsonStr);
-    console.log('[DEBUG] parsed result.cookies:', result.cookies);
-    return result;
-};
+const toWailsHttpSpec = (c: ApiConfig) => models.HttpRequestSpec.createFrom(apiConfigToSpec(c));
 
 const cloneApiConfig = (c: ApiConfig): ApiConfig => JSON.parse(JSON.stringify(c));
 
 /** 从 apiConfig 生成 curl 命令 */
 const buildCurlCommand = (c: ApiConfig): string => {
-    console.log('[DEBUG] buildCurlCommand called with cookies:', c.cookies);
     const parts: string[] = ['curl'];
 
     // URL with params
@@ -272,13 +251,6 @@ const buildCurlCommand = (c: ApiConfig): string => {
     const enabledHeaders = (c.headers || []).filter(h => h.enabled && h.key);
     for (const h of enabledHeaders) {
         parts.push(`-H '${h.key}: ${h.value}'`);
-    }
-
-    // Cookies
-    const enabledCookies = (c.cookies || []).filter(ck => ck.enabled && ck.key);
-    if (enabledCookies.length > 0) {
-        const cookieValue = enabledCookies.map(ck => `${ck.key}=${ck.value}`).join('; ');
-        parts.push(`-H 'Cookie: ${cookieValue}'`);
     }
 
     // Body
@@ -441,7 +413,6 @@ const apiConfigFromHttpSpec = (spec: models.HttpRequestSpec, requestName: string
         bodyType,
         formData: mapPair(spec.form_data),
         urlencoded: mapPair(spec.url_encoded),
-        cookies: mapKV(spec.cookies),
         preScripts: [],
         postScripts: [],
     };
@@ -788,6 +759,7 @@ function App() {
     const [response, setResponse] = useState<any>(null);
     const [formattedResponse, setFormattedResponse] = useState<string>('');
     const [responseBodyHeight, setResponseBodyHeight] = useState<number>(200);
+    const [scriptResultsHeight, setScriptResultsHeight] = useState<number>(200);
     const [executing, setExecuting] = useState(false);
     const [scriptLogsExpanded, setScriptLogsExpanded] = useState(true);
     const [testResultsExpanded, setTestResultsExpanded] = useState(true);
@@ -828,7 +800,7 @@ function App() {
     const [importing, setImporting] = useState(false);
     const [searchVersion, setSearchVersion] = useState(0);
     const [projectWorkspaceStates, setProjectWorkspaceStates] = useState<Record<string, ProjectWorkspaceState>>({});
-    const [listAnimationEnabled, setListAnimationEnabled] = useState(false);
+    const [animationEnabled, setListAnimationEnabled] = useState(false);
     const [appTheme, setAppTheme] = useState(() => {
         // 尝试从 localStorage 读取主题，避免闪烁
         const saved = localStorage.getItem('apiman-theme');
@@ -1919,9 +1891,8 @@ function App() {
 
     // Update curl preview when apiConfig changes
     useEffect(() => {
-        console.log('[DEBUG] useEffect triggered, apiConfig.cookies:', apiConfig.cookies);
         setCurlPreview(buildCurlCommand(apiConfig));
-    }, [apiConfig.method, apiConfig.url, apiConfig.headers, apiConfig.params, apiConfig.body, apiConfig.bodyType, apiConfig.formData, apiConfig.urlencoded, apiConfig.cookies]);
+    }, [apiConfig.method, apiConfig.url, apiConfig.headers, apiConfig.params, apiConfig.body, apiConfig.bodyType, apiConfig.formData, apiConfig.urlencoded]);
 
     // Calculate response-body height dynamically
     useEffect(() => {
@@ -1941,6 +1912,26 @@ function App() {
         // Recalculate on window resize
         window.addEventListener('resize', calculateResponseBodyHeight);
         return () => window.removeEventListener('resize', calculateResponseBodyHeight);
+    }, [response]);
+
+    // Calculate script-results-panel height dynamically
+    useEffect(() => {
+        const calculateScriptResultsHeight = () => {
+            const responsePanel = document.querySelector('.response-panel') as HTMLElement;
+            const responseHeader = document.querySelector('.response-panel .response-header') as HTMLElement;
+            if (responsePanel && responseHeader) {
+                const panelHeight = responsePanel.offsetHeight;
+                const headerHeight = responseHeader.offsetHeight;
+                const bodyHeight = panelHeight - headerHeight - 40; // 40 = tabs height
+                setScriptResultsHeight(Math.max(100, bodyHeight));
+            }
+        };
+
+        calculateScriptResultsHeight();
+
+        // Recalculate on window resize
+        window.addEventListener('resize', calculateScriptResultsHeight);
+        return () => window.removeEventListener('resize', calculateScriptResultsHeight);
     }, [response]);
 
     const triggerOpenTabAnimation = () => {
@@ -2729,11 +2720,6 @@ function App() {
                 key: applyEnvironmentVariables(item.key, variables),
                 value: applyEnvironmentVariables(item.value, variables),
             })),
-            cookies: apiConfig.cookies.map(cookie => ({
-                ...cookie,
-                key: applyEnvironmentVariables(cookie.key, variables),
-                value: applyEnvironmentVariables(cookie.value, variables),
-            })),
         };
 
         if (!apiConfig.url?.trim()) {
@@ -2756,9 +2742,7 @@ function App() {
                     apiConfig.postScripts
                 );
             } else {
-                const spec = toWailsHttpSpec(resolvedConfig);
-                console.log('[DEBUG] ExecuteHTTPRequest spec.cookies:', spec.cookies);
-                result = await ExecuteHTTPRequest(spec);
+                result = await ExecuteHTTPRequest(toWailsHttpSpec(resolvedConfig));
             }
             setResponse(result);
             // 格式化响应体
@@ -3402,7 +3386,7 @@ function App() {
                                     </div>
 
                                     <div
-                                        className={`sidebar-content${(listAnimationEnabled || forceListAnimation) ? ' list-animations-enabled' : ''}${dropTargetFolderPath === currentTree?.path ? ' root-drop-target' : ''}`}
+                                        className={`sidebar-content${(animationEnabled || forceListAnimation) ? ' animations-enabled' : ''}${dropTargetFolderPath === currentTree?.path ? ' root-drop-target' : ''}`}
                                         onDragOver={(e) => {
                                             if (!draggingNode || !currentTree?.path) return;
                                             const check = checkDropAppendIntoFolder(draggingNode, currentTree.path);
@@ -3518,6 +3502,7 @@ function App() {
                                             }))}
                                             size="small"
                                             style={{ marginBottom: 0 }}
+                                            animated={(animationEnabled || forceListAnimation)}
                                         />
                                     </div>
                                     <div className="request-tabs-environment-select">
@@ -3555,6 +3540,7 @@ function App() {
                                                 }))}
                                                 size="small"
                                                 style={{ marginBottom: 12 }}
+                                                animated={(animationEnabled || forceListAnimation)}
                                             />
                                             <div className="environment-panel">
                                                 <Input
@@ -3945,70 +3931,6 @@ function App() {
                                                     ),
                                                 },
                                                 {
-                                                    key: 'cookies',
-                                                    label: 'Cookie',
-                                                    children: (
-                                                        <div className="kv-editor">
-                                                            {apiConfig.cookies.map((cookie, index) => (
-                                                                <div key={index} className="kv-row kv-row-params">
-                                                                    <Checkbox
-                                                                        className="kv-param-enabled"
-                                                                        checked={cookie.enabled !== false}
-                                                                        onChange={(e) => {
-                                                                            const newCookies = [...apiConfig.cookies];
-                                                                            newCookies[index].enabled = e.target.checked;
-                                                                            setApiConfig({ ...apiConfig, cookies: newCookies });
-                                                                        }}
-                                                                        title="发送请求时包含该 Cookie"
-                                                                    />
-                                                                    {renderVariableAwareInput(
-                                                                        cookie.key,
-                                                                        (value) => {
-                                                                            const newCookies = [...apiConfig.cookies];
-                                                                            newCookies[index].key = value;
-                                                                            setApiConfig({ ...apiConfig, cookies: newCookies });
-                                                                        },
-                                                                        'Name',
-                                                                        { flex: 1 }
-                                                                    )}
-                                                                    {renderVariableAwareInput(
-                                                                        cookie.value,
-                                                                        (value) => {
-                                                                            const newCookies = [...apiConfig.cookies];
-                                                                            newCookies[index].value = value;
-                                                                            setApiConfig({ ...apiConfig, cookies: newCookies });
-                                                                        },
-                                                                        'Value',
-                                                                        { flex: 1 }
-                                                                    )}
-                                                                    <Button
-                                                                        type="text"
-                                                                        danger
-                                                                        onClick={() => {
-                                                                            const newCookies = apiConfig.cookies.filter((_, i) => i !== index);
-                                                                            setApiConfig({ ...apiConfig, cookies: newCookies });
-                                                                        }}
-                                                                    >
-                                                                        ×
-                                                                    </Button>
-                                                                </div>
-                                                            ))}
-                                                            <Button
-                                                                type="link"
-                                                                icon={<PlusOutlined />}
-                                                                onClick={() => {
-                                                                    setApiConfig({
-                                                                        ...apiConfig,
-                                                                        cookies: [...apiConfig.cookies, { key: '', value: '', enabled: true }]
-                                                                    });
-                                                                }}
-                                                            >
-                                                                添加 Cookie
-                                                            </Button>
-                                                        </div>
-                                                    ),
-                                                },
-                                                {
                                                     key: 'pre-script',
                                                     label: '前置脚本',
                                                     children: (
@@ -4240,6 +4162,7 @@ function App() {
                                                     ),
                                                 },
                                             ]}
+                                            animated={(animationEnabled || forceListAnimation)}
                                         />
                                     </div>
 
@@ -4279,12 +4202,22 @@ function App() {
                                                         children: (
                                                             <div className="response-body" style={{ height: responseBodyHeight }}>
                                                                 <div className="response-headers">
-                                                                    {response.headers && Object.entries(response.headers).map(([key, value]) => (
-                                                                        <div key={key} className="response-header-item">
-                                                                            <span className="header-key">{key}</span>
-                                                                            <span className="header-value">{String(value)}</span>
-                                                                        </div>
-                                                                    ))}
+                                                                    {response.headers && Object.entries(response.headers as Record<string, string[]>).map(([key, values]) => {
+                                                                        if (key.toLowerCase() === 'set-cookie') {
+                                                                            return values.map((cookie: string, i: number) => (
+                                                                                <div key={`${key}-${i}`} className="response-header-item">
+                                                                                    <span className="header-key">{i === 0 ? key : ''}</span>
+                                                                                    <span className="header-value set-cookie-value">{cookie}</span>
+                                                                                </div>
+                                                                            ));
+                                                                        }
+                                                                        return values.map((value: string, i: number) => (
+                                                                            <div key={`${key}-${i}`} className="response-header-item">
+                                                                                <span className="header-key">{i === 0 ? key : ''}</span>
+                                                                                <span className="header-value">{value}</span>
+                                                                            </div>
+                                                                        ));
+                                                                    })}
                                                                 </div>
                                                             </div>
                                                         ),
@@ -4321,23 +4254,39 @@ function App() {
                                                             <div className="response-body" style={{ height: responseBodyHeight }}>
                                                                 <div className="response-cookies">
                                                                     {response.cookies && response.cookies.length > 0 ? (
-                                                                        response.cookies.map((cookie: any, index: number) => (
-                                                                            <div key={index} className="response-cookie-item">
-                                                                                <div className="cookie-header">
-                                                                                    <span className="cookie-name">{cookie.name}</span>
-                                                                                    <span className="cookie-value">{cookie.value}</span>
-                                                                                </div>
-                                                                                <div className="cookie-meta">
-                                                                                    {cookie.domain && <div className="cookie-domain">Domain: {cookie.domain}</div>}
-                                                                                    {cookie.path && <div className="cookie-path">Path: {cookie.path}</div>}
-                                                                                    {cookie.expires && cookie.expires !== '0001-01-01 00:00:00 +0000 UTC' && <div className="cookie-expires">Expires: {cookie.expires}</div>}
-                                                                                    <div className="cookie-flags">
-                                                                                        {cookie.http_only && <span className="cookie-flag">HttpOnly</span>}
-                                                                                        {cookie.secure && <span className="cookie-flag">Secure</span>}
-                                                                                    </div>
-                                                                                </div>
-                                                                            </div>
-                                                                        ))
+                                                                        <table className="cookie-table">
+                                                                            <thead>
+                                                                                <tr>
+                                                                                    <th>Name</th>
+                                                                                    <th>Value</th>
+                                                                                    <th>Domain</th>
+                                                                                    <th>Path</th>
+                                                                                    <th>Expires</th>
+                                                                                    <th>Flags</th>
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody>
+                                                                                {response.cookies.map((cookie: any, index: number) => (
+                                                                                    <tr key={index}>
+                                                                                        <td className="cookie-name-cell">{cookie.name}</td>
+                                                                                        <td className="cookie-value-cell">{cookie.value}</td>
+                                                                                        <td>{cookie.domain || '-'}</td>
+                                                                                        <td>{cookie.path || '-'}</td>
+                                                                                        <td className="cookie-expires-cell">
+                                                                                            {cookie.expires && cookie.expires !== '0001-01-01 00:00:00 +0000 UTC'
+                                                                                                ? new Date(cookie.expires).toLocaleString()
+                                                                                                : 'Session'}
+                                                                                        </td>
+                                                                                        <td>
+                                                                                            <div className="cookie-flags">
+                                                                                                {cookie.http_only && <span className="cookie-flag http-only">HttpOnly</span>}
+                                                                                                {cookie.secure && <span className="cookie-flag secure">Secure</span>}
+                                                                                            </div>
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                ))}
+                                                                            </tbody>
+                                                                        </table>
                                                                     ) : (
                                                                         <div className="response-empty">No cookies in response</div>
                                                                     )}
@@ -4349,7 +4298,7 @@ function App() {
                                                         key: 'scripts',
                                                         label: '脚本结果',
                                                         children: (
-                                                            <div className="script-results-panel">
+                                                            <div className="script-results-panel" style={{ height: scriptResultsHeight }}>
                                                                 {response.script_logs && response.script_logs.length > 0 && (() => {
                                                                     // Parse workflow items from logs
                                                                     const workflowItems: { name: string; type: 'pre' | 'post' | 'http'; status: 'running' | 'success' | 'failed'; duration?: number }[] = [];
@@ -4468,6 +4417,7 @@ function App() {
                                                         ),
                                                     }] : []),
                                                 ]}
+                                                animated={(animationEnabled || forceListAnimation)}
                                             />
                                         </div>
                                     )}

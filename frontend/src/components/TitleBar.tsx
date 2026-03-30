@@ -348,7 +348,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                                     <Form.Item
                                         name={['ui', 'enableListAnimation']}
                                         valuePropName="checked"
-                                        label="接口列表动画"
+                                        label="动画"
                                         style={{ marginTop: '16px' }}
                                     >
                                         <Switch />

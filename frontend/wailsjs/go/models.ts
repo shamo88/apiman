@@ -331,7 +331,7 @@ export namespace models {
 	}
 	export class CurlResponse {
 	    status_code: number;
-	    headers: Record<string, string>;
+	    headers: Record<string, Array<string>>;
 	    body: string;
 	    duration: number;
 	    error: string;

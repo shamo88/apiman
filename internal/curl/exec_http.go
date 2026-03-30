@@ -104,20 +104,6 @@ func (c *CurlExecutor) ExecuteHTTPRequestWithProxy(spec *models.HttpRequestSpec,
 		req.Header.Set(key, value)
 	}
 
-	// 设置请求 Cookie
-	fmt.Printf("[DEBUG] spec.Cookies: %+v\n", spec.Cookies)
-	if len(spec.Cookies) > 0 {
-		var cookieParts []string
-		for _, c := range spec.Cookies {
-			if c.Enabled && strings.TrimSpace(c.Key) != "" {
-				cookieParts = append(cookieParts, c.Key+"="+c.Value)
-			}
-		}
-		if len(cookieParts) > 0 {
-			req.Header.Set("Cookie", strings.Join(cookieParts, "; "))
-		}
-	}
-
 	client := &http.Client{Timeout: 30 * time.Second}
 	if proxyOpts != nil && proxyOpts.Enabled {
 		client.Transport = buildTransportWithProxy(proxyOpts)
@@ -133,10 +119,10 @@ func (c *CurlExecutor) ExecuteHTTPRequestWithProxy(spec *models.HttpRequestSpec,
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	bodyStr := string(bodyBytes)
 
-	headers := make(map[string]string)
+	headers := make(map[string][]string)
 	for key, values := range resp.Header {
 		if len(values) > 0 {
-			headers[key] = values[0]
+			headers[key] = values
 		}
 	}
 

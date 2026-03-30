@@ -151,7 +151,7 @@ type ResponseCookie struct {
 
 type CurlResponse struct {
 	StatusCode int               `json:"status_code"`
-	Headers    map[string]string `json:"headers"`
+	Headers    map[string][]string `json:"headers"`
 	Body       string            `json:"body"`
 	Duration   int64             `json:"duration"`
 	Error      string            `json:"error"`
