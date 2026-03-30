@@ -1989,13 +1989,11 @@ body,
 .script-workflow-line {
     width: 40px;
     height: 2px;
-    background: repeating-linear-gradient(
-        to right,
-        var(--border-subtle) 0,
-        var(--border-subtle) 4px,
-        transparent 4px,
-        transparent 8px
-    );
+    background: repeating-linear-gradient(to right,
+            var(--border-subtle) 0,
+            var(--border-subtle) 4px,
+            transparent 4px,
+            transparent 8px);
     flex-shrink: 0;
 }
 
@@ -2713,6 +2711,11 @@ body,
     text-align: left !important;
 }
 
+/* 浅色主题设置模态框表单内容左对齐 */
+.settings-modal:not(.theme-dark) .ant-form-item .ant-form-item-control-input-content {
+    text-align: left !important;
+}
+
 .theme-dark .kv-editor {
     background: var(--bg-primary);
 }
@@ -3026,7 +3029,7 @@ body,
 
 /* 设置模态框表单内容左对齐 */
 .settings-modal.theme-dark .ant-form-item .ant-form-item-control-input-content {
-    text-align: left;
+    text-align: left !important;
 }
 
 /* 强制覆盖 Ant Design Modal 内部容器 */
