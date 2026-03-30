@@ -843,6 +843,14 @@ function App() {
     const forceAnimationTimerRef = React.useRef<number | null>(null);
     const movedHighlightTimerRef = React.useRef<number | null>(null);
 
+    // Ant Design 的下拉弹层会挂载到 body（portal）。因此需要把主题 class 挂到 html 上，
+    // 才能让弹层也吃到深色主题的 CSS 变量与覆盖样式。
+    React.useEffect(() => {
+        const root = document.documentElement;
+        if (!root) return;
+        root.classList.toggle('theme-dark', appTheme === 'dark');
+    }, [appTheme]);
+
     const trimRightSpaces = (value: string) => value.replace(/\s+$/g, '');
     const getPrimaryName = (value: string) => value.replace(/-副本\d*$/u, '');
 
@@ -4359,6 +4367,7 @@ function App() {
                 open={createProjectModal}
                 onOk={handleCreateProject}
                 onCancel={() => { setCreateProjectModal(false); setNewProjectName(''); }}
+                className={`create-project-modal ${appTheme === 'dark' ? 'theme-dark' : ''}`}
             >
                 <Input
                     placeholder="输入项目名称"

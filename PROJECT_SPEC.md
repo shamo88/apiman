@@ -1081,14 +1081,6 @@ Linux:   ~/.config/apiman/
 - [ ] 团队协作功能
 - [ ] API 文档自动生成
 
-***
-
-## 📜 许可证
-
-本项目采用 MIT 许可证。
-
-***
-
 ## 🙏 致谢
 
 - [Wails](https://wails.io/) - Go + Web 桌面应用框架
@@ -1100,7 +1092,7 @@ Linux:   ~/.config/apiman/
 
 ## 📞 联系方式
 
-- 作者：zetaoxie
+- shamo
 - 邮箱：<592334843@qq.com>
 
 ***
