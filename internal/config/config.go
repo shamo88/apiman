@@ -340,3 +340,83 @@ func (c *ConfigManager) SaveAppConfig(config *AppConfig) error {
 
 	return os.WriteFile(configFile, data, 0644)
 }
+
+// GlobalCookieFile returns the path to the global cookie file.
+func (c *ConfigManager) GlobalCookieFile() string {
+	return filepath.Join(c.configDir, "cookie")
+}
+
+// LoadGlobalCookies reads global cookies from the cookie file.
+func (c *ConfigManager) LoadGlobalCookies() ([]models.GlobalCookie, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	cookieFile := c.GlobalCookieFile()
+	data, err := os.ReadFile(cookieFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []models.GlobalCookie{}, nil
+		}
+		return nil, err
+	}
+
+	var cookies []models.GlobalCookie
+	if err := json.Unmarshal(data, &cookies); err != nil {
+		return nil, err
+	}
+
+	return cookies, nil
+}
+
+// SaveGlobalCookies saves all global cookies to the cookie file.
+func (c *ConfigManager) SaveGlobalCookies(cookies []models.GlobalCookie) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	cookieFile := c.GlobalCookieFile()
+	data, err := json.MarshalIndent(cookies, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(cookieFile, data, 0644)
+}
+
+// AddGlobalCookie adds a single cookie to the cookie file.
+func (c *ConfigManager) AddGlobalCookie(cookie models.GlobalCookie) error {
+	cookies, err := c.LoadGlobalCookies()
+	if err != nil {
+		return err
+	}
+	cookies = append(cookies, cookie)
+	return c.SaveGlobalCookies(cookies)
+}
+
+// DeleteGlobalCookie removes a cookie by its ID.
+func (c *ConfigManager) DeleteGlobalCookie(id string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	cookieFile := c.GlobalCookieFile()
+	data, err := os.ReadFile(cookieFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	var cookies []models.GlobalCookie
+	if err := json.Unmarshal(data, &cookies); err != nil {
+		return err
+	}
+
+	for i, cookie := range cookies {
+		if cookie.ID == id {
+			cookies = append(cookies[:i], cookies[i+1:]...)
+			break
+		}
+	}
+
+	return c.SaveGlobalCookies(cookies)
+}

@@ -6,6 +6,7 @@ import (
 	"apiman/internal/project"
 	"apiman/internal/service"
 	"context"
+	"encoding/json"
 )
 
 type App struct {
@@ -238,3 +239,36 @@ func (a *App) DisableGitSync() error {
 func (a *App) PullGitRepo() error {
 	return a.service.PullGitRepo()
 }
+
+// LoadGlobalCookies returns all saved global cookies as JSON string.
+func (a *App) LoadGlobalCookies() (string, error) {
+	cookies, err := a.service.LoadGlobalCookies()
+	if err != nil {
+		return "", err
+	}
+	data, err := json.Marshal(cookies)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+// SaveGlobalCookies replaces all global cookies with the given JSON data.
+func (a *App) SaveGlobalCookies(jsonData string) error {
+	var cookies []models.GlobalCookie
+	if err := json.Unmarshal([]byte(jsonData), &cookies); err != nil {
+		return err
+	}
+	return a.service.SaveGlobalCookies(cookies)
+}
+
+// AddGlobalCookies parses and adds set-cookie raw data.
+func (a *App) AddGlobalCookies(rawCookies string) error {
+	return a.service.AddGlobalCookies(rawCookies)
+}
+
+// DeleteGlobalCookie deletes a cookie by its ID.
+func (a *App) DeleteGlobalCookie(id string) error {
+	return a.service.DeleteGlobalCookie(id)
+}
+

@@ -4,6 +4,8 @@ import {models} from '../models';
 import {project} from '../models';
 import {config} from '../models';
 
+export function AddGlobalCookies(arg1:string):Promise<void>;
+
 export function AddRequestCase(arg1:string,arg2:string):Promise<models.CurlRequest>;
 
 export function CopyRequest(arg1:string):Promise<models.CurlRequest>;
@@ -21,6 +23,8 @@ export function CreateRequest(arg1:string,arg2:string,arg3:string,arg4:models.Ht
 export function DeleteEnvironment(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteFolder(arg1:string):Promise<void>;
+
+export function DeleteGlobalCookie(arg1:string):Promise<void>;
 
 export function DeleteProject(arg1:string):Promise<void>;
 
@@ -70,6 +74,8 @@ export function LoadAppConfig():Promise<config.AppConfig>;
 
 export function LoadEnvironments(arg1:string):Promise<Array<models.Environment>>;
 
+export function LoadGlobalCookies():Promise<string>;
+
 export function LoadProjectGroupsState():Promise<project.ProjectGroupsState>;
 
 export function MoveFolder(arg1:string,arg2:string,arg3:string):Promise<string>;
@@ -89,6 +95,8 @@ export function RenameRequestCase(arg1:string,arg2:string,arg3:string):Promise<m
 export function ReplaceVariables(arg1:string,arg2:Record<string, string>):Promise<string>;
 
 export function SaveAppConfig(arg1:config.AppConfig):Promise<void>;
+
+export function SaveGlobalCookies(arg1:string):Promise<void>;
 
 export function SaveGlobalVariables(arg1:Record<string, string>):Promise<void>;
 

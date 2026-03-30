@@ -1,13 +1,13 @@
-import { ApiOutlined, CloseOutlined, CopyOutlined, DownOutlined, EditOutlined, ExperimentOutlined, FileOutlined, FolderOutlined, HomeOutlined, ImportOutlined, MoreOutlined, PlusOutlined, ProjectOutlined, QuestionCircleOutlined, RightOutlined, SearchOutlined, EnvironmentOutlined, CodeOutlined } from '@ant-design/icons';
+import { ApiOutlined, CloseOutlined, CopyOutlined, DownOutlined, EditOutlined, ExperimentOutlined, FileOutlined, FolderOutlined, HomeOutlined, ImportOutlined, MoreOutlined, PlusOutlined, ProjectOutlined, QuestionCircleOutlined, RightOutlined, SearchOutlined, EnvironmentOutlined, CodeOutlined, SafetyOutlined } from '@ant-design/icons';
 import { javascript } from '@codemirror/lang-javascript';
 import CodeMirror from '@uiw/react-codemirror';
 import { JsonView, darkStyles, allExpanded } from 'react-json-view-lite';
 import 'react-json-view-lite/dist/index.css';
 import type { UploadProps } from 'antd';
-import { Button, Card, Checkbox, Col, Dropdown, Empty, Input, InputRef, message, Modal, Radio, Row, Select, Space, Spin, Tabs, Tooltip, Upload } from 'antd';
+import { Button, Card, Checkbox, Col, Divider, Dropdown, Empty, Input, InputRef, message, Modal, Radio, Row, Select, Space, Spin, Table, Tabs, Tooltip, Upload } from 'antd';
 import type { DataNode } from 'antd/es/tree';
 import React, { useEffect, useState } from 'react';
-import { AddRequestCase, CopyRequest, CreateEnvironment, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteEnvironment, DeleteFolder, DeleteProject, DeleteProjectScript, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, ListProjectScripts, LoadAppConfig, LoadEnvironments, MoveFolder, MoveRequest, PullGitRepo, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, SaveAppConfig, UpdateEnvironment, UpdateProjectScript, UpdateRequest, UpdateRequestScripts } from '../wailsjs/go/main/App';
+import { AddGlobalCookies, AddRequestCase, CopyRequest, CreateEnvironment, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteEnvironment, DeleteFolder, DeleteGlobalCookie, DeleteProject, DeleteProjectScript, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, ListProjectScripts, LoadAppConfig, LoadEnvironments, LoadGlobalCookies, MoveFolder, MoveRequest, PullGitRepo, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, SaveAppConfig, SaveGlobalCookies, UpdateEnvironment, UpdateProjectScript, UpdateRequest, UpdateRequestScripts } from '../wailsjs/go/main/App';
 import { models } from '../wailsjs/go/models';
 import './App.css';
 import { ScriptHelpWindow } from './components/ScriptHelpWindow';
@@ -764,6 +764,9 @@ function App() {
     const [loading, setLoading] = useState(false);
     const [createProjectModal, setCreateProjectModal] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
+    const [cookieModalVisible, setCookieModalVisible] = useState(false);
+    const [cookieInput, setCookieInput] = useState('');
+    const [globalCookies, setGlobalCookies] = useState<any[]>([]);
     const [projectTabs, setProjectTabs] = useState<ProjectTab[]>([]);
     const [activeTab, setActiveTab] = useState<string>('home');
     const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
@@ -2100,6 +2103,48 @@ function App() {
         message.success('分组创建成功');
     };
 
+    const loadGlobalCookies = async () => {
+        try {
+            const data = await LoadGlobalCookies();
+            if (data) {
+                setGlobalCookies(JSON.parse(data));
+            } else {
+                setGlobalCookies([]);
+            }
+        } catch (err) {
+            console.error('Failed to load cookies:', err);
+            setGlobalCookies([]);
+        }
+    };
+
+    const handleSaveCookies = async () => {
+        if (!cookieInput.trim()) {
+            message.warning('请输入 set-cookie 内容');
+            return;
+        }
+        try {
+            await AddGlobalCookies(cookieInput);
+            message.success('Cookie 保存成功');
+            setCookieInput('');
+            loadGlobalCookies();
+        } catch (err) {
+            message.error(`保存失败: ${err}`);
+        }
+    };
+
+    const handleDeleteCookie = async (id: string) => {
+        console.log('Deleting cookie:', id);
+        try {
+            const result = await DeleteGlobalCookie(id);
+            console.log('Delete result:', result);
+            message.success('Cookie 已删除');
+            loadGlobalCookies();
+        } catch (err) {
+            console.error('Delete error:', err);
+            message.error(`删除失败: ${err}`);
+        }
+    };
+
     const handleAssignProjectGroup = (projectId: string, groupName: string) => {
         if (!groupName || groupName === DEFAULT_PROJECT_GROUP) {
             setProjectGroupAssignments(prev => {
@@ -3154,6 +3199,9 @@ function App() {
                                 </Upload>
                                 <Button icon={<FolderOutlined />} onClick={() => setCreateGroupModal(true)}>
                                     新建分组
+                                </Button>
+                                <Button icon={<SafetyOutlined />} onClick={() => { setCookieModalVisible(true); loadGlobalCookies(); }}>
+                                    设置Cookie
                                 </Button>
                                 <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateProjectModal(true)}>
                                     新建项目
@@ -4612,6 +4660,72 @@ function App() {
                     onChange={(e) => setCaseRenameInput(e.target.value)}
                     onPressEnter={confirmCaseRenameFromTree}
                 />
+            </Modal>
+
+            <Modal
+                title="设置全局Cookie"
+                open={cookieModalVisible}
+                onOk={handleSaveCookies}
+                onCancel={() => { setCookieModalVisible(false); setCookieInput(''); }}
+                className={`cookie-modal ${appTheme === 'dark' ? 'theme-dark' : ''}`}
+                width={700}
+                okText="保存"
+            >
+                <div style={{ marginBottom: 16 }}>
+                    <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                        输入 set-cookie 原始报文，每行一个。Cookie 将对所有项目的所有请求生效。
+                    </p>
+                    <Input.TextArea
+                        rows={6}
+                        placeholder={`例如:
+session=abc123; Domain=.example.com; Path=/; Expires=Wed, 09 Jun 2026 10:18:14 GMT; HttpOnly; Secure
+token=xyz789; Domain=api.example.com; Path=/api`}
+                        value={cookieInput}
+                        onChange={(e) => setCookieInput(e.target.value)}
+                        style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}
+                    />
+                </div>
+
+                {globalCookies.length > 0 && (
+                    <div>
+                        <Divider style={{ margin: '16px 0' }} />
+                        <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>已保存的 Cookies</p>
+                        <Table
+                            size="small"
+                            dataSource={globalCookies}
+                            rowKey="id"
+                            pagination={false}
+                            columns={[
+                                { title: 'Name', dataIndex: 'name', key: 'name', width: 120, ellipsis: true },
+                                { title: 'Domain', dataIndex: 'domain', key: 'domain', width: 120, ellipsis: true },
+                                { title: 'Path', dataIndex: 'path', key: 'path', width: 80, ellipsis: true },
+                                {
+                                    title: 'Expires',
+                                    dataIndex: 'expires',
+                                    key: 'expires',
+                                    width: 150,
+                                    ellipsis: true,
+                                    render: (val: string) => val ? new Date(val).toLocaleString() : 'Session'
+                                },
+                                {
+                                    title: 'Action',
+                                    key: 'action',
+                                    width: 80,
+                                    render: (_: any, record: any) => (
+                                        <Button
+                                            type="text"
+                                            danger
+                                            size="small"
+                                            onClick={() => handleDeleteCookie(record.id)}
+                                        >
+                                            删除
+                                        </Button>
+                                    )
+                                }
+                            ]}
+                        />
+                    </div>
+                )}
             </Modal>
 
             <ScriptHelpWindow
