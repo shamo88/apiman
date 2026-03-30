@@ -119,11 +119,25 @@ func (c *CurlExecutor) ExecuteHTTPRequestWithProxy(spec *models.HttpRequestSpec,
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	bodyStr := string(bodyBytes)
 
-	headers := make(map[string]string)
+	headers := make(map[string][]string)
 	for key, values := range resp.Header {
 		if len(values) > 0 {
-			headers[key] = values[0]
+			headers[key] = values
 		}
+	}
+
+	// 提取响应 Cookie
+	var cookies []models.ResponseCookie
+	for _, c := range resp.Cookies() {
+		cookies = append(cookies, models.ResponseCookie{
+			Name:     c.Name,
+			Value:    c.Value,
+			Domain:   c.Domain,
+			Path:     c.Path,
+			Expires:  c.Expires.String(),
+			HttpOnly: c.HttpOnly,
+			Secure:   c.Secure,
+		})
 	}
 
 	return &models.CurlResponse{
@@ -131,6 +145,7 @@ func (c *CurlExecutor) ExecuteHTTPRequestWithProxy(spec *models.HttpRequestSpec,
 		Headers:    headers,
 		Body:       bodyStr,
 		Duration:   duration,
+		Cookies:    cookies,
 	}, nil
 }
 

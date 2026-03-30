@@ -65,7 +65,7 @@ type RequestSnapshot struct {
 
 type ResponseSnapshot struct {
 	StatusCode int
-	Headers    map[string]string
+	Headers    map[string][]string
 	Body       string
 	Duration   int64
 }
@@ -422,7 +422,7 @@ func (se *ScriptExecutor) injectAmResponse(vm *goja.Runtime, am *goja.Object, ex
 	response.Set("code", execCtx.Response.StatusCode)
 
 	headers := vm.NewObject()
-	headers.Set("all", func() map[string]string {
+	headers.Set("all", func() map[string][]string {
 		return execCtx.Response.Headers
 	})
 	response.Set("headers", headers)

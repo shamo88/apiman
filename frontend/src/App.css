@@ -1632,7 +1632,7 @@ body,
     border-radius: var(--radius-md);
     height: 100%;
     min-height: 200px;
-    max-height: 600px;
+    max-height: 1000px;
     box-shadow: var(--shadow-card);
 }
 
@@ -1740,6 +1740,30 @@ body,
     min-width: 200px;
 }
 
+.response-header-item .header-value .cookie-separator {
+    color: var(--text-secondary);
+}
+
+.response-header-item .header-value>span {
+    display: block;
+}
+
+.response-header-item .header-value>span>span {
+    display: inline;
+}
+
+/* Set-Cookie display */
+.response-header-item .header-value.set-cookie-value {
+    color: var(--text-secondary);
+    padding-left: 8px;
+    border-left: 2px solid var(--accent-primary);
+    margin-left: 4px;
+}
+
+.response-header-item .header-key:empty {
+    min-width: 0;
+}
+
 /* Tabs inside response-panel must respect parent height */
 .response-panel .ant-tabs {
     flex: 1;
@@ -1770,6 +1794,103 @@ body,
 .response-header-item .header-value {
     color: var(--text-secondary);
     word-break: break-all;
+}
+
+/* Cookie Table */
+.response-cookies {
+    overflow: auto;
+}
+
+.cookie-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    table-layout: fixed;
+}
+
+.cookie-table th {
+    text-align: left;
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border-bottom: 2px solid var(--border-subtle);
+    font-weight: 600;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.cookie-table th:nth-child(1) {
+    width: 15%;
+}
+
+.cookie-table th:nth-child(2) {
+    width: 35%;
+}
+
+.cookie-table th:nth-child(3) {
+    width: 10%;
+}
+
+.cookie-table th:nth-child(4) {
+    width: 8%;
+}
+
+.cookie-table th:nth-child(5) {
+    width: 17%;
+}
+
+.cookie-table th:nth-child(6) {
+    width: 15%;
+}
+
+.cookie-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    vertical-align: top;
+}
+
+.cookie-table tr:hover {
+    background: var(--bg-hover);
+}
+
+.cookie-name-cell {
+    font-weight: 500;
+    color: var(--accent-primary);
+    word-break: break-all;
+}
+
+.cookie-value-cell {
+    color: var(--text-secondary);
+    word-break: break-all;
+    white-space: pre-wrap;
+}
+
+.cookie-expires-cell {
+    color: var(--text-secondary);
+    font-size: 11px;
+}
+
+.cookie-flags {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.cookie-flag {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 500;
+}
+
+.cookie-flag.http-only {
+    background: rgba(139, 92, 246, 0.15);
+    color: #8b5cf6;
+}
+
+.cookie-flag.secure {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
 }
 
 /* JsonView Container */
@@ -1859,7 +1980,6 @@ body,
 
 .script-results-panel {
     padding: 12px;
-    max-height: 400px;
     overflow-y: auto;
 }
 
@@ -1989,13 +2109,11 @@ body,
 .script-workflow-line {
     width: 40px;
     height: 2px;
-    background: repeating-linear-gradient(
-        to right,
-        var(--border-subtle) 0,
-        var(--border-subtle) 4px,
-        transparent 4px,
-        transparent 8px
-    );
+    background: repeating-linear-gradient(to right,
+            var(--border-subtle) 0,
+            var(--border-subtle) 4px,
+            transparent 4px,
+            transparent 8px);
     flex-shrink: 0;
 }
 
@@ -2251,32 +2369,32 @@ body,
     }
 }
 
-.list-animations-enabled .api-folder {
+.animations-enabled .api-folder {
     animation: listSlideIn 0.2s ease;
 }
 
-.list-animations-enabled .api-item {
+.animations-enabled .api-item {
     animation: listSlideIn 0.15s ease;
     animation-fill-mode: both;
 }
 
-.list-animations-enabled .api-item:nth-child(1) {
+.animations-enabled .api-item:nth-child(1) {
     animation-delay: 0.02s;
 }
 
-.list-animations-enabled .api-item:nth-child(2) {
+.animations-enabled .api-item:nth-child(2) {
     animation-delay: 0.04s;
 }
 
-.list-animations-enabled .api-item:nth-child(3) {
+.animations-enabled .api-item:nth-child(3) {
     animation-delay: 0.06s;
 }
 
-.list-animations-enabled .api-item:nth-child(4) {
+.animations-enabled .api-item:nth-child(4) {
     animation-delay: 0.08s;
 }
 
-.list-animations-enabled .api-item:nth-child(5) {
+.animations-enabled .api-item:nth-child(5) {
     animation-delay: 0.1s;
 }
 
@@ -2584,6 +2702,7 @@ body,
     --accent-secondary: #818cf8;
     --accent-gradient: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
 
+
     --border-subtle: rgba(255, 255, 255, 0.1);
     --border-accent: rgba(99, 102, 241, 0.4);
 
@@ -2708,9 +2827,110 @@ body,
     color: var(--text-primary) !important;
 }
 
+.settings-modal.theme-dark .ant-input-number-input::placeholder {
+    color: var(--text-muted) !important;
+}
+
+.settings-modal.theme-dark .ant-input-number {
+    background: var(--bg-primary) !important;
+    border-color: var(--border-subtle) !important;
+}
+
+.settings-modal.theme-dark .ant-input-number:hover {
+    border-color: var(--accent-primary) !important;
+}
+
+.settings-modal.theme-dark .ant-input-number-focused {
+    border-color: var(--accent-primary) !important;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important;
+}
+
+.settings-modal.theme-dark .ant-input-number-handler {
+    border-left-color: var(--border-subtle) !important;
+    color: var(--text-secondary) !important;
+}
+
+.settings-modal.theme-dark .ant-input-number-handler:hover {
+    background: var(--bg-hover) !important;
+}
+
+.settings-modal.theme-dark .ant-input-number-handler .ant-input-number-handler-icon {
+    color: var(--text-secondary) !important;
+}
+
 /* 设置页面单选框左对齐 */
 .settings-modal .ant-radio-group {
     text-align: left !important;
+}
+
+/* 浅色主题设置模态框表单内容左对齐 */
+.settings-modal:not(.theme-dark) .ant-form-item .ant-form-item-control-input-content {
+    text-align: left !important;
+}
+
+/* 深色主题 - 新建项目弹窗 */
+.create-project-modal.theme-dark.ant-modal .ant-modal-content {
+    background: var(--bg-secondary) !important;
+}
+
+.create-project-modal.theme-dark.ant-modal .ant-modal-container {
+    background: var(--bg-secondary) !important;
+}
+
+.create-project-modal.theme-dark.ant-modal .ant-modal-mask {
+    background: rgba(0, 0, 0, 0.5) !important;
+}
+
+.create-project-modal.theme-dark.ant-modal>.ant-modal-wrap {
+    background: var(--bg-secondary) !important;
+}
+
+.create-project-modal.theme-dark .ant-modal-content {
+    background: var(--bg-secondary) !important;
+}
+
+.create-project-modal.theme-dark .ant-modal-header {
+    background: var(--bg-secondary) !important;
+    border-bottom-color: var(--border-subtle) !important;
+}
+
+.create-project-modal.theme-dark .ant-modal-body {
+    background: var(--bg-secondary) !important;
+}
+
+.create-project-modal.theme-dark .ant-modal-footer {
+    background: var(--bg-secondary) !important;
+}
+
+.create-project-modal.theme-dark .ant-modal-title {
+    color: var(--text-primary) !important;
+}
+
+.create-project-modal.theme-dark .ant-modal-close {
+    color: var(--text-secondary) !important;
+}
+
+.create-project-modal.theme-dark .ant-modal-close:hover {
+    color: var(--text-primary) !important;
+}
+
+.create-project-modal.theme-dark .ant-input {
+    background: var(--bg-primary) !important;
+    border-color: var(--border-subtle) !important;
+    color: var(--text-primary) !important;
+}
+
+.create-project-modal.theme-dark .ant-input::placeholder {
+    color: var(--text-muted) !important;
+}
+
+.create-project-modal.theme-dark .ant-input:hover {
+    border-color: var(--accent-primary) !important;
+}
+
+.create-project-modal.theme-dark .ant-input:focus {
+    border-color: var(--accent-primary) !important;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important;
 }
 
 .theme-dark .kv-editor {
@@ -2791,8 +3011,36 @@ body,
     color: var(--text-primary) !important;
 }
 
+.theme-dark .ant-select .ant-select-selection-item {
+    color: var(--text-primary) !important;
+}
+
+.theme-dark .ant-select .ant-select-selection-placeholder {
+    color: var(--text-muted) !important;
+}
+
+.theme-dark .ant-select .ant-select-arrow {
+    color: var(--text-secondary) !important;
+}
+
+.theme-dark .ant-select-disabled .ant-select-arrow {
+    color: var(--text-muted) !important;
+}
+
+.theme-dark .ant-select .ant-select-arrow .anticon,
+.theme-dark .ant-select .ant-select-arrow svg {
+    color: inherit !important;
+    fill: currentColor !important;
+}
+
 .theme-dark .ant-select:hover .ant-select-selector {
     border-color: var(--accent-primary) !important;
+}
+
+.theme-dark .ant-select-focused .ant-select-selector,
+.theme-dark .ant-select:focus-within .ant-select-selector {
+    border-color: var(--accent-primary) !important;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.22) !important;
 }
 
 .theme-dark .ant-select-dropdown {
@@ -2810,6 +3058,15 @@ body,
 
 .theme-dark .ant-select-item-option-selected {
     background: var(--bg-active) !important;
+}
+
+.theme-dark .ant-select-item-option-selected .ant-select-item-option-content {
+    color: var(--accent-secondary) !important;
+    font-weight: 600;
+}
+
+.theme-dark .ant-select-item-option-selected .ant-select-item-option-state {
+    color: var(--accent-secondary) !important;
 }
 
 /* 深色主题 - 开关 */
@@ -2944,6 +3201,14 @@ body,
     background: var(--bg-hover);
 }
 
+/* 深色主题 - Dropdown/Menu 子菜单箭头颜色 */
+.theme-dark .ant-dropdown-menu-submenu-arrow,
+.theme-dark .ant-dropdown-menu-submenu-arrow::before,
+.theme-dark .ant-dropdown-menu-submenu-arrow::after {
+    color: var(--text-secondary) !important;
+    background: currentColor !important;
+}
+
 /* 深色主题 - 表单标签 */
 .theme-dark .ant-form-item-label>label {
     color: var(--text-secondary);
@@ -3026,7 +3291,7 @@ body,
 
 /* 设置模态框表单内容左对齐 */
 .settings-modal.theme-dark .ant-form-item .ant-form-item-control-input-content {
-    text-align: left;
+    text-align: left !important;
 }
 
 /* 强制覆盖 Ant Design Modal 内部容器 */
@@ -3045,13 +3310,134 @@ body,
     color: var(--text-secondary);
 }
 
-.theme-dark .project-group-select-row .ant-select .ant-select-selector {
-    background: var(--bg-primary) !important;
-    border-color: var(--border-subtle) !important;
+.theme-dark .ant-select,
+.theme-dark .ant-select .ant-select-selector,
+.theme-dark .ant-select.ant-select-outlined,
+.theme-dark .ant-select .ant-select-content,
+.theme-dark .css-var-root {
+    background: #242424 !important;
+    background-color: #242424 !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    color: var(--text-primary) !important;
 }
 
-.theme-dark .project-group-select-row .ant-select:hover .ant-select-selector {
+.theme-dark .ant-select:hover .ant-select-selector {
     border-color: var(--accent-primary) !important;
+}
+
+
+.theme-dark .ant-select-selection-item {
+    color: var(--text-primary) !important;
+}
+
+.theme-dark .ant-select-arrow {
+    color: var(--text-secondary) !important;
+}
+
+.theme-dark .ant-select-content {
+    color: var(--text-primary) !important;
+}
+
+.theme-dark .ant-select-input {
+    color: var(--text-primary) !important;
+}
+
+.theme-dark .ant-select-suffix {
+    color: var(--text-secondary) !important;
+}
+
+.theme-dark .ant-select.ant-select-disabled {
+    opacity: 0.6;
+}
+
+.theme-dark .ant-select.ant-select-disabled .ant-select-selector {
+    cursor: not-allowed;
+}
+
+/* 深色主题 - 统一 Select 选择框本体（对齐主页项目分组选择框） */
+.theme-dark .sidebar-filters .ant-select,
+.theme-dark .sidebar-filters .ant-select .ant-select-selector,
+.theme-dark .sidebar-filters .ant-select.ant-select-outlined,
+.theme-dark .api-request-bar .ant-select,
+.theme-dark .api-request-bar .ant-select .ant-select-selector,
+.theme-dark .api-request-bar .ant-select.ant-select-outlined,
+.theme-dark .request-tabs-environment-select .ant-select,
+.theme-dark .request-tabs-environment-select .ant-select .ant-select-selector,
+.theme-dark .request-tabs-environment-select .ant-select.ant-select-outlined {
+    background: #242424 !important;
+    background-color: #242424 !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    color: var(--text-primary) !important;
+}
+
+.theme-dark .sidebar-filters .ant-select:hover .ant-select-selector,
+.theme-dark .api-request-bar .ant-select:hover .ant-select-selector,
+.theme-dark .request-tabs-environment-select .ant-select:hover .ant-select-selector {
+    border-color: var(--accent-primary) !important;
+}
+
+.theme-dark .sidebar-filters .ant-select .ant-select-selection-item,
+.theme-dark .api-request-bar .ant-select .ant-select-selection-item,
+.theme-dark .request-tabs-environment-select .ant-select .ant-select-selection-item {
+    color: var(--text-primary) !important;
+}
+
+.theme-dark .sidebar-filters .ant-select .ant-select-selection-placeholder,
+.theme-dark .api-request-bar .ant-select .ant-select-selection-placeholder,
+.theme-dark .request-tabs-environment-select .ant-select .ant-select-selection-placeholder {
+    color: var(--text-muted) !important;
+}
+
+.theme-dark .sidebar-filters .ant-select-arrow,
+.theme-dark .api-request-bar .ant-select-arrow,
+.theme-dark .request-tabs-environment-select .ant-select-arrow {
+    color: var(--text-secondary) !important;
+}
+
+/* 深色主题 - 选择框展开/聚焦时箭头保持一致（对齐主页项目分组选择框） */
+.theme-dark .sidebar-filters .ant-select.ant-select-open .ant-select-arrow,
+.theme-dark .api-request-bar .ant-select.ant-select-open .ant-select-arrow,
+.theme-dark .request-tabs-environment-select .ant-select.ant-select-open .ant-select-arrow,
+.theme-dark .sidebar-filters .ant-select.ant-select-focused .ant-select-arrow,
+.theme-dark .api-request-bar .ant-select.ant-select-focused .ant-select-arrow,
+.theme-dark .request-tabs-environment-select .ant-select.ant-select-focused .ant-select-arrow {
+    color: var(--text-secondary) !important;
+}
+
+.theme-dark .sidebar-filters .ant-select-suffix,
+.theme-dark .api-request-bar .ant-select-suffix,
+.theme-dark .request-tabs-environment-select .ant-select-suffix {
+    color: var(--text-secondary) !important;
+}
+
+.theme-dark .sidebar-filters .ant-select.ant-select-open .ant-select-suffix,
+.theme-dark .api-request-bar .ant-select.ant-select-open .ant-select-suffix,
+.theme-dark .request-tabs-environment-select .ant-select.ant-select-open .ant-select-suffix,
+.theme-dark .sidebar-filters .ant-select.ant-select-focused .ant-select-suffix,
+.theme-dark .api-request-bar .ant-select.ant-select-focused .ant-select-suffix,
+.theme-dark .request-tabs-environment-select .ant-select.ant-select-focused .ant-select-suffix {
+    color: var(--text-secondary) !important;
+}
+
+.theme-dark .sidebar-filters .ant-select-arrow svg,
+.theme-dark .api-request-bar .ant-select-arrow svg,
+.theme-dark .request-tabs-environment-select .ant-select-arrow svg,
+.theme-dark .sidebar-filters .ant-select-suffix svg,
+.theme-dark .api-request-bar .ant-select-suffix svg,
+.theme-dark .request-tabs-environment-select .ant-select-suffix svg {
+    fill: currentColor !important;
+}
+
+.theme-dark .sidebar-filters .ant-select-disabled .ant-select-arrow,
+.theme-dark .api-request-bar .ant-select-disabled .ant-select-arrow,
+.theme-dark .request-tabs-environment-select .ant-select-disabled .ant-select-arrow {
+    color: var(--text-muted) !important;
+}
+
+.theme-dark .sidebar-filters .ant-select-disabled .ant-select-suffix,
+.theme-dark .api-request-bar .ant-select-disabled .ant-select-suffix,
+.theme-dark .request-tabs-environment-select .ant-select-disabled .ant-select-suffix {
+    color: var(--text-muted) !important;
 }
 
 /* 深色主题 - 接口过滤选择 */
@@ -3334,6 +3720,115 @@ body,
     color: #e06c75 !important;
 }
 
+/* 深色主题 - 消息提示 */
+.theme-dark .ant-message-notice-content {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-card);
+}
+
+.theme-dark .ant-message-success .anticon {
+    color: #49cc90 !important;
+}
+
+.theme-dark .ant-message-error .anticon {
+    color: #f93e3e !important;
+}
+
+.theme-dark .ant-message-warning .anticon {
+    color: #fca130 !important;
+}
+
+.theme-dark .ant-message-info .anticon {
+    color: #61affe !important;
+}
+
+/* 深色主题 - 确认对话框 */
+.theme-dark .ant-modal-confirm .ant-modal-content {
+    background: var(--bg-secondary);
+}
+
+.theme-dark .ant-modal-confirm .ant-modal-header {
+    background: var(--bg-secondary);
+    border-color: var(--border-subtle);
+}
+
+.theme-dark .ant-modal-confirm .ant-modal-title {
+    color: var(--text-primary);
+}
+
+.theme-dark .ant-modal-confirm .ant-modal-close {
+    color: var(--text-secondary);
+}
+
+.theme-dark .ant-modal-confirm .ant-modal-close:hover {
+    color: var(--text-primary);
+}
+
+.theme-dark .ant-modal-confirm .ant-modal-body {
+    color: var(--text-secondary);
+}
+
+.theme-dark .ant-modal-confirm .ant-modal-footer {
+    border-color: var(--border-subtle);
+}
+
+/* 深色主题 - 滚动条样式 */
+.theme-dark ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.theme-dark ::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+}
+
+.theme-dark ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+}
+
+.theme-dark ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.theme-dark .script-editor-wrapper::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.theme-dark .script-editor-wrapper::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+}
+
+.theme-dark .script-editor-wrapper::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+}
+
+.theme-dark .script-editor-wrapper::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.theme-dark .sidebar-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.theme-dark .sidebar-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.theme-dark .sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+}
+
+.theme-dark .sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
 .theme-dark .cm-editor .cm-attribute {
     color: #d19a66 !important;
 }
@@ -3453,4 +3948,66 @@ body,
 .theme-dark .title-bar-tabs .ant-tabs-tab:focus {
     outline: none !important;
     box-shadow: none !important;
+}
+
+/* 深色主题 - 下拉框样式（弹层挂载到 body，依赖 html.theme-dark） */
+html.theme-dark .ant-select-dropdown,
+.theme-dark .ant-select-dropdown {
+    background: #242424 !important;
+    background-color: #242424 !important;
+}
+
+html.theme-dark .ant-select-dropdown * {
+    background-color: inherit !important;
+}
+
+html.theme-dark .ant-select-dropdown .ant-select-item-option {
+    color: #e8e8e8 !important;
+}
+
+html.theme-dark .ant-select-dropdown .ant-select-item-option .ant-select-item-option-content {
+    color: #e8e8e8 !important;
+}
+
+html.theme-dark .ant-select-dropdown .ant-select-item-option-active {
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* html.theme-dark .ant-select-dropdown .ant-select-item-option-selected {
+    background: rgba(99, 102, 241, 0.3) !important;
+}
+
+html.theme-dark .ant-select-dropdown .ant-select-item-option-selected .ant-select-item-option-content {
+    color: #818cf8 !important;
+} */
+
+/* 浅色主题 - 下拉框样式 */
+html:not(.theme-dark) .ant-select-dropdown,
+:not(.theme-dark).ant-select-dropdown {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+}
+
+html:not(.theme-dark) .ant-select-dropdown * {
+    background-color: inherit !important;
+}
+
+html:not(.theme-dark) .ant-select-dropdown .ant-select-item-option {
+    color: var(--text-primary) !important;
+}
+
+html:not(.theme-dark) .ant-select-dropdown .ant-select-item-option .ant-select-item-option-content {
+    color: var(--text-primary) !important;
+}
+
+html:not(.theme-dark) .ant-select-dropdown .ant-select-item-option-active {
+    background: rgba(0, 0, 0, 0.04) !important;
+}
+
+html:not(.theme-dark) .ant-select-dropdown .ant-select-item-option-selected {
+    background: rgba(79, 70, 229, 0.1) !important;
+}
+
+html:not(.theme-dark) .ant-select-dropdown .ant-select-item-option-selected .ant-select-item-option-content {
+    color: #4f46e5 !important;
 }

@@ -110,10 +110,10 @@ func (c *CurlExecutor) ExecuteWithProxy(curlCommand string, proxyOpts *ProxyOpti
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	bodyStr := string(bodyBytes)
 
-	headers := make(map[string]string)
+	headers := make(map[string][]string)
 	for key, values := range resp.Header {
 		if len(values) > 0 {
-			headers[key] = values[0]
+			headers[key] = values
 		}
 	}
 

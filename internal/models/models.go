@@ -73,6 +73,7 @@ type HttpRequestSpec struct {
 	BodyType   string          `json:"body_type"`
 	FormData   []RequestPair   `json:"form_data"`
 	UrlEncoded []RequestPair   `json:"url_encoded"`
+	Cookies    []RequestKeyVal `json:"cookies"`
 }
 
 // HttpRequestCase is a named variant of a request under one interface (用例).
@@ -137,14 +138,26 @@ type ProjectScript struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// ResponseCookie 响应Cookie结构
+type ResponseCookie struct {
+	Name     string `json:"name"`
+	Value    string `json:"value"`
+	Domain   string `json:"domain"`
+	Path     string `json:"path"`
+	Expires  string `json:"expires"`
+	HttpOnly bool   `json:"http_only"`
+	Secure   bool   `json:"secure"`
+}
+
 type CurlResponse struct {
 	StatusCode int               `json:"status_code"`
-	Headers    map[string]string `json:"headers"`
+	Headers    map[string][]string `json:"headers"`
 	Body       string            `json:"body"`
 	Duration   int64             `json:"duration"`
 	Error      string            `json:"error"`
 	ScriptLogs []string          `json:"script_logs,omitempty"`
 	Tests      []TestResult      `json:"tests,omitempty"`
+	Cookies    []ResponseCookie  `json:"cookies,omitempty"`
 }
 
 type TestResult struct {

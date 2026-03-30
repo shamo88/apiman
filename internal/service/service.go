@@ -772,3 +772,15 @@ func (s *Service) DisableGitSync() error {
 
 	return nil
 }
+
+// PullGitRepo 拉取 Git 仓库最新代码，保存前调用
+func (s *Service) PullGitRepo() error {
+	appCfg, err := s.ConfigManager.LoadAppConfig()
+	if err != nil || appCfg == nil {
+		return nil
+	}
+	if !appCfg.GitSync.Enabled || appCfg.GitSync.RemoteURL == "" {
+		return nil
+	}
+	return s.GitSyncMgr.CloneOrPull(appCfg.GitSync.RemoteURL, appCfg.GitSync.Branch, appCfg.GitSync.Password)
+}

@@ -234,3 +234,7 @@ func (a *App) EnableGitSync(remoteURL, branch, password string) error {
 func (a *App) DisableGitSync() error {
 	return a.service.DisableGitSync()
 }
+
+func (a *App) PullGitRepo() error {
+	return a.service.PullGitRepo()
+}

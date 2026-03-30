@@ -7,7 +7,7 @@ import type { UploadProps } from 'antd';
 import { Button, Card, Checkbox, Col, Dropdown, Empty, Input, InputRef, message, Modal, Radio, Row, Select, Space, Spin, Tabs, Tooltip, Upload } from 'antd';
 import type { DataNode } from 'antd/es/tree';
 import React, { useEffect, useState } from 'react';
-import { AddRequestCase, CopyRequest, CreateEnvironment, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteEnvironment, DeleteFolder, DeleteProject, DeleteProjectScript, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, ListProjectScripts, LoadAppConfig, LoadEnvironments, MoveFolder, MoveRequest, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, SaveAppConfig, UpdateEnvironment, UpdateProjectScript, UpdateRequest, UpdateRequestScripts } from '../wailsjs/go/main/App';
+import { AddRequestCase, CopyRequest, CreateEnvironment, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteEnvironment, DeleteFolder, DeleteProject, DeleteProjectScript, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, ListProjectScripts, LoadAppConfig, LoadEnvironments, MoveFolder, MoveRequest, PullGitRepo, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, SaveAppConfig, UpdateEnvironment, UpdateProjectScript, UpdateRequest, UpdateRequestScripts } from '../wailsjs/go/main/App';
 import { models } from '../wailsjs/go/models';
 import './App.css';
 import { ScriptHelpWindow } from './components/ScriptHelpWindow';
@@ -230,6 +230,11 @@ const toWailsHttpSpec = (c: ApiConfig) => models.HttpRequestSpec.createFrom(apiC
 
 const cloneApiConfig = (c: ApiConfig): ApiConfig => JSON.parse(JSON.stringify(c));
 
+/** 检查文本是否包含 {{}} 变量占位符 */
+const containsVariablePlaceholder = (text: string): boolean => {
+    return /\{\{[^}]+\}\}/.test(text);
+};
+
 /** 从 apiConfig 生成 curl 命令 */
 const buildCurlCommand = (c: ApiConfig): string => {
     const parts: string[] = ['curl'];
@@ -238,7 +243,12 @@ const buildCurlCommand = (c: ApiConfig): string => {
     let url = c.url || '';
     const enabledParams = (c.params || []).filter(p => p.enabled && p.key);
     if (enabledParams.length > 0) {
-        const queryParams = enabledParams.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&');
+        const queryParams = enabledParams.map(p => {
+            const encodedKey = encodeURIComponent(p.key);
+            // 如果值包含 {{}} 变量，不进行编码
+            const encodedValue = containsVariablePlaceholder(p.value) ? p.value : encodeURIComponent(p.value);
+            return `${encodedKey}=${encodedValue}`;
+        }).join('&');
         url += (url.includes('?') ? '&' : '?') + queryParams;
     }
 
@@ -272,7 +282,12 @@ const buildCurlCommand = (c: ApiConfig): string => {
     } else if (c.bodyType === 'x-www-form-urlencoded') {
         const enabledFields = (c.urlencoded || []).filter(f => f.enabled && f.key);
         if (enabledFields.length > 0) {
-            const encoded = enabledFields.map(f => `${encodeURIComponent(f.key)}=${encodeURIComponent(f.value)}`).join('&');
+            const encoded = enabledFields.map(f => {
+                const encodedKey = encodeURIComponent(f.key);
+                // 如果值包含 {{}} 变量，不进行编码
+                const encodedValue = containsVariablePlaceholder(f.value) ? f.value : encodeURIComponent(f.value);
+                return `${encodedKey}=${encodedValue}`;
+            }).join('&');
             if (!enabledHeaders.some(h => h.key.toLowerCase() === 'content-type')) {
                 parts.push("-H 'Content-Type: application/x-www-form-urlencoded'");
             }
@@ -759,6 +774,7 @@ function App() {
     const [response, setResponse] = useState<any>(null);
     const [formattedResponse, setFormattedResponse] = useState<string>('');
     const [responseBodyHeight, setResponseBodyHeight] = useState<number>(200);
+    const [scriptResultsHeight, setScriptResultsHeight] = useState<number>(200);
     const [executing, setExecuting] = useState(false);
     const [scriptLogsExpanded, setScriptLogsExpanded] = useState(true);
     const [testResultsExpanded, setTestResultsExpanded] = useState(true);
@@ -799,7 +815,7 @@ function App() {
     const [importing, setImporting] = useState(false);
     const [searchVersion, setSearchVersion] = useState(0);
     const [projectWorkspaceStates, setProjectWorkspaceStates] = useState<Record<string, ProjectWorkspaceState>>({});
-    const [listAnimationEnabled, setListAnimationEnabled] = useState(false);
+    const [animationEnabled, setListAnimationEnabled] = useState(false);
     const [appTheme, setAppTheme] = useState(() => {
         // 尝试从 localStorage 读取主题，避免闪烁
         const saved = localStorage.getItem('apiman-theme');
@@ -826,6 +842,7 @@ function App() {
     const [sidebarMenu, setSidebarMenu] = useState<'apis' | 'environments' | 'scripts'>('apis');
     const [environments, setEnvironments] = useState<Environment[]>([]);
     const [selectedEnvironmentId, setSelectedEnvironmentId] = useState<string>('');
+    const [environmentsInitiallyLoaded, setEnvironmentsInitiallyLoaded] = useState(false);
     const [editingEnvironmentId, setEditingEnvironmentId] = useState<string>('');
     const [environmentFormName, setEnvironmentFormName] = useState('');
     const [environmentFormVariables, setEnvironmentFormVariables] = useState<EnvironmentVariableRow[]>([createEnvironmentVariableRow()]);
@@ -842,6 +859,14 @@ function App() {
     const [scriptHelpVisible, setScriptHelpVisible] = useState(false);
     const forceAnimationTimerRef = React.useRef<number | null>(null);
     const movedHighlightTimerRef = React.useRef<number | null>(null);
+
+    // Ant Design 的下拉弹层会挂载到 body（portal）。因此需要把主题 class 挂到 html 上，
+    // 才能让弹层也吃到深色主题的 CSS 变量与覆盖样式。
+    React.useEffect(() => {
+        const root = document.documentElement;
+        if (!root) return;
+        root.classList.toggle('theme-dark', appTheme === 'dark');
+    }, [appTheme]);
 
     const trimRightSpaces = (value: string) => value.replace(/\s+$/g, '');
     const getPrimaryName = (value: string) => value.replace(/-副本\d*$/u, '');
@@ -1106,6 +1131,7 @@ function App() {
 
     const loadEnvironmentsData = async (projectID: string) => {
         setEnvLoading(true);
+        setEnvironmentsInitiallyLoaded(false);
         try {
             const envs = await LoadEnvironments(projectID);
             setEnvironments(envs || []);
@@ -1438,6 +1464,8 @@ function App() {
                 <div key={api.path} className="api-request-block">
                     <div
                         className={`api-item ${parentOpen ? 'is-parent-open' : ''} ${movedHighlightPath === api.path ? 'moved-highlight' : ''}`}
+                        onClick={() => handleTreeItemClick(api)}
+
                         onDragOver={(e) => {
                             e.stopPropagation();
                             if (!draggingNode) return;
@@ -1512,7 +1540,6 @@ function App() {
                             draggable
                             role="button"
                             tabIndex={0}
-                            onClick={() => handleTreeItemClick(api)}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter' || e.key === ' ') {
                                     e.preventDefault();
@@ -1611,10 +1638,10 @@ function App() {
                             const check = intoFolderHalf
                                 ? checkDropAppendIntoFolder(draggingNode, targetPath)
                                 : (() => {
-                                      const p = getParentFolderPath(folder.path!);
-                                      if (p === null) return { ok: false as const, reason: 'invalid-target' };
-                                      return checkDropOrdered(draggingNode, p, folder.id);
-                                  })();
+                                    const p = getParentFolderPath(folder.path!);
+                                    if (p === null) return { ok: false as const, reason: 'invalid-target' };
+                                    return checkDropOrdered(draggingNode, p, folder.id);
+                                })();
                             if (!check.ok) {
                                 e.dataTransfer.dropEffect = 'none';
                                 setDropTargetFolderPath(null);
@@ -1757,15 +1784,19 @@ function App() {
             return;
         }
 
-        const hasSelected = environments.some(env => env.id === selectedEnvironmentId);
-        if (!hasSelected) {
-            setSelectedEnvironmentId(environments[0].id);
+        // Auto-select first environment only on initial load, not on subsequent changes
+        // This preserves user's explicit selection of "不使用环境"
+        if (!environmentsInitiallyLoaded) {
+            if (!selectedEnvironmentId) {
+                setSelectedEnvironmentId(environments[0].id);
+            }
+            setEnvironmentsInitiallyLoaded(true);
         }
 
         if (editingEnvironmentId && !environments.some(env => env.id === editingEnvironmentId)) {
             resetEnvironmentEditor();
         }
-    }, [environments, selectedEnvironmentId, editingEnvironmentId]);
+    }, [environments, selectedEnvironmentId, editingEnvironmentId, environmentsInitiallyLoaded]);
 
     useEffect(() => {
         const activeProject = projectTabs.find(t => t.id === activeTab)?.project;
@@ -1775,6 +1806,7 @@ function App() {
             setScriptFormName('');
             setScriptFormContent('// 在这里编写 JavaScript 脚本\n');
             setEnvironments([]);
+            setEnvironmentsInitiallyLoaded(false);
             return;
         }
         loadProjectScriptsData(activeProject.id);
@@ -1902,6 +1934,26 @@ function App() {
         // Recalculate on window resize
         window.addEventListener('resize', calculateResponseBodyHeight);
         return () => window.removeEventListener('resize', calculateResponseBodyHeight);
+    }, [response]);
+
+    // Calculate script-results-panel height dynamically
+    useEffect(() => {
+        const calculateScriptResultsHeight = () => {
+            const responsePanel = document.querySelector('.response-panel') as HTMLElement;
+            const responseHeader = document.querySelector('.response-panel .response-header') as HTMLElement;
+            if (responsePanel && responseHeader) {
+                const panelHeight = responsePanel.offsetHeight;
+                const headerHeight = responseHeader.offsetHeight;
+                const bodyHeight = panelHeight - headerHeight - 40; // 40 = tabs height
+                setScriptResultsHeight(Math.max(100, bodyHeight));
+            }
+        };
+
+        calculateScriptResultsHeight();
+
+        // Recalculate on window resize
+        window.addEventListener('resize', calculateScriptResultsHeight);
+        return () => window.removeEventListener('resize', calculateScriptResultsHeight);
     }, [response]);
 
     const triggerOpenTabAnimation = () => {
@@ -2799,6 +2851,9 @@ function App() {
         if (!currentRequest?.path) return;
 
         try {
+            // 保存前先 pull 最新代码
+            await PullGitRepo();
+
             if (requestCases.length === 0) {
                 await UpdateRequest(
                     currentRequest.path,
@@ -3356,7 +3411,7 @@ function App() {
                                     </div>
 
                                     <div
-                                        className={`sidebar-content${(listAnimationEnabled || forceListAnimation) ? ' list-animations-enabled' : ''}${dropTargetFolderPath === currentTree?.path ? ' root-drop-target' : ''}`}
+                                        className={`sidebar-content${(animationEnabled || forceListAnimation) ? ' animations-enabled' : ''}${dropTargetFolderPath === currentTree?.path ? ' root-drop-target' : ''}`}
                                         onDragOver={(e) => {
                                             if (!draggingNode || !currentTree?.path) return;
                                             const check = checkDropAppendIntoFolder(draggingNode, currentTree.path);
@@ -3472,6 +3527,7 @@ function App() {
                                             }))}
                                             size="small"
                                             style={{ marginBottom: 0 }}
+                                            animated={(animationEnabled || forceListAnimation)}
                                         />
                                     </div>
                                     <div className="request-tabs-environment-select">
@@ -3509,6 +3565,7 @@ function App() {
                                                 }))}
                                                 size="small"
                                                 style={{ marginBottom: 12 }}
+                                                animated={(animationEnabled || forceListAnimation)}
                                             />
                                             <div className="environment-panel">
                                                 <Input
@@ -4130,6 +4187,7 @@ function App() {
                                                     ),
                                                 },
                                             ]}
+                                            animated={(animationEnabled || forceListAnimation)}
                                         />
                                     </div>
 
@@ -4169,12 +4227,22 @@ function App() {
                                                         children: (
                                                             <div className="response-body" style={{ height: responseBodyHeight }}>
                                                                 <div className="response-headers">
-                                                                    {response.headers && Object.entries(response.headers).map(([key, value]) => (
-                                                                        <div key={key} className="response-header-item">
-                                                                            <span className="header-key">{key}</span>
-                                                                            <span className="header-value">{String(value)}</span>
-                                                                        </div>
-                                                                    ))}
+                                                                    {response.headers && Object.entries(response.headers as Record<string, string[]>).map(([key, values]) => {
+                                                                        if (key.toLowerCase() === 'set-cookie') {
+                                                                            return values.map((cookie: string, i: number) => (
+                                                                                <div key={`${key}-${i}`} className="response-header-item">
+                                                                                    <span className="header-key">{i === 0 ? key : ''}</span>
+                                                                                    <span className="header-value set-cookie-value">{cookie}</span>
+                                                                                </div>
+                                                                            ));
+                                                                        }
+                                                                        return values.map((value: string, i: number) => (
+                                                                            <div key={`${key}-${i}`} className="response-header-item">
+                                                                                <span className="header-key">{i === 0 ? key : ''}</span>
+                                                                                <span className="header-value">{value}</span>
+                                                                            </div>
+                                                                        ));
+                                                                    })}
                                                                 </div>
                                                             </div>
                                                         ),
@@ -4204,11 +4272,58 @@ function App() {
                                                             </div>
                                                         ),
                                                     },
+                                                    {
+                                                        key: 'cookies',
+                                                        label: 'Cookie',
+                                                        children: (
+                                                            <div className="response-body" style={{ height: responseBodyHeight }}>
+                                                                <div className="response-cookies">
+                                                                    {response.cookies && response.cookies.length > 0 ? (
+                                                                        <table className="cookie-table">
+                                                                            <thead>
+                                                                                <tr>
+                                                                                    <th>Name</th>
+                                                                                    <th>Value</th>
+                                                                                    <th>Domain</th>
+                                                                                    <th>Path</th>
+                                                                                    <th>Expires</th>
+                                                                                    <th>Flags</th>
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody>
+                                                                                {response.cookies.map((cookie: any, index: number) => (
+                                                                                    <tr key={index}>
+                                                                                        <td className="cookie-name-cell">{cookie.name}</td>
+                                                                                        <td className="cookie-value-cell">{cookie.value}</td>
+                                                                                        <td>{cookie.domain || '-'}</td>
+                                                                                        <td>{cookie.path || '-'}</td>
+                                                                                        <td className="cookie-expires-cell">
+                                                                                            {cookie.expires && cookie.expires !== '0001-01-01 00:00:00 +0000 UTC'
+                                                                                                ? new Date(cookie.expires).toLocaleString()
+                                                                                                : 'Session'}
+                                                                                        </td>
+                                                                                        <td>
+                                                                                            <div className="cookie-flags">
+                                                                                                {cookie.http_only && <span className="cookie-flag http-only">HttpOnly</span>}
+                                                                                                {cookie.secure && <span className="cookie-flag secure">Secure</span>}
+                                                                                            </div>
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                ))}
+                                                                            </tbody>
+                                                                        </table>
+                                                                    ) : (
+                                                                        <div className="response-empty">No cookies in response</div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ),
+                                                    },
                                                     ...(response.script_logs?.length || response.tests?.length ? [{
                                                         key: 'scripts',
                                                         label: '脚本结果',
                                                         children: (
-                                                            <div className="script-results-panel">
+                                                            <div className="script-results-panel" style={{ height: scriptResultsHeight }}>
                                                                 {response.script_logs && response.script_logs.length > 0 && (() => {
                                                                     // Parse workflow items from logs
                                                                     const workflowItems: { name: string; type: 'pre' | 'post' | 'http'; status: 'running' | 'success' | 'failed'; duration?: number }[] = [];
@@ -4327,6 +4442,7 @@ function App() {
                                                         ),
                                                     }] : []),
                                                 ]}
+                                                animated={(animationEnabled || forceListAnimation)}
                                             />
                                         </div>
                                     )}
@@ -4359,6 +4475,7 @@ function App() {
                 open={createProjectModal}
                 onOk={handleCreateProject}
                 onCancel={() => { setCreateProjectModal(false); setNewProjectName(''); }}
+                className={`create-project-modal ${appTheme === 'dark' ? 'theme-dark' : ''}`}
             >
                 <Input
                     placeholder="输入项目名称"

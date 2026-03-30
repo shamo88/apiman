@@ -76,6 +76,8 @@ export function MoveFolder(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function MoveRequest(arg1:string,arg2:string,arg3:string):Promise<string>;
 
+export function PullGitRepo():Promise<void>;
+
 export function RenameFolder(arg1:string,arg2:string):Promise<models.Folder>;
 
 export function RenameProject(arg1:string,arg2:string):Promise<models.Project>;
