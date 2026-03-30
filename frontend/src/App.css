@@ -1209,6 +1209,7 @@ body,
     flex-direction: column;
     overflow: auto;
     padding: 24px;
+    min-height: 0;
 }
 
 .request-active-case-hint {
@@ -1623,15 +1624,15 @@ body,
 }
 
 .response-panel {
-    flex: 1;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     background: var(--bg-card);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
+    height: 100%;
     min-height: 200px;
-    max-height: 50vh;
+    max-height: 600px;
     box-shadow: var(--shadow-card);
 }
 
@@ -1745,11 +1746,13 @@ body,
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    min-height: 0;
 }
 
 .response-panel .ant-tabs-content {
     flex: 1;
     overflow: auto;
+    min-height: 0;
 }
 
 .response-panel .ant-tabs-tabpane {
@@ -1757,10 +1760,11 @@ body,
     overflow: auto;
 }
 
-.response-panel .ant-tabs-tabpane > .response-body,
-.response-panel .ant-tabs-tabpane > .response-json {
-    height: 100%;
+.response-panel .ant-tabs-tabpane>.response-body,
+.response-panel .ant-tabs-tabpane>.response-json {
+    min-height: 0;
     box-sizing: border-box;
+    overflow: auto;
 }
 
 .response-header-item .header-value {
@@ -2612,7 +2616,7 @@ body,
     border-color: var(--border-subtle) !important;
 }
 
-.settings-modal.theme-dark .ant-form-item-label > label {
+.settings-modal.theme-dark .ant-form-item-label>label {
     color: var(--text-secondary) !important;
 }
 
@@ -2824,17 +2828,17 @@ body,
     color: var(--text-primary);
 }
 
-.theme-dark .ant-table-thead > tr > th {
+.theme-dark .ant-table-thead>tr>th {
     background: var(--bg-tertiary);
     color: var(--text-primary);
     border-color: var(--border-subtle);
 }
 
-.theme-dark .ant-table-tbody > tr > td {
+.theme-dark .ant-table-tbody>tr>td {
     border-color: var(--border-subtle);
 }
 
-.theme-dark .ant-table-tbody > tr:hover > td {
+.theme-dark .ant-table-tbody>tr:hover>td {
     background: var(--bg-hover);
 }
 
@@ -2879,7 +2883,7 @@ body,
 }
 
 /* 深色主题 - 表单标签 */
-.theme-dark .ant-form-item-label > label {
+.theme-dark .ant-form-item-label>label {
     color: var(--text-secondary);
 }
 

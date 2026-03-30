@@ -758,6 +758,7 @@ function App() {
     const [currentRequest, setCurrentRequest] = useState<CurlRequest | null>(null);
     const [response, setResponse] = useState<any>(null);
     const [formattedResponse, setFormattedResponse] = useState<string>('');
+    const [responseBodyHeight, setResponseBodyHeight] = useState<number>(200);
     const [executing, setExecuting] = useState(false);
     const [createFolderModal, setCreateFolderModal] = useState(false);
     const [newFolderName, setNewFolderName] = useState('');
@@ -1880,6 +1881,26 @@ function App() {
     useEffect(() => {
         setCurlPreview(buildCurlCommand(apiConfig));
     }, [apiConfig.method, apiConfig.url, apiConfig.headers, apiConfig.params, apiConfig.body, apiConfig.bodyType, apiConfig.formData, apiConfig.urlencoded]);
+
+    // Calculate response-body height dynamically
+    useEffect(() => {
+        const calculateResponseBodyHeight = () => {
+            const responsePanel = document.querySelector('.response-panel') as HTMLElement;
+            const responseHeader = document.querySelector('.response-panel .response-header') as HTMLElement;
+            if (responsePanel && responseHeader) {
+                const panelHeight = responsePanel.offsetHeight;
+                const headerHeight = responseHeader.offsetHeight;
+                const bodyHeight = panelHeight - headerHeight - 40; // 40 = tabs height
+                setResponseBodyHeight(Math.max(100, bodyHeight));
+            }
+        };
+
+        calculateResponseBodyHeight();
+
+        // Recalculate on window resize
+        window.addEventListener('resize', calculateResponseBodyHeight);
+        return () => window.removeEventListener('resize', calculateResponseBodyHeight);
+    }, [response]);
 
     const triggerOpenTabAnimation = () => {
         if (forceAnimationTimerRef.current) {
@@ -4128,13 +4149,12 @@ function App() {
                                             </div>
                                             <Tabs
                                                 defaultActiveKey="body"
-                                                style={{ height: '100%' }}
                                                 items={[
                                                     {
                                                         key: 'body',
                                                         label: 'Body',
                                                         children: (
-                                                            <div className="response-body">
+                                                            <div className="response-body" style={{ height: responseBodyHeight }}>
                                                                 <pre className="response-content">
                                                                     {response.body || response.error || 'No response body'}
                                                                 </pre>
@@ -4145,7 +4165,7 @@ function App() {
                                                         key: 'headers',
                                                         label: 'Header',
                                                         children: (
-                                                            <div className="response-body">
+                                                            <div className="response-body" style={{ height: responseBodyHeight }}>
                                                                 <div className="response-headers">
                                                                     {response.headers && Object.entries(response.headers).map(([key, value]) => (
                                                                         <div key={key} className="response-header-item">
@@ -4161,7 +4181,7 @@ function App() {
                                                         key: 'formatted',
                                                         label: 'JsonView',
                                                         children: (
-                                                            <div className="response-body response-json">
+                                                            <div className="response-body response-json" style={{ height: responseBodyHeight }}>
                                                                 {(() => {
                                                                     try {
                                                                         const data = JSON.parse(response.body || '{}');
