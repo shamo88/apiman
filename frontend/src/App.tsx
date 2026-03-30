@@ -3020,6 +3020,7 @@ function App() {
                 activeTab={activeTab}
                 onListAnimationChange={setListAnimationEnabled}
                 onThemeChange={setAppTheme}
+                theme={appTheme}
                 onSettingsSave={loadProjects}
                 onTabChange={(key) => {
                     switchProjectTab(key);

@@ -1,5 +1,5 @@
 import { AppstoreOutlined, CloseOutlined, GithubOutlined, GlobalOutlined, InfoCircleOutlined, MinusOutlined, SettingOutlined } from '@ant-design/icons';
-import { Button, Col, Divider, Form, Input, InputNumber, message, Modal, Row, Select, Space, Switch, Tabs } from 'antd';
+import { Button, Col, Divider, Form, Input, InputNumber, message, Modal, Radio, Row, Select, Space, Switch, Tabs } from 'antd';
 import React from 'react';
 import { DisableGitSync, EnableGitSync, InitGitRepo, InitProjectsDir, LoadAppConfig, SaveAppConfig, SyncAllProjectsToGit } from '../../wailsjs/go/main/App';
 import { config as wailsConfig } from '../../wailsjs/go/models';
@@ -13,6 +13,7 @@ interface TitleBarProps {
     tabItems?: any[];
     onListAnimationChange?: (enabled: boolean) => void;
     onThemeChange?: (theme: string) => void;
+    theme?: string;
     onSettingsSave?: () => void;
 }
 
@@ -42,6 +43,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
     tabItems,
     onListAnimationChange,
     onThemeChange,
+    theme = 'light',
     onSettingsSave
 }) => {
     const [settingsVisible, setSettingsVisible] = React.useState(false);
@@ -276,10 +278,11 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                 onCancel={() => setSettingsVisible(false)}
                 footer={null}
                 width={800}
-                className="settings-modal"
+                className={`settings-modal ${theme === 'dark' ? 'theme-dark' : ''}`}
             >
+                <div className={theme === 'dark' ? 'theme-dark' : ''} style={{ background: 'var(--bg-secondary)', minHeight: 400 }}>
                 <Row gutter={0} style={{ minHeight: 400 }}>
-                    <Col span={6} style={{ borderRight: '1px solid #f0f0f0', paddingRight: 16 }}>
+                    <Col span={6} style={{ borderRight: '1px solid var(--border-subtle)', paddingRight: 16 }}>
                         {settingsMenuItems.map(item => (
                             <div
                                 key={item.key}
@@ -356,13 +359,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                                         label="主题"
                                         style={{ marginTop: '16px' }}
                                     >
-                                        <Select
-                                            options={[
-                                                { value: 'light', label: '浅色' },
-                                                { value: 'dark', label: '深色' },
-                                            ]}
-                                            style={{ width: 120 }}
-                                        />
+                                        <Radio.Group>
+                                            <Radio value="light" style={{ marginRight: 16 }}>浅色</Radio>
+                                            <Radio value="dark">深色</Radio>
+                                        </Radio.Group>
                                     </Form.Item>
 
                                     <Divider style={{ marginTop: 24 }} />
@@ -588,6 +588,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                         )}
                     </Col>
                 </Row>
+                </div>
             </Modal>
         </>
     );
