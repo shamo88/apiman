@@ -1,36 +1,62 @@
-# apiman
+# Apiman
 
 #### Description
-api测试工具
+Apiman is a desktop API testing tool built with Wails v2 (Go + React/TypeScript), similar to Postman/Apifox.
 
-#### Software Architecture
-Software architecture description
+#### Features
+- Multi-project management
+- Folder organization
+- Environment variables
+- Request cases (multiple test scenarios per request)
+- JavaScript scripting support (via goja)
+- Git sync backup
+- Dark/Light theme
+
+#### Architecture
+
+**Backend (Go)** - `internal/`
+- `config/` - Configuration management, handles `~/.apiman/` storage
+- `models/` - Data structures
+- `curl/` - HTTP request execution engine
+- `git/` - Git sync functionality
+- `project/` - Project management
+- `service/` - Business logic orchestration
+
+**Frontend (React + TypeScript)** - `frontend/src/`
+- `App.tsx` - Main UI component
+- `components/` - Title bar, script help window components
+- `wailsjs/` - Auto-generated Wails bindings
 
 #### Installation
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+1. Install Go 1.21+
+2. Install Node.js 18+
+3. Install Wails CLI: `go install github.com/wailsapp/wails/v2/cmd/wails@latest`
+4. Install frontend dependencies: `cd frontend && npm install`
 
-#### Instructions
+#### Build Commands
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+```bash
+# Development mode
+wails dev
 
-#### Contribution
+# Production build
+wails build
 
-1.  Fork the repository
-2.  Create Feat_xxx branch
-3.  Commit your code
-4.  Create Pull Request
+# Frontend only build
+cd frontend && npm run build
+```
 
+#### Logs
 
-#### Gitee Feature
+Log file location: `~/.apiman/logs/apiman.log`
 
-1.  You can use Readme\_XXX.md to support different languages, such as Readme\_en.md, Readme\_zh.md
-2.  Gitee blog [blog.gitee.com](https://blog.gitee.com)
-3.  Explore open source project [https://gitee.com/explore](https://gitee.com/explore)
-4.  The most valuable open source project [GVP](https://gitee.com/gvp)
-5.  The manual of Gitee [https://gitee.com/help](https://gitee.com/help)
-6.  The most popular members  [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+Logs support automatic rotation, max 100MB per file.
+
+#### Data Storage
+
+Projects are stored in `~/.apiman/projects/` with each project containing:
+- `collection.postman.json` - Project data
+- `environments.json` - Environment configurations
+- `variables.json` - Project variables
+- `scripts/` - Project scripts
