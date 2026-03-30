@@ -1,6 +1,8 @@
 import { ApiOutlined, CloseOutlined, CopyOutlined, DownOutlined, EditOutlined, ExperimentOutlined, FileOutlined, FolderOutlined, HomeOutlined, ImportOutlined, MoreOutlined, PlusOutlined, ProjectOutlined, QuestionCircleOutlined, RightOutlined, SearchOutlined, EnvironmentOutlined, CodeOutlined } from '@ant-design/icons';
 import { javascript } from '@codemirror/lang-javascript';
 import CodeMirror from '@uiw/react-codemirror';
+import { JsonView, darkStyles, allExpanded } from 'react-json-view-lite';
+import 'react-json-view-lite/dist/index.css';
 import type { UploadProps } from 'antd';
 import { Button, Card, Checkbox, Col, Dropdown, Empty, Input, InputRef, message, Modal, Radio, Row, Select, Space, Spin, Tabs, Tooltip, Upload } from 'antd';
 import type { DataNode } from 'antd/es/tree';
@@ -755,6 +757,7 @@ function App() {
     const [activeRequestTab, setActiveRequestTab] = useState<string>('');
     const [currentRequest, setCurrentRequest] = useState<CurlRequest | null>(null);
     const [response, setResponse] = useState<any>(null);
+    const [formattedResponse, setFormattedResponse] = useState<string>('');
     const [executing, setExecuting] = useState(false);
     const [createFolderModal, setCreateFolderModal] = useState(false);
     const [newFolderName, setNewFolderName] = useState('');
@@ -794,7 +797,11 @@ function App() {
     const [searchVersion, setSearchVersion] = useState(0);
     const [projectWorkspaceStates, setProjectWorkspaceStates] = useState<Record<string, ProjectWorkspaceState>>({});
     const [listAnimationEnabled, setListAnimationEnabled] = useState(false);
-    const [appTheme, setAppTheme] = useState('light');
+    const [appTheme, setAppTheme] = useState(() => {
+        // 尝试从 localStorage 读取主题，避免闪烁
+        const saved = localStorage.getItem('apiman-theme');
+        return saved === 'dark' || saved === 'light' ? saved : 'light';
+    });
     const [forceListAnimation, setForceListAnimation] = useState(false);
     const [projectSearchKeyword, setProjectSearchKeyword] = useState('');
     const [projectGroups, setProjectGroups] = useState<string[]>([]);
@@ -1032,6 +1039,7 @@ function App() {
         setActiveRequestTab(emptyState.activeRequestTab);
         setCurrentRequest(emptyState.currentRequest);
         setResponse(emptyState.response);
+        setFormattedResponse('');
         setSelectedKeys(emptyState.selectedKeys);
         setApiConfig(emptyState.apiConfig);
         setSelectedEnvironmentId(emptyState.selectedEnvironmentId);
@@ -2684,6 +2692,17 @@ function App() {
                 result = await ExecuteHTTPRequest(toWailsHttpSpec(resolvedConfig));
             }
             setResponse(result);
+            // 格式化响应体
+            try {
+                if (result.body) {
+                    const parsed = JSON.parse(result.body);
+                    setFormattedResponse(JSON.stringify(parsed, null, 2));
+                } else {
+                    setFormattedResponse('');
+                }
+            } catch {
+                setFormattedResponse(result.body || '');
+            }
             setStatus(`请求完成 - ${result.status_code}`);
         } catch (error: any) {
             console.error('Failed to execute request:', error);
@@ -3019,7 +3038,10 @@ function App() {
             <TitleBar
                 activeTab={activeTab}
                 onListAnimationChange={setListAnimationEnabled}
-                onThemeChange={setAppTheme}
+                onThemeChange={(theme) => {
+                    localStorage.setItem('apiman-theme', theme);
+                    setAppTheme(theme);
+                }}
                 theme={appTheme}
                 onSettingsSave={loadProjects}
                 onTabChange={(key) => {
@@ -4106,6 +4128,7 @@ function App() {
                                             </div>
                                             <Tabs
                                                 defaultActiveKey="body"
+                                                style={{ height: '100%' }}
                                                 items={[
                                                     {
                                                         key: 'body',
@@ -4115,6 +4138,47 @@ function App() {
                                                                 <pre className="response-content">
                                                                     {response.body || response.error || 'No response body'}
                                                                 </pre>
+                                                            </div>
+                                                        ),
+                                                    },
+                                                    {
+                                                        key: 'headers',
+                                                        label: 'Header',
+                                                        children: (
+                                                            <div className="response-body">
+                                                                <div className="response-headers">
+                                                                    {response.headers && Object.entries(response.headers).map(([key, value]) => (
+                                                                        <div key={key} className="response-header-item">
+                                                                            <span className="header-key">{key}</span>
+                                                                            <span className="header-value">{String(value)}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        ),
+                                                    },
+                                                    {
+                                                        key: 'formatted',
+                                                        label: 'JsonView',
+                                                        children: (
+                                                            <div className="response-body response-json">
+                                                                {(() => {
+                                                                    try {
+                                                                        const data = JSON.parse(response.body || '{}');
+                                                                        return (
+                                                                            <div className="json-view-container">
+                                                                                <JsonView
+                                                                                    data={data}
+                                                                                    style={appTheme === 'dark' ? darkStyles : undefined}
+                                                                                    shouldExpandNode={allExpanded}
+                                                                                    clickToExpandNode
+                                                                                />
+                                                                            </div>
+                                                                        );
+                                                                    } catch {
+                                                                        return <pre className="response-content">{formattedResponse || '非 JSON 格式或无响应内容'}</pre>;
+                                                                    }
+                                                                })()}
                                                             </div>
                                                         ),
                                                     },

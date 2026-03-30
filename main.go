@@ -15,14 +15,22 @@ var assets embed.FS
 func main() {
 	app := NewApp()
 
-	err := wails.Run(&options.App{
+	// Load config to determine theme before app starts
+	cfg, err := app.service.LoadAppConfig()
+	bgColor := &options.RGBA{R: 255, G: 255, B: 255, A: 255}
+	if err == nil && cfg != nil && cfg.UI.Theme == "dark" {
+		// Dark theme background
+		bgColor = &options.RGBA{R: 36, G: 36, B: 36, A: 255}
+	}
+
+	err = wails.Run(&options.App{
 		Title:            "Apiman - API Management Tool",
 		Width:            1280,
 		Height:           800,
 		MinWidth:         800,
 		MinHeight:        600,
 		Frameless:        true,
-		BackgroundColour: &options.RGBA{R: 255, G: 255, B: 255, A: 255},
+		BackgroundColour: bgColor,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

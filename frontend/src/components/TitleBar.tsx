@@ -282,7 +282,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
             >
                 <div className={theme === 'dark' ? 'theme-dark' : ''} style={{ background: 'var(--bg-secondary)', minHeight: 400 }}>
                 <Row gutter={0} style={{ minHeight: 400 }}>
-                    <Col span={6} style={{ borderRight: '1px solid var(--border-subtle)', paddingRight: 16 }}>
+                    <Col span={6} style={{ borderRight: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}`, paddingRight: 16 }}>
                         {settingsMenuItems.map(item => (
                             <div
                                 key={item.key}
@@ -292,8 +292,8 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                                     marginBottom: 4,
                                     cursor: 'pointer',
                                     borderRadius: 6,
-                                    background: activeSettingsTab === item.key ? '#e6f7ff' : 'transparent',
-                                    color: activeSettingsTab === item.key ? '#1890ff' : '#333',
+                                    background: activeSettingsTab === item.key ? (theme === 'dark' ? 'rgba(99,102,241,0.2)' : '#e6f7ff') : 'transparent',
+                                    color: activeSettingsTab === item.key ? (theme === 'dark' ? '#818cf8' : '#1890ff') : (theme === 'dark' ? '#e8e8e8' : '#333'),
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: 8,
@@ -315,8 +315,8 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: 8,
-                                color: activeSettingsTab === 'about' ? '#1890ff' : '#333',
-                                background: activeSettingsTab === 'about' ? '#e6f7ff' : 'transparent',
+                                color: activeSettingsTab === 'about' ? (theme === 'dark' ? '#818cf8' : '#1890ff') : (theme === 'dark' ? '#e8e8e8' : '#333'),
+                                background: activeSettingsTab === 'about' ? (theme === 'dark' ? 'rgba(99,102,241,0.2)' : '#e6f7ff') : 'transparent',
                             }}
                         >
                             <InfoCircleOutlined />
@@ -359,16 +359,16 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                                         label="主题"
                                         style={{ marginTop: '16px' }}
                                     >
-                                        <Radio.Group>
-                                            <Radio value="light" style={{ marginRight: 16 }}>浅色</Radio>
-                                            <Radio value="dark">深色</Radio>
+                                        <Radio.Group style={{ textAlign: 'left' }}>
+                                            <Radio value="light" style={{ marginRight: 16, color: theme === 'dark' ? 'var(--text-secondary)' : '#333' }}>浅色</Radio>
+                                            <Radio value="dark" style={{ color: theme === 'dark' ? 'var(--text-secondary)' : '#333' }}>深色</Radio>
                                         </Radio.Group>
                                     </Form.Item>
 
-                                    <Divider style={{ marginTop: 24 }} />
+                                    <Divider style={{ marginTop: 24, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }} />
 
                                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-                                        <Button onClick={() => setSettingsVisible(false)}>
+                                        <Button onClick={() => setSettingsVisible(false)} style={{ background: theme === 'dark' ? '#303030' : undefined, color: theme === 'dark' ? '#e8e8e8' : undefined, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : undefined }}>
                                             取消
                                         </Button>
                                         <Button type="primary" onClick={handleSaveSettings}>
@@ -408,27 +408,27 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                                         <Switch />
                                     </Form.Item>
 
-                                    <Divider style={{ margin: '16px 0' }} />
+                                    <Divider style={{ margin: '16px 0', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }} />
 
                                     <div style={{ marginBottom: 24 }}>
-                                        <div style={{ fontWeight: 500, marginBottom: 12, color: '#333' }}>代理配置</div>
+                                        <div style={{ fontWeight: 500, marginBottom: 12, color: theme === 'dark' ? '#e8e8e8' : '#333' }}>代理配置</div>
                                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                             <thead>
-                                                <tr style={{ background: '#fafafa' }}>
-                                                    <th style={{ textAlign: 'left', padding: '10px 12px', width: 80, fontWeight: 500, color: '#333', borderBottom: '1px solid #f0f0f0' }}>协议</th>
-                                                    <th style={{ textAlign: 'left', padding: '10px 12px', fontWeight: 500, color: '#333', borderBottom: '1px solid #f0f0f0' }}>服务器地址</th>
-                                                    <th style={{ textAlign: 'left', padding: '10px 12px', width: 120, fontWeight: 500, color: '#333', borderBottom: '1px solid #f0f0f0' }}>端口</th>
+                                                <tr style={{ background: theme === 'dark' ? '#303030' : '#fafafa' }}>
+                                                    <th style={{ textAlign: 'left', padding: '10px 12px', width: 80, fontWeight: 500, color: theme === 'dark' ? '#e8e8e8' : '#333', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>协议</th>
+                                                    <th style={{ textAlign: 'left', padding: '10px 12px', fontWeight: 500, color: theme === 'dark' ? '#e8e8e8' : '#333', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>服务器地址</th>
+                                                    <th style={{ textAlign: 'left', padding: '10px 12px', width: 120, fontWeight: 500, color: theme === 'dark' ? '#e8e8e8' : '#333', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>端口</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 <tr>
-                                                    <td style={{ padding: '8px 12px', color: '#666', fontWeight: 500, borderBottom: '1px solid #f0f0f0' }}>HTTP</td>
-                                                    <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
+                                                    <td style={{ padding: '8px 12px', color: theme === 'dark' ? '#a0a0a0' : '#666', fontWeight: 500, borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>HTTP</td>
+                                                    <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
                                                         <Form.Item name={['proxy', 'httpHost']} style={{ marginBottom: 0 }}>
                                                             <Input placeholder="不填则不使用" />
                                                         </Form.Item>
                                                     </td>
-                                                    <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
+                                                    <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
                                                         <Form.Item name={['proxy', 'httpPort']} style={{ marginBottom: 0 }}>
                                                             <InputNumber
                                                                 placeholder="端口"
@@ -441,13 +441,13 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                                                     </td>
                                                 </tr>
                                                 <tr>
-                                                    <td style={{ padding: '8px 12px', color: '#666', fontWeight: 500, borderBottom: '1px solid #f0f0f0' }}>HTTPS</td>
-                                                    <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
+                                                    <td style={{ padding: '8px 12px', color: theme === 'dark' ? '#a0a0a0' : '#666', fontWeight: 500, borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>HTTPS</td>
+                                                    <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
                                                         <Form.Item name={['proxy', 'httpsHost']} style={{ marginBottom: 0 }}>
                                                             <Input placeholder="不填则不使用" />
                                                         </Form.Item>
                                                     </td>
-                                                    <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
+                                                    <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
                                                         <Form.Item name={['proxy', 'httpsPort']} style={{ marginBottom: 0 }}>
                                                             <InputNumber
                                                                 placeholder="端口"
@@ -460,7 +460,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                                                     </td>
                                                 </tr>
                                                 <tr>
-                                                    <td style={{ padding: '8px 12px', color: '#666', fontWeight: 500 }}>SOCKS5</td>
+                                                    <td style={{ padding: '8px 12px', color: theme === 'dark' ? '#a0a0a0' : '#666', fontWeight: 500 }}>SOCKS5</td>
                                                     <td style={{ padding: '8px 12px' }}>
                                                         <Form.Item name={['proxy', 'socks5Host']} style={{ marginBottom: 0 }}>
                                                             <Input placeholder="不填则不使用" />
@@ -482,10 +482,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                                         </table>
                                     </div>
 
-                                    <Divider style={{ marginTop: 32 }} />
+                                    <Divider style={{ marginTop: 32, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }} />
 
                                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-                                        <Button onClick={() => setSettingsVisible(false)}>
+                                        <Button onClick={() => setSettingsVisible(false)} style={{ background: theme === 'dark' ? '#303030' : undefined, color: theme === 'dark' ? '#e8e8e8' : undefined, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : undefined }}>
                                             取消
                                         </Button>
                                         <Button type="primary" onClick={handleSaveSettings}>
@@ -519,31 +519,31 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                                         <Switch />
                                     </Form.Item>
 
-                                    <Divider style={{ margin: '16px 0' }} />
+                                    <Divider style={{ margin: '16px 0', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }} />
 
                                     <div style={{ marginBottom: 16 }}>
-                                        <div style={{ fontWeight: 500, marginBottom: 12, color: '#333' }}>仓库配置</div>
+                                        <div style={{ fontWeight: 500, marginBottom: 12, color: theme === 'dark' ? '#e8e8e8' : '#333' }}>仓库配置</div>
                                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                             <tbody>
                                                 <tr>
-                                                    <td style={{ padding: '8px 12px', color: '#666', fontWeight: 500, width: 80, borderBottom: '1px solid #f0f0f0' }}>仓库地址</td>
-                                                    <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
+                                                    <td style={{ padding: '8px 12px', color: theme === 'dark' ? '#a0a0a0' : '#666', fontWeight: 500, width: 80, borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>仓库地址</td>
+                                                    <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
                                                         <Form.Item name={['gitSync', 'remoteUrl']} style={{ marginBottom: 0 }}>
                                                             <Input placeholder="https://gitee.com/username/repo.git" />
                                                         </Form.Item>
                                                     </td>
                                                 </tr>
                                                 <tr>
-                                                    <td style={{ padding: '8px 12px', color: '#666', fontWeight: 500, borderBottom: '1px solid #f0f0f0' }}>分支</td>
-                                                    <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
+                                                    <td style={{ padding: '8px 12px', color: theme === 'dark' ? '#a0a0a0' : '#666', fontWeight: 500, borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>分支</td>
+                                                    <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
                                                         <Form.Item name={['gitSync', 'branch']} style={{ marginBottom: 0 }}>
                                                             <Input placeholder="main" />
                                                         </Form.Item>
                                                     </td>
                                                 </tr>
                                                 <tr>
-                                                    <td style={{ padding: '8px 12px', color: '#666', fontWeight: 500, borderBottom: '1px solid #f0f0f0' }}>Access Token</td>
-                                                    <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
+                                                    <td style={{ padding: '8px 12px', color: theme === 'dark' ? '#a0a0a0' : '#666', fontWeight: 500, borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>Access Token</td>
+                                                    <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
                                                         <Form.Item name={['gitSync', 'password']} style={{ marginBottom: 0 }}>
                                                             <Input type="password" placeholder="粘贴你的 Access Token" />
                                                         </Form.Item>
@@ -553,10 +553,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                                         </table>
                                     </div>
 
-                                    <Divider style={{ marginTop: 32 }} />
+                                    <Divider style={{ marginTop: 32, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }} />
 
                                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-                                        <Button onClick={() => setSettingsVisible(false)}>
+                                        <Button onClick={() => setSettingsVisible(false)} style={{ background: theme === 'dark' ? '#303030' : undefined, color: theme === 'dark' ? '#e8e8e8' : undefined, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : undefined }}>
                                             取消
                                         </Button>
                                         <Button type="primary" onClick={handleSaveSettings}>
@@ -571,15 +571,15 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                             <div>
                                 <div style={{ textAlign: 'center', padding: '60px 20px' }}>
                                     <img src="/logo.png" alt="Apiman" style={{ width: '200px', marginBottom: '24px' }} />
-                                    <p style={{ color: '#666', margin: '0 0 24px 0', fontSize: 14 }}>API 管理工具</p>
-                                    <div style={{ background: '#f5f5f5', padding: '16px 24px', borderRadius: 8, display: 'inline-block' }}>
-                                        <p style={{ color: '#333', margin: '0 0 8px 0', fontSize: 14 }}>
+                                    <p style={{ color: theme === 'dark' ? '#a0a0a0' : '#666', margin: '0 0 24px 0', fontSize: 14 }}>API 管理工具</p>
+                                    <div style={{ background: theme === 'dark' ? '#303030' : '#f5f5f5', padding: '16px 24px', borderRadius: 8, display: 'inline-block' }}>
+                                        <p style={{ color: theme === 'dark' ? '#e8e8e8' : '#333', margin: '0 0 8px 0', fontSize: 14 }}>
                                             <strong>版本</strong>：1.0.0
                                         </p>
-                                        <p style={{ color: '#333', margin: '0 0 8px 0', fontSize: 14 }}>
+                                        <p style={{ color: theme === 'dark' ? '#e8e8e8' : '#333', margin: '0 0 8px 0', fontSize: 14 }}>
                                             <strong>技术栈</strong>：Wails + React + TypeScript
                                         </p>
-                                        <p style={{ color: '#333', margin: 0, fontSize: 14 }}>
+                                        <p style={{ color: theme === 'dark' ? '#e8e8e8' : '#333', margin: 0, fontSize: 14 }}>
                                             <strong>作者</strong>：zetaoxie
                                         </p>
                                     </div>

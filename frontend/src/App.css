@@ -1631,10 +1631,12 @@ body,
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
     min-height: 200px;
+    max-height: 50vh;
     box-shadow: var(--shadow-card);
 }
 
 .response-header {
+    flex-shrink: 0;
     padding: 12px 16px;
     background: var(--bg-tertiary);
     border-bottom: 1px solid var(--border-subtle);
@@ -1672,6 +1674,104 @@ body,
     flex: 1;
     overflow: auto;
     padding: 16px;
+    text-align: left;
+    box-sizing: border-box;
+}
+
+.response-json {
+    flex: 1;
+    overflow: auto;
+    padding: 16px;
+    text-align: left;
+    box-sizing: border-box;
+}
+
+/* JSON Viewer 自定义高亮颜色 - 浅色主题 */
+.response-json ._1MGIk {
+    font-weight: 600;
+    margin-right: 5px;
+    color: #0b75f5;
+}
+
+.response-json ._vGjyY {
+    color: #469038;
+}
+
+.response-json ._2T6PJ,
+.response-json ._1Gho6 {
+    color: #df113a;
+}
+
+.response-json ._1bQdo {
+    color: #df113a;
+}
+
+/* JSON Viewer 深色主题容器 */
+._11RoI {
+    background: rgb(0, 43, 54);
+    padding: 10px;
+    border-radius: 4px;
+}
+
+/* Response Headers */
+.response-headers {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.response-header-item {
+    display: flex;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-subtle);
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+.response-header-item:last-child {
+    border-bottom: none;
+}
+
+.response-header-item .header-key {
+    color: var(--accent-primary);
+    font-weight: 500;
+    min-width: 200px;
+}
+
+/* Tabs inside response-panel must respect parent height */
+.response-panel .ant-tabs {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.response-panel .ant-tabs-content {
+    flex: 1;
+    overflow: auto;
+}
+
+.response-panel .ant-tabs-tabpane {
+    height: 100%;
+    overflow: auto;
+}
+
+.response-panel .ant-tabs-tabpane > .response-body,
+.response-panel .ant-tabs-tabpane > .response-json {
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.response-header-item .header-value {
+    color: var(--text-secondary);
+    word-break: break-all;
+}
+
+/* JsonView Container */
+.json-view-container {
+    overflow: auto;
+    max-height: 100%;
 }
 
 .response-content {
@@ -2808,8 +2908,70 @@ body,
     color: var(--text-primary);
 }
 
+.settings-modal.theme-dark .ant-modal {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.settings-modal.theme-dark .ant-modal-content {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
 .settings-modal.theme-dark .ant-modal-title {
     color: var(--text-primary) !important;
+}
+
+.settings-modal.theme-dark .ant-modal-close {
+    color: var(--text-secondary);
+}
+
+.settings-modal.theme-dark .ant-modal-close:hover {
+    color: var(--text-primary);
+}
+
+/* 设置模态框边框覆盖 */
+.settings-modal.theme-dark.ant-modal .ant-modal-body {
+    border-top: none;
+    border-bottom: none;
+}
+
+/* 深色主题遮罩层 */
+.theme-dark .ant-modal-mask {
+    background: rgba(0, 0, 0, 0.6) !important;
+}
+
+/* 设置模态框遮罩 */
+.settings-modal.theme-dark .ant-modal-mask {
+    background: rgba(0, 0, 0, 0.7) !important;
+}
+
+/* 覆盖 Ant Design Modal 的 CSS 变量 */
+.settings-modal.theme-dark .ant-modal-container {
+    --ant-modal-content-bg: #252525 !important;
+    background-color: #252525 !important;
+    background: #252525 !important;
+}
+
+.settings-modal.theme-dark .ant-modal-content {
+    --ant-modal-content-bg: #252525 !important;
+    background-color: #252525 !important;
+    background: #252525 !important;
+}
+
+/* 设置模态框表单内容左对齐 */
+.settings-modal.theme-dark .ant-form-item .ant-form-item-control-input-content {
+    text-align: left;
+}
+
+/* 强制覆盖 Ant Design Modal 内部容器 */
+.settings-modal.theme-dark.ant-modal .ant-modal-container {
+    --ant-modal-content-bg: #252525 !important;
+    background-color: #252525 !important;
+}
+
+.settings-modal.theme-dark.ant-modal .ant-modal-container .ant-modal-content {
+    background-color: #252525 !important;
+    background: #252525 !important;
 }
 
 /* 深色主题 - 项目分组选择 */
