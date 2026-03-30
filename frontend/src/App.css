@@ -3272,6 +3272,52 @@ body,
     color: var(--text-secondary) !important;
 }
 
+/* 深色主题 - 选择框展开/聚焦时箭头保持一致（对齐主页项目分组选择框） */
+.theme-dark .sidebar-filters .ant-select.ant-select-open .ant-select-arrow,
+.theme-dark .api-request-bar .ant-select.ant-select-open .ant-select-arrow,
+.theme-dark .request-tabs-environment-select .ant-select.ant-select-open .ant-select-arrow,
+.theme-dark .sidebar-filters .ant-select.ant-select-focused .ant-select-arrow,
+.theme-dark .api-request-bar .ant-select.ant-select-focused .ant-select-arrow,
+.theme-dark .request-tabs-environment-select .ant-select.ant-select-focused .ant-select-arrow {
+    color: var(--text-secondary) !important;
+}
+
+.theme-dark .sidebar-filters .ant-select-suffix,
+.theme-dark .api-request-bar .ant-select-suffix,
+.theme-dark .request-tabs-environment-select .ant-select-suffix {
+    color: var(--text-secondary) !important;
+}
+
+.theme-dark .sidebar-filters .ant-select.ant-select-open .ant-select-suffix,
+.theme-dark .api-request-bar .ant-select.ant-select-open .ant-select-suffix,
+.theme-dark .request-tabs-environment-select .ant-select.ant-select-open .ant-select-suffix,
+.theme-dark .sidebar-filters .ant-select.ant-select-focused .ant-select-suffix,
+.theme-dark .api-request-bar .ant-select.ant-select-focused .ant-select-suffix,
+.theme-dark .request-tabs-environment-select .ant-select.ant-select-focused .ant-select-suffix {
+    color: var(--text-secondary) !important;
+}
+
+.theme-dark .sidebar-filters .ant-select-arrow svg,
+.theme-dark .api-request-bar .ant-select-arrow svg,
+.theme-dark .request-tabs-environment-select .ant-select-arrow svg,
+.theme-dark .sidebar-filters .ant-select-suffix svg,
+.theme-dark .api-request-bar .ant-select-suffix svg,
+.theme-dark .request-tabs-environment-select .ant-select-suffix svg {
+    fill: currentColor !important;
+}
+
+.theme-dark .sidebar-filters .ant-select-disabled .ant-select-arrow,
+.theme-dark .api-request-bar .ant-select-disabled .ant-select-arrow,
+.theme-dark .request-tabs-environment-select .ant-select-disabled .ant-select-arrow {
+    color: var(--text-muted) !important;
+}
+
+.theme-dark .sidebar-filters .ant-select-disabled .ant-select-suffix,
+.theme-dark .api-request-bar .ant-select-disabled .ant-select-suffix,
+.theme-dark .request-tabs-environment-select .ant-select-disabled .ant-select-suffix {
+    color: var(--text-muted) !important;
+}
+
 /* 深色主题 - 接口过滤选择 */
 .theme-dark .sidebar-filters .ant-select .ant-select-selector {
     background: var(--bg-primary) !important;
