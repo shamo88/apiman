@@ -1475,6 +1475,8 @@ function App() {
                 <div key={api.path} className="api-request-block">
                     <div
                         className={`api-item ${parentOpen ? 'is-parent-open' : ''} ${movedHighlightPath === api.path ? 'moved-highlight' : ''}`}
+                        onClick={() => handleTreeItemClick(api)}
+
                         onDragOver={(e) => {
                             e.stopPropagation();
                             if (!draggingNode) return;
@@ -1549,7 +1551,6 @@ function App() {
                             draggable
                             role="button"
                             tabIndex={0}
-                            onClick={() => handleTreeItemClick(api)}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter' || e.key === ' ') {
                                     e.preventDefault();
@@ -1648,10 +1649,10 @@ function App() {
                             const check = intoFolderHalf
                                 ? checkDropAppendIntoFolder(draggingNode, targetPath)
                                 : (() => {
-                                      const p = getParentFolderPath(folder.path!);
-                                      if (p === null) return { ok: false as const, reason: 'invalid-target' };
-                                      return checkDropOrdered(draggingNode, p, folder.id);
-                                  })();
+                                    const p = getParentFolderPath(folder.path!);
+                                    if (p === null) return { ok: false as const, reason: 'invalid-target' };
+                                    return checkDropOrdered(draggingNode, p, folder.id);
+                                })();
                             if (!check.ok) {
                                 e.dataTransfer.dropEffect = 'none';
                                 setDropTargetFolderPath(null);
