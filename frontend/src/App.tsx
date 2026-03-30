@@ -827,6 +827,7 @@ function App() {
     const [sidebarMenu, setSidebarMenu] = useState<'apis' | 'environments' | 'scripts'>('apis');
     const [environments, setEnvironments] = useState<Environment[]>([]);
     const [selectedEnvironmentId, setSelectedEnvironmentId] = useState<string>('');
+    const [environmentsInitiallyLoaded, setEnvironmentsInitiallyLoaded] = useState(false);
     const [editingEnvironmentId, setEditingEnvironmentId] = useState<string>('');
     const [environmentFormName, setEnvironmentFormName] = useState('');
     const [environmentFormVariables, setEnvironmentFormVariables] = useState<EnvironmentVariableRow[]>([createEnvironmentVariableRow()]);
@@ -1115,6 +1116,7 @@ function App() {
 
     const loadEnvironmentsData = async (projectID: string) => {
         setEnvLoading(true);
+        setEnvironmentsInitiallyLoaded(false);
         try {
             const envs = await LoadEnvironments(projectID);
             setEnvironments(envs || []);
@@ -1767,15 +1769,19 @@ function App() {
             return;
         }
 
-        const hasSelected = environments.some(env => env.id === selectedEnvironmentId);
-        if (!hasSelected) {
-            setSelectedEnvironmentId(environments[0].id);
+        // Auto-select first environment only on initial load, not on subsequent changes
+        // This preserves user's explicit selection of "不使用环境"
+        if (!environmentsInitiallyLoaded) {
+            if (!selectedEnvironmentId) {
+                setSelectedEnvironmentId(environments[0].id);
+            }
+            setEnvironmentsInitiallyLoaded(true);
         }
 
         if (editingEnvironmentId && !environments.some(env => env.id === editingEnvironmentId)) {
             resetEnvironmentEditor();
         }
-    }, [environments, selectedEnvironmentId, editingEnvironmentId]);
+    }, [environments, selectedEnvironmentId, editingEnvironmentId, environmentsInitiallyLoaded]);
 
     useEffect(() => {
         const activeProject = projectTabs.find(t => t.id === activeTab)?.project;
@@ -1785,6 +1791,7 @@ function App() {
             setScriptFormName('');
             setScriptFormContent('// 在这里编写 JavaScript 脚本\n');
             setEnvironments([]);
+            setEnvironmentsInitiallyLoaded(false);
             return;
         }
         loadProjectScriptsData(activeProject.id);
