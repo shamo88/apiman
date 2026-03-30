@@ -45,6 +45,7 @@ go build -o apiman.exe
 - **config/** - Configuration manager handling `~/.apiman/` storage (environments, global variables, app config)
 - **models/** - Data structures: `Environment`, `Project`, `Folder`, `CurlRequest`, `HttpRequestSpec`, `HttpRequestCase`, `CurlResponse`, `ProjectScript`
 - **curl/** - HTTP request execution engine. `curl.go` handles raw curl parsing and HTTP execution; `exec_with_scripts.go` adds pre/post script execution via goja
+- **git/** - Git sync functionality for backing up projects to remote repositories
 - **project/** - `ProjectManager` handles project CRUD, folder management, request management, and Postman collection persistence (`collection.postman.json`)
 - **postman/** - Postman collection format support (import/export)
 - **script/** - JavaScript runtime using goja VM. `runtime.go` sets up the VM with `am` API object; `executor.go` runs scripts; `crypto.go` provides MD5/SHA/AES/RSA utilities
@@ -154,6 +155,24 @@ Supported HTTP methods with color coding:
 
 The app supports light and dark themes. Theme can be changed in **Settings → General → Theme**:
 - **浅色** - Light theme (default)
-- **深色** - Dark theme with `#242424` as primary background color
+- **深色** - Dark theme with `rgb(36, 36, 36)` (#242424) as primary background color
 
 Dark theme CSS variables are defined in `frontend/src/App.css` under `.theme-dark` class.
+
+## Settings
+
+The app has three settings tabs in **Settings** modal:
+
+### 通用 (General)
+- **接口列表动画** - Enable/disable animation effects in the API list
+- **主题** - Choose between light and dark theme
+
+### 网络代理 (Proxy)
+- **启用代理** - Toggle proxy usage
+- HTTP/HTTPS/SOCKS5 proxy server configuration with host and port
+
+### Git 同步 (Git Sync)
+- **启用 Git 同步** - Enable/disable automatic project backup to git repository
+- **仓库地址** - Remote git repository URL
+- **分支** - Branch name (default: main)
+- **Access Token** - Authentication token for the repository
