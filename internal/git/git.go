@@ -225,6 +225,15 @@ func (g *GitSyncManager) pullRepo(branch, password string) error {
 		return fmt.Errorf("failed to get worktree: %w", err)
 	}
 
+	// Check if worktree has uncommitted changes
+	status, err := worktree.Status()
+	if err != nil {
+		log.Printf("[GitSync] Failed to get worktree status: %v", err)
+	} else if !status.IsClean() {
+		log.Printf("[GitSync] Worktree has uncommitted changes, skipping pull")
+		return nil
+	}
+
 	auth := ensureAuth(password)
 
 	pullOpts := &git.PullOptions{
