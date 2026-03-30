@@ -136,3 +136,24 @@ Pre/post scripts run in a goja JavaScript VM with access to an `am` API object.
 ## Window Configuration
 
 The app runs frameless (`Frameless: true` in `main.go`). The custom title bar is in `frontend/src/components/TitleBar.tsx` which calls Wails runtime methods for window minimize/close/maximize.
+
+## HTTP Methods
+
+Supported HTTP methods with color coding:
+| Method | Color | Sidebar Label |
+|--------|-------|---------------|
+| GET | #61affe (蓝) | GET |
+| POST | #49cc90 (绿) | POST |
+| PUT | #fca130 (橙) | PUT |
+| DELETE | #f93e3e (红) | DEL |
+| PATCH | #50e3c2 (青) | PAT |
+| OPTIONS | #0d5aa7 (深蓝) | OPT |
+| HEAD | #9012fe (紫) | HEAD |
+
+## Theme Settings
+
+The app supports light and dark themes. Theme can be changed in **Settings → General → Theme**:
+- **浅色** - Light theme (default)
+- **深色** - Dark theme with `#242424` as primary background color
+
+Dark theme CSS variables are defined in `frontend/src/App.css` under `.theme-dark` class.
