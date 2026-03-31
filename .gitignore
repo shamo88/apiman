@@ -50,3 +50,4 @@ test-postman-collection.json
 .claude/settings.local.json
 test/scripts/签名脚本__test-signature.js
 test/scripts/签名脚本__test-signature.meta
+vendor

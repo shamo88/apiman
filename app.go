@@ -2,10 +2,12 @@ package main
 
 import (
 	"apiman/internal/config"
+	"apiman/internal/mcp"
 	"apiman/internal/models"
 	"apiman/internal/project"
 	"apiman/internal/service"
 	"context"
+	"encoding/json"
 )
 
 type App struct {
@@ -179,12 +181,12 @@ func (a *App) ListProjectScripts(projectID string) ([]models.ProjectScript, erro
 	return a.service.ListProjectScripts(projectID)
 }
 
-func (a *App) CreateProjectScript(projectID, name, content string) (*models.ProjectScript, error) {
-	return a.service.CreateProjectScript(projectID, name, content)
+func (a *App) CreateProjectScript(projectID, name, description, content string) (*models.ProjectScript, error) {
+	return a.service.CreateProjectScript(projectID, name, description, content)
 }
 
-func (a *App) UpdateProjectScript(projectID, scriptID, name, content string) (*models.ProjectScript, error) {
-	return a.service.UpdateProjectScript(projectID, scriptID, name, content)
+func (a *App) UpdateProjectScript(projectID, scriptID, name, description, content string) (*models.ProjectScript, error) {
+	return a.service.UpdateProjectScript(projectID, scriptID, name, description, content)
 }
 
 func (a *App) DeleteProjectScript(projectID, scriptID string) error {
@@ -238,3 +240,110 @@ func (a *App) DisableGitSync() error {
 func (a *App) PullGitRepo() error {
 	return a.service.PullGitRepo()
 }
+
+// LoadGlobalCookies returns all saved global cookies as JSON string.
+func (a *App) LoadGlobalCookies() (string, error) {
+	cookies, err := a.service.LoadGlobalCookies()
+	if err != nil {
+		return "", err
+	}
+	data, err := json.Marshal(cookies)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+// SaveGlobalCookies replaces all global cookies with the given JSON data.
+func (a *App) SaveGlobalCookies(jsonData string) error {
+	var cookies []models.GlobalCookie
+	if err := json.Unmarshal([]byte(jsonData), &cookies); err != nil {
+		return err
+	}
+	return a.service.SaveGlobalCookies(cookies)
+}
+
+// AddGlobalCookies parses and adds set-cookie raw data.
+func (a *App) AddGlobalCookies(rawCookies string) error {
+	return a.service.AddGlobalCookies(rawCookies)
+}
+
+// DeleteGlobalCookie deletes a cookie by its ID.
+func (a *App) DeleteGlobalCookie(id string) error {
+	return a.service.DeleteGlobalCookie(id)
+}
+
+// MCP Server instance (set from main.go)
+var mcpServer *mcp.Server
+
+// LoadMCPConfig loads the MCP configuration.
+func (a *App) LoadMCPConfig() (*config.MCPConfig, error) {
+	cfg, err := a.service.LoadAppConfig()
+	if err != nil {
+		return nil, err
+	}
+	return &cfg.MCP, nil
+}
+
+// SaveMCPConfig saves the MCP configuration.
+func (a *App) SaveMCPConfig(cfg *config.MCPConfig) error {
+	appCfg, err := a.service.LoadAppConfig()
+	if err != nil {
+		appCfg = &config.AppConfig{}
+	}
+	appCfg.MCP = *cfg
+	return a.service.SaveAppConfig(appCfg)
+}
+
+// StartMCP starts the MCP server with current config.
+func (a *App) StartMCP() error {
+	cfg, err := a.LoadMCPConfig()
+	if err != nil {
+		return err
+	}
+
+	// Ensure project exists
+	if cfg.ProjectID == "" {
+		project, err := a.service.CreateProject("MCP Default Project")
+		if err != nil {
+			return err
+		}
+		cfg.ProjectID = project.ID
+		if err := a.SaveMCPConfig(cfg); err != nil {
+			return err
+		}
+	}
+
+	// Stop existing server if running
+	if mcpServer != nil && mcpServer.IsRunning() {
+		mcpServer.Stop()
+	}
+
+	mcpServer = mcp.NewServer(a.service, cfg)
+	return mcpServer.Start()
+}
+
+// StopMCP stops the MCP server.
+func (a *App) StopMCP() error {
+	if mcpServer != nil {
+		return mcpServer.Stop()
+	}
+	return nil
+}
+
+// GetMCPStatus returns the MCP server status.
+func (a *App) GetMCPStatus() string {
+	if mcpServer == nil {
+		return "stopped"
+	}
+	if mcpServer.IsRunning() {
+		return "running"
+	}
+	return "stopped"
+}
+
+// ListProjectsForMCP lists all projects for MCP configuration.
+func (a *App) ListProjectsForMCP() ([]models.Project, error) {
+	return a.service.ListProjects()
+}
+

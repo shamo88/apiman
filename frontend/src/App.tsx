@@ -1,17 +1,18 @@
-import { ApiOutlined, CloseOutlined, CopyOutlined, DownOutlined, EditOutlined, ExperimentOutlined, FileOutlined, FolderOutlined, HomeOutlined, ImportOutlined, MoreOutlined, PlusOutlined, ProjectOutlined, QuestionCircleOutlined, RightOutlined, SearchOutlined, EnvironmentOutlined, CodeOutlined } from '@ant-design/icons';
+import { ApiOutlined, CloseOutlined, CopyOutlined, DownOutlined, EditOutlined, ExperimentOutlined, FileOutlined, FolderOutlined, HomeOutlined, ImportOutlined, MoreOutlined, PlusOutlined, ProjectOutlined, QuestionCircleOutlined, RightOutlined, SearchOutlined, EnvironmentOutlined, CodeOutlined, SafetyOutlined } from '@ant-design/icons';
 import { javascript } from '@codemirror/lang-javascript';
 import CodeMirror from '@uiw/react-codemirror';
 import { JsonView, darkStyles, allExpanded } from 'react-json-view-lite';
 import 'react-json-view-lite/dist/index.css';
 import type { UploadProps } from 'antd';
-import { Button, Card, Checkbox, Col, Dropdown, Empty, Input, InputRef, message, Modal, Radio, Row, Select, Space, Spin, Tabs, Tooltip, Upload } from 'antd';
+import { Button, Card, Checkbox, Col, Divider, Dropdown, Empty, Input, InputRef, message, Modal, Radio, Row, Select, Space, Spin, Table, Tabs, Tooltip, Upload } from 'antd';
 import type { DataNode } from 'antd/es/tree';
 import React, { useEffect, useState } from 'react';
-import { AddRequestCase, CopyRequest, CreateEnvironment, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteEnvironment, DeleteFolder, DeleteProject, DeleteProjectScript, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, ListProjectScripts, LoadAppConfig, LoadEnvironments, MoveFolder, MoveRequest, PullGitRepo, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, SaveAppConfig, UpdateEnvironment, UpdateProjectScript, UpdateRequest, UpdateRequestScripts } from '../wailsjs/go/main/App';
+import { AddGlobalCookies, AddRequestCase, CopyRequest, CreateEnvironment, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteEnvironment, DeleteFolder, DeleteGlobalCookie, DeleteProject, DeleteProjectScript, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, ListProjectScripts, LoadAppConfig, LoadEnvironments, LoadGlobalCookies, MoveFolder, MoveRequest, PullGitRepo, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, SaveAppConfig, SaveGlobalCookies, UpdateEnvironment, UpdateProjectScript, UpdateRequest, UpdateRequestScripts, LoadMCPConfig, SaveMCPConfig, StartMCP, StopMCP, GetMCPStatus } from '../wailsjs/go/main/App';
 import { models } from '../wailsjs/go/models';
 import './App.css';
 import { ScriptHelpWindow } from './components/ScriptHelpWindow';
 import { TitleBar } from './components/TitleBar';
+import { MCPSettingsModal } from './components/MCPSettingsModal';
 
 interface Project {
     id: string;
@@ -102,6 +103,7 @@ interface ProjectScript {
     id: string;
     project_id: string;
     name: string;
+    description: string;
     path: string;
     content: string;
 }
@@ -764,6 +766,12 @@ function App() {
     const [loading, setLoading] = useState(false);
     const [createProjectModal, setCreateProjectModal] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
+    const [cookieModalVisible, setCookieModalVisible] = useState(false);
+    const [cookieInput, setCookieInput] = useState('');
+    const [globalCookies, setGlobalCookies] = useState<any[]>([]);
+    const [mcpModalVisible, setMCpModalVisible] = useState(false);
+    const [mcpConfig, setMCPConfig] = useState<any>({ enabled: false, port: 3847, project_id: '', api_key: '' });
+    const [mcpStatus, setMCPStatus] = useState<'stopped' | 'running' | 'error'>('stopped');
     const [projectTabs, setProjectTabs] = useState<ProjectTab[]>([]);
     const [activeTab, setActiveTab] = useState<string>('home');
     const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
@@ -853,6 +861,7 @@ function App() {
     const [projectScripts, setProjectScripts] = useState<ProjectScript[]>([]);
     const [editingScriptId, setEditingScriptId] = useState<string>('');
     const [scriptFormName, setScriptFormName] = useState('');
+    const [scriptFormDescription, setScriptFormDescription] = useState('');
     const [scriptFormContent, setScriptFormContent] = useState('// 在这里编写 JavaScript 脚本\n');
     const [scriptsLoading, setScriptsLoading] = useState(false);
     const [scriptSaving, setScriptSaving] = useState(false);
@@ -1153,10 +1162,12 @@ function App() {
                 const target = scripts.find(item => item.id === editingScriptId) || scripts[0];
                 setEditingScriptId(target.id);
                 setScriptFormName(target.name);
+                setScriptFormDescription(target.description || '');
                 setScriptFormContent(target.content || '');
             } else {
                 setEditingScriptId('');
                 setScriptFormName('');
+                setScriptFormDescription('');
                 setScriptFormContent('// 在这里编写 JavaScript 脚本\n');
             }
         } catch (error: any) {
@@ -1172,11 +1183,12 @@ function App() {
         const scriptName = `脚本${projectScripts.length + 1}`;
         setScriptSaving(true);
         try {
-            const created = await CreateProjectScript(currentProject.id, scriptName, '// 在这里编写 JavaScript 脚本\n');
+            const created = await CreateProjectScript(currentProject.id, scriptName, '', '// 在这里编写 JavaScript 脚本\n');
             message.success('脚本已创建');
             await loadProjectScriptsData(currentProject.id);
             setEditingScriptId(created.id);
             setScriptFormName(created.name);
+            setScriptFormDescription(created.description || '');
             setScriptFormContent(created.content || '');
             setSidebarMenu('scripts');
         } catch (error: any) {
@@ -1189,6 +1201,7 @@ function App() {
     const handleSelectScriptEditor = (script: ProjectScript) => {
         setEditingScriptId(script.id);
         setScriptFormName(script.name);
+        setScriptFormDescription(script.description || '');
         setScriptFormContent(script.content || '');
     };
 
@@ -1201,7 +1214,7 @@ function App() {
         }
         setScriptSaving(true);
         try {
-            await UpdateProjectScript(currentProject.id, editingScriptId, name, scriptFormContent);
+            await UpdateProjectScript(currentProject.id, editingScriptId, name, scriptFormDescription, scriptFormContent);
             message.success('脚本已保存');
             await loadProjectScriptsData(currentProject.id);
         } catch (error: any) {
@@ -1769,6 +1782,8 @@ function App() {
             loadProjects();
             loadUiConfig();
             loadProjectGroupsState();
+            loadMCPStatus();
+            loadMCPConfig();
         };
         init();
     }, []);
@@ -1804,6 +1819,7 @@ function App() {
             setProjectScripts([]);
             setEditingScriptId('');
             setScriptFormName('');
+            setScriptFormDescription('');
             setScriptFormContent('// 在这里编写 JavaScript 脚本\n');
             setEnvironments([]);
             setEnvironmentsInitiallyLoaded(false);
@@ -2098,6 +2114,101 @@ function App() {
         setCreateGroupModal(false);
         setNewGroupName('');
         message.success('分组创建成功');
+    };
+
+    const loadMCPStatus = async () => {
+        try {
+            const status = await GetMCPStatus();
+            setMCPStatus(status as 'stopped' | 'running' | 'error');
+        } catch (err) {
+            console.error('Failed to get MCP status:', err);
+            setMCPStatus('stopped');
+        }
+    };
+
+    const loadMCPConfig = async () => {
+        try {
+            const config = await LoadMCPConfig();
+            if (config) {
+                setMCPConfig(config);
+            }
+        } catch (err) {
+            console.error('Failed to load MCP config:', err);
+        }
+    };
+
+    const handleSaveMCPConfig = async (config: any) => {
+        try {
+            // Save config first
+            await SaveMCPConfig(config);
+            setMCPConfig(config);
+
+            // Then start or stop based on enabled flag
+            if (config.enabled) {
+                await StartMCP();
+                setMCPStatus('running');
+            } else {
+                await StopMCP();
+                setMCPStatus('stopped');
+            }
+        } catch (err) {
+            console.error('Failed to save MCP config:', err);
+            setMCPStatus('error');
+            throw err;
+        }
+    };
+
+    const handleStopMCP = async () => {
+        try {
+            await StopMCP();
+            setMCPStatus('stopped');
+            const config = { ...mcpConfig, enabled: false };
+            await SaveMCPConfig(config);
+            setMCPConfig(config);
+        } catch (err) {
+            console.error('Failed to stop MCP:', err);
+            message.error('停止 MCP 失败');
+        }
+    };
+
+    const loadGlobalCookies = async () => {
+        try {
+            const data = await LoadGlobalCookies();
+            if (data) {
+                setGlobalCookies(JSON.parse(data));
+            } else {
+                setGlobalCookies([]);
+            }
+        } catch (err) {
+            console.error('Failed to load cookies:', err);
+            setGlobalCookies([]);
+        }
+    };
+
+    const handleSaveCookies = async () => {
+        if (!cookieInput.trim()) {
+            message.warning('请输入 set-cookie 内容');
+            return;
+        }
+        try {
+            await AddGlobalCookies(cookieInput);
+            message.success('Cookie 保存成功');
+            setCookieInput('');
+            loadGlobalCookies();
+        } catch (err) {
+            message.error(`保存失败: ${err}`);
+        }
+    };
+
+    const handleDeleteCookie = async (id: string) => {
+        try {
+            await DeleteGlobalCookie(id);
+            message.success('Cookie 已删除');
+            loadGlobalCookies();
+        } catch (err: any) {
+            console.error('Delete error:', err);
+            message.error(`删除失败: ${err?.message || err}`);
+        }
     };
 
     const handleAssignProjectGroup = (projectId: string, groupName: string) => {
@@ -3637,12 +3748,21 @@ function App() {
                                     {editingScriptId ? (
                                         <div className="environment-panel script-panel">
                                             <div className="script-editor-header">
-                                                <Input
-                                                    placeholder="脚本名称"
-                                                    value={scriptFormName}
-                                                    onChange={(e) => setScriptFormName(e.target.value)}
-                                                    style={{ maxWidth: 360 }}
-                                                />
+                                                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                                                    <Input
+                                                        placeholder="脚本名称"
+                                                        value={scriptFormName}
+                                                        onChange={(e) => setScriptFormName(e.target.value)}
+                                                        style={{ maxWidth: 200 }}
+                                                    />
+                                                    <Input.TextArea
+                                                        placeholder="描述（可选）"
+                                                        value={scriptFormDescription}
+                                                        onChange={(e) => setScriptFormDescription(e.target.value)}
+                                                        style={{ maxWidth: 300, minWidth: 200, minHeight: 60, maxHeight: 120 }}
+                                                        autoSize={{ minRows: 2, maxRows: 4 }}
+                                                    />
+                                                </div>
                                                 <Space>
                                                     <Tooltip title="脚本开发指南">
                                                         <Button
@@ -4614,11 +4734,105 @@ function App() {
                 />
             </Modal>
 
+            <Modal
+                title="设置全局Cookie"
+                open={cookieModalVisible}
+                onOk={handleSaveCookies}
+                onCancel={() => { setCookieModalVisible(false); setCookieInput(''); }}
+                className={`cookie-modal ${appTheme === 'dark' ? 'theme-dark' : ''}`}
+                width={700}
+                okText="保存"
+            >
+                <div style={{ marginBottom: 16 }}>
+                    <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                        输入 set-cookie 原始报文，每行一个。Cookie 将对所有项目的所有请求生效。
+                    </p>
+                    <Input.TextArea
+                        rows={6}
+                        placeholder={`例如:
+session=abc123; Domain=.example.com; Path=/; Expires=Wed, 09 Jun 2026 10:18:14 GMT; HttpOnly; Secure
+token=xyz789; Domain=api.example.com; Path=/api`}
+                        value={cookieInput}
+                        onChange={(e) => setCookieInput(e.target.value)}
+                        style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}
+                    />
+                </div>
+
+                {globalCookies.length > 0 && (
+                    <div>
+                        <Divider style={{ margin: '16px 0' }} />
+                        <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>已保存的 Cookies</p>
+                        <Table
+                            size="small"
+                            dataSource={globalCookies}
+                            rowKey="id"
+                            pagination={false}
+                            scroll={{ y: 200 }}
+                            columns={[
+                                { title: 'Name', dataIndex: 'name', key: 'name', width: 120, ellipsis: true },
+                                { title: 'Domain', dataIndex: 'domain', key: 'domain', width: 120, ellipsis: true },
+                                { title: 'Path', dataIndex: 'path', key: 'path', width: 80, ellipsis: true },
+                                {
+                                    title: 'Expires',
+                                    dataIndex: 'expires',
+                                    key: 'expires',
+                                    width: 150,
+                                    ellipsis: true,
+                                    render: (val: string) => val ? new Date(val).toLocaleString() : 'Session'
+                                },
+                                { title: 'SameSite', dataIndex: 'same_site', key: 'same_site', width: 80, ellipsis: true },
+                                { title: 'Priority', dataIndex: 'priority', key: 'priority', width: 80, ellipsis: true },
+                                {
+                                    title: 'Action',
+                                    key: 'action',
+                                    width: 80,
+                                    render: (_: any, record: any) => (
+                                        <Button
+                                            type="text"
+                                            danger
+                                            size="small"
+                                            onClick={() => handleDeleteCookie(record.id)}
+                                        >
+                                            删除
+                                        </Button>
+                                    )
+                                }
+                            ]}
+                        />
+                    </div>
+                )}
+            </Modal>
+
             <ScriptHelpWindow
                 visible={scriptHelpVisible}
                 onClose={() => setScriptHelpVisible(false)}
             />
 
+            <MCPSettingsModal
+                visible={mcpModalVisible}
+                onClose={() => setMCpModalVisible(false)}
+                projects={projects}
+                mcpConfig={mcpConfig}
+                onSave={handleSaveMCPConfig}
+                currentStatus={mcpStatus}
+                appTheme={appTheme}
+            />
+
+            <div className="app-footer">
+                <Button
+                    icon={<SafetyOutlined />}
+                    onClick={() => { setCookieModalVisible(true); loadGlobalCookies(); }}
+                >
+                    Cookie
+                </Button>
+                <Button
+                    icon={<ApiOutlined />}
+                    className={`mcp-status ${mcpStatus}`}
+                    onClick={() => { setMCpModalVisible(true); }}
+                >
+                    {mcpStatus === 'running' ? 'MCP 运行中' : 'MCP'}
+                </Button>
+            </div>
         </div>
     );
 }

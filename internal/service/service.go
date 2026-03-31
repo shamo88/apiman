@@ -8,6 +8,7 @@ import (
 	"apiman/internal/postman"
 	"apiman/internal/project"
 	"apiman/internal/script"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -300,6 +301,9 @@ func (s *Service) ExecuteCurl(command string) (*models.CurlResponse, error) {
 }
 
 func (s *Service) ExecuteHTTPRequest(spec models.HttpRequestSpec) (*models.CurlResponse, error) {
+	// 注入全局 Cookie
+	spec = s.injectGlobalCookies(spec)
+
 	appCfg, err := s.ConfigManager.LoadAppConfig()
 	if err != nil || appCfg == nil {
 		return s.CurlExecutor.ExecuteHTTPRequest(&spec)
@@ -314,6 +318,62 @@ func (s *Service) ExecuteHTTPRequest(spec models.HttpRequestSpec) (*models.CurlR
 		SOCKS5Port: appCfg.Proxy.SOCKS5Port,
 	}
 	return s.CurlExecutor.ExecuteHTTPRequestWithProxy(&spec, proxyOpts)
+}
+
+// injectGlobalCookies loads global cookies and injects matching ones into the request spec.
+func (s *Service) injectGlobalCookies(spec models.HttpRequestSpec) models.HttpRequestSpec {
+	// 构建完整 URL（含 params）
+	fullURL := buildFullURL(strings.TrimSpace(spec.HttpURL), spec.Params)
+
+	// 解析 URL 获取 domain 和 path
+	u, err := url.Parse(fullURL)
+	if err != nil {
+		return spec
+	}
+
+	// 加载全局 cookie
+	cookies, err := s.ConfigManager.LoadGlobalCookies()
+	if err != nil || len(cookies) == 0 {
+		return spec
+	}
+
+	// 过滤匹配的 cookie
+	matched := curl.FilterCookies(u.Host, u.Path, cookies)
+	if len(matched) == 0 {
+		return spec
+	}
+
+	// 构建 Cookie header
+	var cookieParts []string
+	for _, c := range matched {
+		cookieParts = append(cookieParts, c.Name+"="+c.Value)
+	}
+	cookieHeader := strings.Join(cookieParts, "; ")
+
+	// 添加到 Headers
+	spec.Headers = append(spec.Headers, models.RequestKeyVal{
+		Key:     "Cookie",
+		Value:   cookieHeader,
+		Enabled: true,
+	})
+
+	return spec
+}
+
+// buildFullURL builds the full URL with query parameters.
+func buildFullURL(base string, params []models.RequestKeyVal) string {
+	out := base
+	for _, p := range params {
+		if !p.Enabled || strings.TrimSpace(p.Key) == "" {
+			continue
+		}
+		sep := "?"
+		if strings.Contains(out, "?") {
+			sep = "&"
+		}
+		out += sep + url.QueryEscape(p.Key) + "=" + url.QueryEscape(p.Value)
+	}
+	return out
 }
 
 func (s *Service) ExtractVariables(text string) []string {
@@ -392,16 +452,16 @@ func (s *Service) ListProjectScripts(projectID string) ([]models.ProjectScript, 
 	return s.ProjectMgr.ListProjectScripts(projectID)
 }
 
-func (s *Service) CreateProjectScript(projectID, name, content string) (*models.ProjectScript, error) {
-	script, err := s.ProjectMgr.CreateProjectScript(projectID, name, content)
+func (s *Service) CreateProjectScript(projectID, name, description, content string) (*models.ProjectScript, error) {
+	script, err := s.ProjectMgr.CreateProjectScript(projectID, name, description, content)
 	if err == nil && s.shouldAutoSync() {
 		go s.SyncProjectToGit(projectID)
 	}
 	return script, err
 }
 
-func (s *Service) UpdateProjectScript(projectID, scriptID, name, content string) (*models.ProjectScript, error) {
-	script, err := s.ProjectMgr.UpdateProjectScript(projectID, scriptID, name, content)
+func (s *Service) UpdateProjectScript(projectID, scriptID, name, description, content string) (*models.ProjectScript, error) {
+	script, err := s.ProjectMgr.UpdateProjectScript(projectID, scriptID, name, description, content)
 	if err == nil && s.shouldAutoSync() {
 		// Wait 1 second before syncing to ensure file write is completed
 		go func() {
@@ -783,4 +843,33 @@ func (s *Service) PullGitRepo() error {
 		return nil
 	}
 	return s.GitSyncMgr.CloneOrPull(appCfg.GitSync.RemoteURL, appCfg.GitSync.Branch, appCfg.GitSync.Password)
+}
+
+// LoadGlobalCookies loads all global cookies.
+func (s *Service) LoadGlobalCookies() ([]models.GlobalCookie, error) {
+	return s.ConfigManager.LoadGlobalCookies()
+}
+
+// SaveGlobalCookies saves all global cookies (full replacement).
+func (s *Service) SaveGlobalCookies(cookies []models.GlobalCookie) error {
+	return s.ConfigManager.SaveGlobalCookies(cookies)
+}
+
+// AddGlobalCookies parses and adds set-cookie raw data to the cookie store.
+func (s *Service) AddGlobalCookies(rawCookies string) error {
+	cookies, err := curl.ParseSetCookieLines(rawCookies)
+	if err != nil {
+		return err
+	}
+	for _, cookie := range cookies {
+		if err := s.ConfigManager.AddGlobalCookie(cookie); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// DeleteGlobalCookie deletes a cookie by its ID.
+func (s *Service) DeleteGlobalCookie(id string) error {
+	return s.ConfigManager.DeleteGlobalCookie(id)
 }

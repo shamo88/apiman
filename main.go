@@ -4,6 +4,7 @@ import (
 	"embed"
 
 	"apiman/internal/logger"
+	"apiman/internal/mcp"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -28,6 +29,17 @@ func main() {
 	if err == nil && cfg != nil && cfg.UI.Theme == "dark" {
 		// Dark theme background
 		bgColor = &options.RGBA{R: 36, G: 36, B: 36, A: 255}
+	}
+
+	// Auto-start MCP server if enabled
+	if err == nil && cfg != nil && cfg.MCP.Enabled {
+		// Initialize projects dir first
+		_ = app.service.InitProjectsDir()
+		// Create MCP server and start
+		mcpServer = mcp.NewServer(app.service, &cfg.MCP)
+		if err := mcpServer.Start(); err != nil {
+			println("Failed to start MCP server:", err.Error())
+		}
 	}
 
 	err = wails.Run(&options.App{

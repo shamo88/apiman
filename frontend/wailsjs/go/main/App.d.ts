@@ -4,6 +4,8 @@ import {models} from '../models';
 import {project} from '../models';
 import {config} from '../models';
 
+export function AddGlobalCookies(arg1:string):Promise<void>;
+
 export function AddRequestCase(arg1:string,arg2:string):Promise<models.CurlRequest>;
 
 export function CopyRequest(arg1:string):Promise<models.CurlRequest>;
@@ -14,13 +16,15 @@ export function CreateFolder(arg1:string,arg2:string,arg3:string):Promise<models
 
 export function CreateProject(arg1:string):Promise<models.Project>;
 
-export function CreateProjectScript(arg1:string,arg2:string,arg3:string):Promise<models.ProjectScript>;
+export function CreateProjectScript(arg1:string,arg2:string,arg3:string,arg4:string):Promise<models.ProjectScript>;
 
 export function CreateRequest(arg1:string,arg2:string,arg3:string,arg4:models.HttpRequestSpec):Promise<models.CurlRequest>;
 
 export function DeleteEnvironment(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteFolder(arg1:string):Promise<void>;
+
+export function DeleteGlobalCookie(arg1:string):Promise<void>;
 
 export function DeleteProject(arg1:string):Promise<void>;
 
@@ -50,6 +54,8 @@ export function GetConfigDir():Promise<string>;
 
 export function GetGlobalVariables():Promise<Record<string, string>>;
 
+export function GetMCPStatus():Promise<string>;
+
 export function GetProjectTree(arg1:string):Promise<project.ProjectTree>;
 
 export function GetProjectsDir():Promise<string>;
@@ -66,9 +72,15 @@ export function ListProjectScripts(arg1:string):Promise<Array<models.ProjectScri
 
 export function ListProjects():Promise<Array<models.Project>>;
 
+export function ListProjectsForMCP():Promise<Array<models.Project>>;
+
 export function LoadAppConfig():Promise<config.AppConfig>;
 
 export function LoadEnvironments(arg1:string):Promise<Array<models.Environment>>;
+
+export function LoadGlobalCookies():Promise<string>;
+
+export function LoadMCPConfig():Promise<config.MCPConfig>;
 
 export function LoadProjectGroupsState():Promise<project.ProjectGroupsState>;
 
@@ -90,9 +102,17 @@ export function ReplaceVariables(arg1:string,arg2:Record<string, string>):Promis
 
 export function SaveAppConfig(arg1:config.AppConfig):Promise<void>;
 
+export function SaveGlobalCookies(arg1:string):Promise<void>;
+
 export function SaveGlobalVariables(arg1:Record<string, string>):Promise<void>;
 
+export function SaveMCPConfig(arg1:config.MCPConfig):Promise<void>;
+
 export function SaveProjectGroupsState(arg1:project.ProjectGroupsState):Promise<void>;
+
+export function StartMCP():Promise<void>;
+
+export function StopMCP():Promise<void>;
 
 export function SyncAllProjectsToGit():Promise<void>;
 
@@ -100,7 +120,7 @@ export function SyncProjectToGit(arg1:string):Promise<void>;
 
 export function UpdateEnvironment(arg1:string,arg2:string,arg3:string,arg4:Record<string, string>):Promise<void>;
 
-export function UpdateProjectScript(arg1:string,arg2:string,arg3:string,arg4:string):Promise<models.ProjectScript>;
+export function UpdateProjectScript(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<models.ProjectScript>;
 
 export function UpdateRequest(arg1:string,arg2:models.HttpRequestSpec,arg3:Array<models.HttpRequestCase>,arg4:string):Promise<void>;
 

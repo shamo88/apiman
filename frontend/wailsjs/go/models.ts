@@ -1,5 +1,23 @@
 export namespace config {
 	
+	export class MCPConfig {
+	    enabled: boolean;
+	    port: number;
+	    project_id: string;
+	    api_key: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	        this.port = source["port"];
+	        this.project_id = source["project_id"];
+	        this.api_key = source["api_key"];
+	    }
+	}
 	export class GitSyncConfig {
 	    enabled: boolean;
 	    remoteUrl?: string;
@@ -66,6 +84,7 @@ export namespace config {
 	    proxy: ProxyConfig;
 	    ui: UIConfig;
 	    gitSync: GitSyncConfig;
+	    mcp: MCPConfig;
 	
 	    static createFrom(source: any = {}) {
 	        return new AppConfig(source);
@@ -76,6 +95,7 @@ export namespace config {
 	        this.proxy = this.convertValues(source["proxy"], ProxyConfig);
 	        this.ui = this.convertValues(source["ui"], UIConfig);
 	        this.gitSync = this.convertValues(source["gitSync"], GitSyncConfig);
+	        this.mcp = this.convertValues(source["mcp"], MCPConfig);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -96,6 +116,7 @@ export namespace config {
 		    return a;
 		}
 	}
+	
 	
 	
 
@@ -498,6 +519,7 @@ export namespace models {
 	    id: string;
 	    project_id: string;
 	    name: string;
+	    description: string;
 	    path: string;
 	    content: string;
 	    // Go type: time
@@ -514,6 +536,7 @@ export namespace models {
 	        this.id = source["id"];
 	        this.project_id = source["project_id"];
 	        this.name = source["name"];
+	        this.description = source["description"];
 	        this.path = source["path"];
 	        this.content = source["content"];
 	        this.created_at = this.convertValues(source["created_at"], null);
