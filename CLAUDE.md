@@ -176,3 +176,70 @@ The app has three settings tabs in **Settings** modal:
 - **仓库地址** - Remote git repository URL
 - **分支** - Branch name (default: main)
 - **Access Token** - Authentication token for the repository
+
+## MCP Server
+
+Apiman 内置 MCP (Model Context Protocol) Server，允许 AI 助手（如 Claude Code）通过标准 MCP 协议直接调用 Apiman 的项目管理、API 请求执行等功能。
+
+### 配置文件
+
+`~/.apiman/config.json` 中的 MCP 配置：
+```json
+{
+  "mcp": {
+    "enabled": true,
+    "port": 3847,
+    "project_id": "<project-uuid>",
+    "api_key": "mcp_sk_xxxxxxxxxxxx"
+  }
+}
+```
+
+### 目录结构
+
+```
+internal/mcp/
+├── server.go       # HTTP Streamable Server 主循环
+├── handler.go      # MCP 工具调用 → service 映射
+├── middleware.go  # API Key 认证中间件
+├── tools.go        # MCP 工具定义 (name, description, schema)
+└── types.go        # MCP 协议类型定义
+```
+
+### MCP 工具列表
+
+| 工具名 | 描述 |
+|--------|------|
+| `mcp_list_apis` | 列出绑定项目下所有接口（含多级目录） |
+| `mcp_list_scripts` | 列出绑定项目下所有脚本 |
+| `mcp_get_request` | 获取指定请求的完整详情（headers/params/body/scripts） |
+| `mcp_create_case` | 为指定请求创建新用例 |
+| `mcp_update_case` | 更新指定请求的已有用例 |
+| `mcp_create_request` | 在绑定项目中创建新接口 |
+| `mcp_create_folder` | 在绑定项目中创建新文件夹 |
+| `mcp_execute_request` | 执行已保存的 HTTP 请求（支持指定用例） |
+| `mcp_execute_raw` | 执行原始 HTTP 请求（不依赖已保存的请求） |
+
+### Claude Code 配置
+
+在 `~/.claude/settings.json` 或项目级 `.mcp.json` 中添加：
+
+```json
+{
+  "mcpServers": {
+    "apiman": {
+      "transport": "streamable-http",
+      "url": "http://localhost:3847/mcp/streamable",
+      "headers": {
+        "Authorization": "Bearer <配置的API密钥>"
+      }
+    }
+  }
+}
+```
+
+### 路径格式
+
+请求路径格式为 `request|project-id|request-id`，用例路径格式为 `requestCase|project-id|request-id|case-id`。
+
+详细技术方案见 [docs/mcp-server-design.md](docs/mcp-server-design.md)。

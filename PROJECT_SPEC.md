@@ -24,6 +24,7 @@
 - ✨ **变量高亮与补全**：请求配置区支持 `{{variable}}` 高亮与联想补全
 - 🔌 **网络代理**：支持 HTTP/HTTPS/SOCKS5 代理配置并在请求执行时生效
 - 📊 **响应展示**：支持状态码、响应时间、格式化响应体展示
+- 🤖 **MCP Server**：内置 MCP (Model Context Protocol) Server，支持 AI 助手通过标准协议调用 Apiman 的项目管理、API 请求执行等功能
 
 ***
 
@@ -63,6 +64,13 @@ apiman/
 │   ├── git/                  # Git 同步模块
 │   │   └── git.go          # Git 仓库克隆/拉取/推送/提交
 │   │
+│   ├── mcp/                  # MCP Server 模块
+│   │   ├── server.go       # HTTP Streamable Server 主循环
+│   │   ├── handler.go      # MCP 工具调用 → service 映射
+│   │   ├── middleware.go   # API Key 认证中间件
+│   │   ├── tools.go        # MCP 工具定义
+│   │   └── types.go        # MCP 协议类型定义
+│   │
 │   ├── curl/                 # Curl 执行引擎
 │   │   ├── curl.go          # HTTP 请求执行、响应格式化
 │   │   └── exec_with_scripts.go  # 脚本增强的请求执行
@@ -88,7 +96,8 @@ apiman/
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── TitleBar.tsx # 自定义窗口标题栏组件
-│   │   │   └── ScriptHelpWindow.tsx # 脚本 API 帮助浮窗组件
+│   │   │   ├── ScriptHelpWindow.tsx # 脚本 API 帮助浮窗组件
+│   │   │   └── MCPSettingsModal.tsx # MCP Server 设置弹窗组件
 │   │   │
 │   │   ├── types/
 │   │   │   └── index.ts     # TypeScript 类型定义
@@ -166,6 +175,7 @@ type AppConfig struct {
     Proxy    ProxyConfig    `json:"proxy"`     // 代理配置
     UI       UIConfig      `json:"ui"`        // UI 配置
     GitSync  GitSyncConfig `json:"gitSync"`   // Git 同步配置
+    MCP      MCPConfig     `json:"mcp"`       // MCP Server 配置
 }
 
 type ProxyConfig struct {
@@ -186,6 +196,13 @@ type GitSyncConfig struct {
     Password  string `json:"password,omitempty"`
     AutoSync  bool   `json:"autoSync"`
     WorkDir   string `json:"workDir,omitempty"`
+}
+
+type MCPConfig struct {
+    Enabled    bool   `json:"enabled"`
+    Port       int    `json:"port"`
+    ProjectID  string `json:"project_id"`   // 绑定的项目 ID
+    APIKey     string `json:"api_key"`      // 认证密钥
 }
 ```
 
@@ -330,6 +347,65 @@ ListProjectScripts(projectID string)    // 列出项目脚本
 CreateProjectScript(projectID, name, content) // 创建脚本
 UpdateProjectScript(projectID, scriptID, name, content) // 更新脚本
 DeleteProjectScript(projectID, scriptID) // 删除脚本
+```
+
+### 7. **MCP Server 模块** (`internal/mcp`)
+
+Apiman 内置 MCP (Model Context Protocol) Server，使 AI 助手（如 Claude Code）能够通过标准 MCP 协议直接调用 Apiman 功能。
+
+**核心能力**：
+
+- 🔌 **HTTP Streamable 传输**：使用 MCP 官方推荐的 HTTP Streamable 传输模式
+- 🔐 **API Key 认证**：所有请求需携带 Bearer Token 认证
+- 📁 **项目绑定**：MCP Server 绑定到指定项目，操作权限限于该项目
+- ⚡ **完整工具集**：覆盖 API 查询、创建、执行全流程
+
+**MCP 工具列表**：
+
+| 工具名 | 描述 |
+|--------|------|
+| `mcp_list_apis` | 列出绑定项目下所有接口（含多级目录） |
+| `mcp_list_scripts` | 列出绑定项目下所有脚本 |
+| `mcp_get_request` | 获取指定请求的完整详情 |
+| `mcp_create_case` | 为指定请求创建新用例 |
+| `mcp_update_case` | 更新指定请求的已有用例 |
+| `mcp_create_request` | 在绑定项目中创建新接口 |
+| `mcp_create_folder` | 在绑定项目中创建新文件夹 |
+| `mcp_execute_request` | 执行已保存的 HTTP 请求（支持指定用例） |
+| `mcp_execute_raw` | 执行原始 HTTP 请求（不依赖已保存的请求） |
+
+**端点**：
+
+| 方法 | 路径 | 描述 |
+|------|------|------|
+| POST | `/mcp/streamable` | MCP 主端点（双向流） |
+| GET | `/mcp/health` | 健康检查 |
+| GET | `/mcp/info` | Server 信息 |
+
+**Claude Code 配置示例**：
+
+```json
+{
+  "mcpServers": {
+    "apiman": {
+      "transport": "streamable-http",
+      "url": "http://localhost:3847/mcp/streamable",
+      "headers": {
+        "Authorization": "Bearer <配置的API密钥>"
+      }
+    }
+  }
+}
+```
+
+**关键方法**：
+
+```go
+LoadMCPConfig()     // 加载 MCP 配置
+SaveMCPConfig(cfg)  // 保存 MCP 配置
+StartMCPServer()    // 启动 MCP 服务
+StopMCPServer()     // 停止 MCP 服务
+GetMCPStatus()      // 获取服务状态
 ```
 
 ***
@@ -657,6 +733,10 @@ wails build
 - **响应展示**：
   - 状态码 + 时间
   - 格式化响应体
+- **MCP 设置**：
+  - 底栏 MCP 状态按钮（显示运行/停止/错误状态）
+  - 支持配置端口、项目绑定、API Key
+  - 启用/禁用 MCP 服务
 
 ***
 
@@ -1080,6 +1160,7 @@ Linux:   ~/.config/apiman/
 - [ ] 快捷键支持
 - [ ] 团队协作功能
 - [ ] API 文档自动生成
+- [x] MCP Server
 
 ## 🙏 致谢
 
@@ -1274,5 +1355,34 @@ Linux:   ~/.config/apiman/
 - ✅ `{{$random.float}}` 随机浮点数
 - ✅ `{{$random.alpha(n)}}` 随机字母字符串
 - ✅ `{{$random.alphanumeric(n)}}` 随机字母数字字符串
+
+### v1.6（MCP Server）
+
+#### MCP Server 核心功能
+
+- ✅ 内置 MCP (Model Context Protocol) Server
+- ✅ HTTP Streamable 传输模式
+- ✅ API Key 认证中间件
+- ✅ 项目绑定机制（操作权限限于绑定项目）
+- ✅ 9 个 MCP 工具完整实现
+
+#### MCP 工具实现
+
+- ✅ `mcp_list_apis` - 列出项目下所有接口（含多级目录）
+- ✅ `mcp_list_scripts` - 列出项目下所有脚本
+- ✅ `mcp_get_request` - 获取请求详情
+- ✅ `mcp_create_case` - 创建用例
+- ✅ `mcp_update_case` - 更新用例
+- ✅ `mcp_create_request` - 创建接口
+- ✅ `mcp_create_folder` - 创建文件夹
+- ✅ `mcp_execute_request` - 执行已保存请求
+- ✅ `mcp_execute_raw` - 执行原始请求
+
+#### 技术实现
+
+- ✅ `internal/mcp/` 模块（server.go / handler.go / middleware.go / tools.go / types.go）
+- ✅ 底栏 MCP 状态按钮与设置弹窗
+- ✅ MCP 配置持久化
+- ✅ Claude Code 集成支持
 
 
