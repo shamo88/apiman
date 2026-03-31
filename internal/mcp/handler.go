@@ -41,6 +41,19 @@ func (h *Handler) HandleToolCall(call MCPToolCall) (*MCPToolResult, error) {
 		path, _ := call.Arguments["path"].(string)
 		caseData, _ := call.Arguments["case_data"].(map[string]any)
 		return h.createCase(path, caseData)
+	case "mcp_update_case":
+		path, _ := call.Arguments["path"].(string)
+		caseID, _ := call.Arguments["case_id"].(string)
+		caseData, _ := call.Arguments["case_data"].(map[string]any)
+		return h.updateCase(path, caseID, caseData)
+	case "mcp_create_request":
+		parentID, _ := call.Arguments["parent_id"].(string)
+		spec, _ := call.Arguments["spec"].(map[string]any)
+		return h.createRequest(parentID, spec)
+	case "mcp_create_folder":
+		parentID, _ := call.Arguments["parent_id"].(string)
+		name, _ := call.Arguments["name"].(string)
+		return h.createFolder(parentID, name)
 	case "mcp_execute_request":
 		path, _ := call.Arguments["path"].(string)
 		caseID, _ := call.Arguments["case_id"].(string)
@@ -563,4 +576,192 @@ func parseStringArray(v interface{}) []string {
 		return result
 	}
 	return nil
+}
+
+// updateCase updates an existing test case for a request.
+func (h *Handler) updateCase(path, caseID string, caseData map[string]any) (*MCPToolResult, error) {
+	if path == "" {
+		return nil, fmt.Errorf("path is required")
+	}
+	if caseID == "" {
+		return nil, fmt.Errorf("case_id is required")
+	}
+	if caseData == nil {
+		return nil, fmt.Errorf("case_data is required")
+	}
+
+	// Security check: verify projectID in path matches bound project
+	if h.projectID != "" {
+		parts := strings.Split(path, "|")
+		if len(parts) != 3 || parts[0] != "request" {
+			return nil, fmt.Errorf("invalid path format: %s", path)
+		}
+		if parts[1] != h.projectID {
+			return nil, fmt.Errorf("project ID mismatch: requested %s but bound to %s", parts[1], h.projectID)
+		}
+	}
+
+	// Get the current request
+	curlReq, err := h.svc.GetRequest(path)
+	if err != nil {
+		return nil, fmt.Errorf("request not found: %s", err)
+	}
+
+	// Find and update the case
+	found := false
+	updatedCases := make([]models.HttpRequestCase, len(curlReq.Cases))
+	copy(updatedCases, curlReq.Cases)
+
+	for i, c := range updatedCases {
+		if c.ID == caseID {
+			found = true
+			// Update name if provided
+			if name, ok := caseData["name"].(string); ok && name != "" {
+				updatedCases[i].Name = name
+			}
+			// Update spec if provided
+			if specData, ok := caseData["spec"].(map[string]any); ok {
+				spec := parseSpecFromMap(specData)
+				updatedCases[i].Spec = spec
+			}
+			break
+		}
+	}
+
+	if !found {
+		return nil, fmt.Errorf("case not found: %s", caseID)
+	}
+
+	// Determine active case ID
+	activeCaseID := curlReq.Cases[0].ID
+	if len(updatedCases) > 0 {
+		activeCaseID = updatedCases[0].ID
+	}
+
+	// Get interface spec
+	var interfaceSpec models.HttpRequestSpec
+	if curlReq.InterfaceSpec != nil {
+		interfaceSpec = *curlReq.InterfaceSpec
+	}
+
+	// Update the request with updated cases
+	if err := h.svc.UpdateRequest(path, interfaceSpec, updatedCases, activeCaseID); err != nil {
+		return nil, fmt.Errorf("failed to update case: %s", err)
+	}
+
+	// Find the updated case to return its info
+	var updatedCaseName string
+	for _, c := range updatedCases {
+		if c.ID == caseID {
+			updatedCaseName = c.Name
+			break
+		}
+	}
+
+	result := MCPUpdateCaseResponse{
+		ID:   caseID,
+		Name: updatedCaseName,
+	}
+
+	data, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MCPToolResult{
+		Content: []MCPContentBlock{{Type: "text", Text: string(data)}},
+	}, nil
+}
+
+// createRequest creates a new API request in the bound project.
+func (h *Handler) createRequest(parentID string, specData map[string]any) (*MCPToolResult, error) {
+	if h.projectID == "" {
+		return nil, fmt.Errorf("no project bound to MCP server")
+	}
+	if specData == nil {
+		return nil, fmt.Errorf("spec is required")
+	}
+
+	name, _ := specData["name"].(string)
+	if name == "" {
+		return nil, fmt.Errorf("request name is required")
+	}
+
+	method, _ := specData["method"].(string)
+	if method == "" {
+		method = "GET"
+	}
+
+	httpURL, _ := specData["http_url"].(string)
+	if httpURL == "" {
+		return nil, fmt.Errorf("http_url is required")
+	}
+
+	// Parse the spec
+	spec := parseSpecFromMap(specData)
+	spec.Method = method
+	spec.HttpURL = httpURL
+
+	// Determine parent path
+	parentPath := ""
+	if parentID != "" {
+		// Get folder info to build path
+		parentPath = "folder|" + h.projectID + "|" + parentID
+	}
+
+	// Create the request
+	curlReq, err := h.svc.CreateRequest(h.projectID, parentPath, name, spec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %s", err)
+	}
+
+	result := MCPCreateRequestResponse{
+		ID:   curlReq.ID,
+		Name: curlReq.Name,
+	}
+
+	data, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MCPToolResult{
+		Content: []MCPContentBlock{{Type: "text", Text: string(data)}},
+	}, nil
+}
+
+// createFolder creates a new folder in the bound project.
+func (h *Handler) createFolder(parentID, name string) (*MCPToolResult, error) {
+	if h.projectID == "" {
+		return nil, fmt.Errorf("no project bound to MCP server")
+	}
+	if name == "" {
+		return nil, fmt.Errorf("folder name is required")
+	}
+
+	// Determine parent path
+	parentPath := ""
+	if parentID != "" {
+		parentPath = "folder|" + h.projectID + "|" + parentID
+	}
+
+	// Create the folder
+	folder, err := h.svc.CreateFolder(h.projectID, parentPath, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create folder: %s", err)
+	}
+
+	result := MCPCreateFolderResponse{
+		ID:   folder.ID,
+		Name: folder.Name,
+	}
+
+	data, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MCPToolResult{
+		Content: []MCPContentBlock{{Type: "text", Text: string(data)}},
+	}, nil
 }
