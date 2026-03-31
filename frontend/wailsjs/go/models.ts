@@ -4,6 +4,7 @@ export namespace config {
 	    enabled: boolean;
 	    port: number;
 	    project_id: string;
+	    environment_id: string;
 	    api_key: string;
 	
 	    static createFrom(source: any = {}) {
@@ -15,6 +16,7 @@ export namespace config {
 	        this.enabled = source["enabled"];
 	        this.port = source["port"];
 	        this.project_id = source["project_id"];
+	        this.environment_id = source["environment_id"];
 	        this.api_key = source["api_key"];
 	    }
 	}
@@ -258,7 +260,6 @@ export namespace models {
 	    form_data?: RequestPair[];
 	    url_encoded?: RequestPair[];
 	    cases?: HttpRequestCase[];
-	    active_case_id?: string;
 	    interface_spec?: HttpRequestSpec;
 	
 	    static createFrom(source: any = {}) {
@@ -286,7 +287,6 @@ export namespace models {
 	        this.form_data = this.convertValues(source["form_data"], RequestPair);
 	        this.url_encoded = this.convertValues(source["url_encoded"], RequestPair);
 	        this.cases = this.convertValues(source["cases"], HttpRequestCase);
-	        this.active_case_id = source["active_case_id"];
 	        this.interface_spec = this.convertValues(source["interface_spec"], HttpRequestSpec);
 	    }
 	
@@ -477,6 +477,8 @@ export namespace models {
 	}
 	export class HistoryEntry {
 	    id: string;
+	    source: string;
+	    source_tool: string;
 	    project_name: string;
 	    request_name: string;
 	    method: string;
@@ -493,6 +495,8 @@ export namespace models {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
+	        this.source = source["source"];
+	        this.source_tool = source["source_tool"];
 	        this.project_name = source["project_name"];
 	        this.request_name = source["request_name"];
 	        this.method = source["method"];
@@ -519,6 +523,36 @@ export namespace models {
 		    }
 		    return a;
 		}
+	}
+	export class HistorySearchParams {
+	    project: string;
+	    name: string;
+	    url: string;
+	    method: string;
+	    status: number;
+	    source: string;
+	    tool: string;
+	    from: string;
+	    to: string;
+	    keyword: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HistorySearchParams(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.project = source["project"];
+	        this.name = source["name"];
+	        this.url = source["url"];
+	        this.method = source["method"];
+	        this.status = source["status"];
+	        this.source = source["source"];
+	        this.tool = source["tool"];
+	        this.from = source["from"];
+	        this.to = source["to"];
+	        this.keyword = source["keyword"];
+	    }
 	}
 	
 	
@@ -608,6 +642,8 @@ export namespace models {
 	}
 	export class RequestHistory {
 	    id: string;
+	    source: string;
+	    source_tool: string;
 	    project_id: string;
 	    project_name: string;
 	    request_name: string;
@@ -626,6 +662,8 @@ export namespace models {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
+	        this.source = source["source"];
+	        this.source_tool = source["source_tool"];
 	        this.project_id = source["project_id"];
 	        this.project_name = source["project_name"];
 	        this.request_name = source["request_name"];

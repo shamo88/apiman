@@ -3,6 +3,7 @@ package mcp
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 
 	"apiman/internal/models"
@@ -12,15 +13,17 @@ import (
 
 // Handler handles MCP tool calls.
 type Handler struct {
-	svc       *service.Service
-	projectID string
+	svc           *service.Service
+	projectID     string
+	environmentID string
 }
 
 // NewHandler creates a new MCP handler.
-func NewHandler(svc *service.Service, projectID string) *Handler {
+func NewHandler(svc *service.Service, projectID, environmentID string) *Handler {
 	return &Handler{
-		svc:       svc,
-		projectID: projectID,
+		svc:           svc,
+		projectID:     projectID,
+		environmentID: environmentID,
 	}
 }
 
@@ -41,10 +44,14 @@ func (h *Handler) HandleToolCall(call MCPToolCall) (*MCPToolResult, error) {
 	case "mcp_execute_request":
 		path, _ := call.Arguments["path"].(string)
 		caseID, _ := call.Arguments["case_id"].(string)
-		return h.executeRequest(path, caseID)
+		preScriptIDs := parseStringArray(call.Arguments["pre_script_ids"])
+		postScriptIDs := parseStringArray(call.Arguments["post_script_ids"])
+		return h.executeRequest(path, caseID, preScriptIDs, postScriptIDs)
 	case "mcp_execute_raw":
 		spec := call.Arguments
-		return h.executeRaw(spec)
+		preScriptIDs := parseStringArray(call.Arguments["pre_script_ids"])
+		postScriptIDs := parseStringArray(call.Arguments["post_script_ids"])
+		return h.executeRaw(spec, preScriptIDs, postScriptIDs)
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", call.Name)
 	}
@@ -201,25 +208,46 @@ func (h *Handler) getRequest(path string) (*MCPToolResult, error) {
 	}
 
 	projectID := parts[1]
-	requestID := parts[2]
 
-	// Build the actual path for GetRequest
-	actualPath := fmt.Sprintf("request|%s|%s", projectID, requestID)
+	// Security check: verify projectID matches bound project
+	if h.projectID != "" && projectID != h.projectID {
+		return nil, fmt.Errorf("project ID mismatch: requested %s but bound to %s", projectID, h.projectID)
+	}
 
-	curlReq, err := h.svc.GetRequest(actualPath)
+	curlReq, err := h.svc.GetRequest(path)
 	if err != nil {
 		return nil, fmt.Errorf("request not found: %s", err)
+	}
+
+	// Use InterfaceSpec for original request data if available, otherwise use curlReq fields
+	var method, url, body, bodyType string
+	var headers []models.RequestKeyVal
+	var params []models.RequestKeyVal
+	if curlReq.InterfaceSpec != nil {
+		method = curlReq.InterfaceSpec.Method
+		url = curlReq.InterfaceSpec.HttpURL
+		headers = curlReq.InterfaceSpec.Headers
+		params = curlReq.InterfaceSpec.Params
+		body = curlReq.InterfaceSpec.Body
+		bodyType = curlReq.InterfaceSpec.BodyType
+	} else {
+		method = curlReq.Method
+		url = curlReq.HttpURL
+		headers = curlReq.Headers
+		params = curlReq.Params
+		body = curlReq.Body
+		bodyType = curlReq.BodyType
 	}
 
 	detail := models.MCPRequestDetail{
 		ID:          curlReq.ID,
 		Name:        curlReq.Name,
-		Method:      curlReq.Method,
-		URL:         curlReq.HttpURL,
-		Headers:     curlReq.Headers,
-		Params:      curlReq.Params,
-		Body:        curlReq.Body,
-		BodyType:    curlReq.BodyType,
+		Method:      method,
+		URL:         url,
+		Headers:     headers,
+		Params:      params,
+		Body:        body,
+		BodyType:    bodyType,
 		PreScripts:  curlReq.PreScripts,
 		PostScripts: curlReq.PostScripts,
 		Cases:       curlReq.Cases,
@@ -244,6 +272,17 @@ func (h *Handler) createCase(path string, caseData map[string]any) (*MCPToolResu
 		return nil, fmt.Errorf("case_data is required")
 	}
 
+	// Security check: verify projectID in path matches bound project
+	if h.projectID != "" {
+		parts := strings.Split(path, "|")
+		if len(parts) != 3 || parts[0] != "request" {
+			return nil, fmt.Errorf("invalid path format: %s", path)
+		}
+		if parts[1] != h.projectID {
+			return nil, fmt.Errorf("project ID mismatch: requested %s but bound to %s", parts[1], h.projectID)
+		}
+	}
+
 	caseName, _ := caseData["name"].(string)
 	if caseName == "" {
 		return nil, fmt.Errorf("case_name is required")
@@ -254,9 +293,15 @@ func (h *Handler) createCase(path string, caseData map[string]any) (*MCPToolResu
 		return nil, fmt.Errorf("failed to create case: %s", err)
 	}
 
+	// Find the new case ID from cases (it's the last one added)
+	newCaseID := ""
+	if len(curlReq.Cases) > 0 {
+		newCaseID = curlReq.Cases[len(curlReq.Cases)-1].ID
+	}
+
 	// Return the new case info
 	result := MCPCreateCaseResponse{
-		ID:   curlReq.ID,
+		ID:   newCaseID,
 		Name: caseName,
 	}
 
@@ -266,7 +311,10 @@ func (h *Handler) createCase(path string, caseData map[string]any) (*MCPToolResu
 		if spec.Method != "" || spec.HttpURL != "" || spec.Body != "" {
 			// Get the latest request to find the new case ID
 			updatedReq, err := h.svc.GetRequest(path)
-			if err == nil && len(updatedReq.Cases) > 0 {
+			if err != nil {
+				return nil, fmt.Errorf("failed to get updated request: %s", err)
+			}
+			if len(updatedReq.Cases) > 0 {
 				newCaseID := updatedReq.Cases[len(updatedReq.Cases)-1].ID
 				// Update the case with the provided spec
 				updatedCases := make([]models.HttpRequestCase, len(updatedReq.Cases))
@@ -281,7 +329,9 @@ func (h *Handler) createCase(path string, caseData map[string]any) (*MCPToolResu
 				if updatedReq.InterfaceSpec != nil {
 					interfaceSpec = *updatedReq.InterfaceSpec
 				}
-				_ = h.svc.UpdateRequest(path, interfaceSpec, updatedCases, newCaseID)
+				if err := h.svc.UpdateRequest(path, interfaceSpec, updatedCases, newCaseID); err != nil {
+					return nil, fmt.Errorf("failed to update case spec: %s", err)
+				}
 			}
 		}
 	}
@@ -297,7 +347,7 @@ func (h *Handler) createCase(path string, caseData map[string]any) (*MCPToolResu
 }
 
 // executeRequest executes a saved request.
-func (h *Handler) executeRequest(path, caseID string) (*MCPToolResult, error) {
+func (h *Handler) executeRequest(path, caseID string, preScriptIDs, postScriptIDs []string) (*MCPToolResult, error) {
 	if path == "" {
 		return nil, fmt.Errorf("path is required")
 	}
@@ -309,28 +359,51 @@ func (h *Handler) executeRequest(path, caseID string) (*MCPToolResult, error) {
 	}
 	projectID := parts[1]
 
+	// Security check: verify projectID matches bound project
+	if h.projectID != "" && projectID != h.projectID {
+		return nil, fmt.Errorf("project ID mismatch: requested %s but bound to %s", projectID, h.projectID)
+	}
+
+	// Get project name for history
+	projectName, _ := h.svc.GetProjectName(projectID)
+
 	// Get the request first
 	curlReq, err := h.svc.GetRequest(path)
 	if err != nil {
 		return nil, fmt.Errorf("request not found: %s", err)
 	}
 
-	// Determine which case to use
-	useCaseID := caseID
-	if useCaseID == "" {
-		useCaseID = curlReq.ActiveCaseID
+	// Determine which spec to use
+	var spec models.HttpRequestSpec
+	if caseID != "" {
+		// Use the specified case's spec
+		for _, c := range curlReq.Cases {
+			if c.ID == caseID {
+				spec = c.Spec
+				break
+			}
+		}
+	} else {
+		// Use interface's original spec (InterfaceSpec if available, otherwise the curlReq fields)
+		if curlReq.InterfaceSpec != nil {
+			spec = *curlReq.InterfaceSpec
+		} else {
+			spec = models.SpecFromCurlRequest(curlReq)
+		}
 	}
 
 	// Execute with scripts
-	resp, err := h.svc.ExecuteHTTPRequestWithScripts(
+	resp, err := h.svc.ExecuteHTTPRequestWithScriptsWithSource(
 		projectID,
-		"", // projectName
+		projectName,
 		curlReq.Name,
 		curlReq.Path,
-		"", // environment ID - could be extended
-		models.SpecFromCurlRequest(curlReq),
-		nil, // preScriptIDs
-		nil, // postScriptIDs
+		h.environmentID,
+		spec,
+		preScriptIDs,
+		postScriptIDs,
+		models.HistorySourceMCP,
+		"mcp_execute_request",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("execution failed: %s", err)
@@ -349,7 +422,7 @@ func (h *Handler) executeRequest(path, caseID string) (*MCPToolResult, error) {
 }
 
 // executeRaw executes a raw HTTP request.
-func (h *Handler) executeRaw(args map[string]interface{}) (*MCPToolResult, error) {
+func (h *Handler) executeRaw(args map[string]interface{}, preScriptIDs, postScriptIDs []string) (*MCPToolResult, error) {
 	method, _ := args["method"].(string)
 	httpURL, _ := args["http_url"].(string)
 
@@ -359,7 +432,45 @@ func (h *Handler) executeRaw(args map[string]interface{}) (*MCPToolResult, error
 
 	spec := parseSpecFromMap(args)
 
-	resp, err := h.svc.ExecuteHTTPRequest(spec)
+	// Get project name for history
+	projectName, _ := h.svc.GetProjectName(h.projectID)
+
+	var resp *models.CurlResponse
+	var err error
+
+	// Use ExecuteHTTPRequestWithScriptsWithSource if scripts are provided, otherwise use ExecuteHTTPRequest
+	if len(preScriptIDs) > 0 || len(postScriptIDs) > 0 {
+		resp, err = h.svc.ExecuteHTTPRequestWithScriptsWithSource(
+			h.projectID,
+			projectName,
+			"raw_request",
+			"",
+			h.environmentID,
+			spec,
+			preScriptIDs,
+			postScriptIDs,
+			models.HistorySourceMCP,
+			"mcp_execute_raw",
+		)
+	} else {
+		resp, err = h.svc.ExecuteHTTPRequest(spec)
+		// Record history for raw request without scripts
+		if err == nil {
+			if historyErr := h.svc.RecordHistoryWithSource(
+				h.projectID,
+				projectName,
+				"raw_request",
+				"",
+				spec,
+				resp,
+				models.HistorySourceMCP,
+				"mcp_execute_raw",
+			); historyErr != nil {
+				// Log but don't fail the request for history recording errors
+				log.Printf("[MCP] Warning: failed to record history: %v", historyErr)
+			}
+		}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("execution failed: %s", err)
 	}
@@ -435,4 +546,21 @@ func parseSpecFromMap(data map[string]any) models.HttpRequestSpec {
 	}
 
 	return spec
+}
+
+// parseStringArray parses a string array from interface{}.
+func parseStringArray(v interface{}) []string {
+	if v == nil {
+		return nil
+	}
+	if arr, ok := v.([]any); ok {
+		result := make([]string, 0, len(arr))
+		for _, item := range arr {
+			if s, ok := item.(string); ok {
+				result = append(result, s)
+			}
+		}
+		return result
+	}
+	return nil
 }

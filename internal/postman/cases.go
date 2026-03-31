@@ -20,7 +20,7 @@ func CurlRequestFromCollectionItem(projectID string, item *CollectionItem) *mode
 	return cr
 }
 
-// AttachCasesToCurlRequest fills cr.Cases / ActiveCaseID and applies the active case spec to cr.
+// AttachCasesToCurlRequest fills cr.Cases. The InterfaceSpec should be set by the caller.
 func AttachCasesToCurlRequest(cr *models.CurlRequest, item *CollectionItem) {
 	if cr == nil || item == nil {
 		return
@@ -29,16 +29,6 @@ func AttachCasesToCurlRequest(cr *models.CurlRequest, item *CollectionItem) {
 	if cr.Cases == nil {
 		cr.Cases = []models.HttpRequestCase{}
 	}
-	cr.ActiveCaseID = strings.TrimSpace(item.ApimanActiveCaseID)
-	if len(cr.Cases) == 0 {
-		cr.ActiveCaseID = ""
-		return
-	}
-	if cr.ActiveCaseID == "" || !casesHasID(cr.Cases, cr.ActiveCaseID) {
-		cr.ActiveCaseID = cr.Cases[0].ID
-	}
-	spec := specForCaseID(cr.Cases, cr.ActiveCaseID)
-	applySpecToCurlRequest(cr, spec)
 }
 
 func casesHasID(cases []models.HttpRequestCase, id string) bool {

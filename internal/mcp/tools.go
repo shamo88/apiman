@@ -69,7 +69,7 @@ func GetToolDefinitions() []MCPTool {
 		},
 		{
 			Name:        "mcp_execute_request",
-			Description: "Execute an HTTP request by its path. Optionally specify a case_id to use that test case.",
+			Description: "Execute an HTTP request by its path. Optionally specify a case_id to use that test case, and pre/post script IDs for script execution.",
 			InputSchema: map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
@@ -81,13 +81,27 @@ func GetToolDefinitions() []MCPTool {
 						"type":        "string",
 						"description": "Optional case ID to execute. If not specified, uses the active case.",
 					},
+					"pre_script_ids": map[string]interface{}{
+						"type": "array",
+						"items": map[string]interface{}{
+							"type": "string",
+						},
+						"description": "Optional array of pre-script IDs to execute before the request.",
+					},
+					"post_script_ids": map[string]interface{}{
+						"type": "array",
+						"items": map[string]interface{}{
+							"type": "string",
+						},
+						"description": "Optional array of post-script IDs to execute after the response is received.",
+					},
 				},
 				"required": []string{"path"},
 			},
 		},
 		{
 			Name:        "mcp_execute_raw",
-			Description: "Execute a raw HTTP request without referencing a saved request. Useful for quick API tests.",
+			Description: "Execute a raw HTTP request without referencing a saved request. Useful for quick API tests. Supports scripts from the bound project.",
 			InputSchema: map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
@@ -128,6 +142,20 @@ func GetToolDefinitions() []MCPTool {
 					"body_type": map[string]interface{}{
 						"type":        "string",
 						"description": "Body type: raw, form_data, urlencoded, etc.",
+					},
+					"pre_script_ids": map[string]interface{}{
+						"type": "array",
+						"items": map[string]interface{}{
+							"type": "string",
+						},
+						"description": "Optional array of pre-script IDs to execute before the request.",
+					},
+					"post_script_ids": map[string]interface{}{
+						"type": "array",
+						"items": map[string]interface{}{
+							"type": "string",
+						},
+						"description": "Optional array of post-script IDs to execute after the response is received.",
 					},
 				},
 				"required": []string{"method", "http_url"},

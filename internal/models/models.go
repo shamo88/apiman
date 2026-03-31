@@ -5,6 +5,14 @@ import (
 	"time"
 )
 
+// HistorySourceType represents the source of a history entry.
+type HistorySourceType string
+
+const (
+	HistorySourceGUI HistorySourceType = "GUI"
+	HistorySourceMCP HistorySourceType = "MCP"
+)
+
 type Environment struct {
 	ID        string            `json:"id"`
 	Name      string            `json:"name"`
@@ -105,9 +113,7 @@ type CurlRequest struct {
 	UrlEncoded []RequestPair   `json:"url_encoded,omitempty"`
 
 	Cases        []HttpRequestCase `json:"cases,omitempty"`
-	ActiveCaseID string            `json:"active_case_id,omitempty"`
 	// InterfaceSpec is the collection item's root request (item.Request) when the item has cases.
-	// It is independent from per-case specs; the flattened Method/URL/Body fields still reflect the active case for convenience.
 	InterfaceSpec *HttpRequestSpec `json:"interface_spec,omitempty"`
 }
 
@@ -208,26 +214,62 @@ type MCPCaseData struct {
 
 // RequestHistory records a single HTTP request execution.
 type RequestHistory struct {
-	ID          string          `json:"id"`
-	ProjectID   string          `json:"project_id"`
-	ProjectName string          `json:"project_name"`
-	RequestName string          `json:"request_name"`
-	RequestPath string          `json:"request_path"`
-	Method      string          `json:"method"`
-	URL         string          `json:"url"`
-	Spec        HttpRequestSpec `json:"spec"`
-	Response    *CurlResponse   `json:"response"`
-	CreatedAt   time.Time       `json:"created_at"`
+	ID          string            `json:"id"`
+	Source      HistorySourceType `json:"source"`
+	SourceTool  string            `json:"source_tool"`
+	ProjectID   string            `json:"project_id"`
+	ProjectName string            `json:"project_name"`
+	RequestName string            `json:"request_name"`
+	RequestPath string            `json:"request_path"`
+	Method      string            `json:"method"`
+	URL         string            `json:"url"`
+	Spec        HttpRequestSpec   `json:"spec"`
+	Response    *CurlResponse     `json:"response"`
+	CreatedAt   time.Time         `json:"created_at"`
 }
 
 // HistoryEntry is a lightweight summary for listing.
 type HistoryEntry struct {
-	ID          string    `json:"id"`
-	ProjectName string    `json:"project_name"`
-	RequestName string    `json:"request_name"`
-	Method      string    `json:"method"`
-	URL         string    `json:"url"`
-	StatusCode  int       `json:"status_code"`
-	Duration    int64     `json:"duration"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID          string            `json:"id"`
+	Source      HistorySourceType `json:"source"`
+	SourceTool  string            `json:"source_tool"`
+	ProjectName string            `json:"project_name"`
+	RequestName string            `json:"request_name"`
+	Method      string            `json:"method"`
+	URL         string            `json:"url"`
+	StatusCode  int               `json:"status_code"`
+	Duration    int64             `json:"duration"`
+	CreatedAt   time.Time         `json:"created_at"`
+}
+
+// HistoryIndex is the index file entry for a history item.
+type HistoryIndex struct {
+	ID           string            `json:"id"`
+	Timestamp    time.Time         `json:"timestamp"`
+	Source       HistorySourceType `json:"source"`
+	SourceTool   string            `json:"source_tool"`
+	ProjectID    string            `json:"project_id"`
+	ProjectName  string            `json:"project_name"`
+	RequestName  string            `json:"request_name"`
+	RequestPath  string            `json:"request_path"`
+	Method       string            `json:"method"`
+	URL          string            `json:"url"`
+	Status       string            `json:"status"`
+	ResponseCode int               `json:"response_code"`
+	Duration     int64             `json:"duration"`
+	DetailFile   string            `json:"detail_file"`
+}
+
+// HistorySearchParams defines search/filter parameters for history.
+type HistorySearchParams struct {
+	Project  string `json:"project"`  // project name fuzzy search
+	Name     string `json:"name"`     // request name fuzzy search
+	URL      string `json:"url"`      // URL fuzzy search
+	Method   string `json:"method"`   // HTTP method exact match
+	Status   int    `json:"status"`   // status code exact match
+	Source   string `json:"source"`   // source exact match (GUI/MCP)
+	Tool     string `json:"tool"`     // MCP tool name exact match
+	From     string `json:"from"`     // start time (YYYY-MM-DD)
+	To       string `json:"to"`       // end time (YYYY-MM-DD)
+	Keyword  string `json:"keyword"`  // comprehensive search (URL + request name)
 }

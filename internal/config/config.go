@@ -270,10 +270,11 @@ type GitSyncConfig struct {
 }
 
 type MCPConfig struct {
-	Enabled   bool   `json:"enabled"`
-	Port     int    `json:"port"`
-	ProjectID string `json:"project_id"`
-	APIKey   string `json:"api_key"`
+	Enabled       bool   `json:"enabled"`
+	Port          int    `json:"port"`
+	ProjectID     string `json:"project_id"`
+	EnvironmentID string `json:"environment_id"`
+	APIKey        string `json:"api_key"`
 }
 
 type AppConfig struct {

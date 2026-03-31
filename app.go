@@ -356,6 +356,11 @@ func (a *App) ListHistory(limit int) ([]models.HistoryEntry, error) {
 	return a.service.ListHistory(limit)
 }
 
+// SearchHistory searches request history with filter parameters.
+func (a *App) SearchHistory(params models.HistorySearchParams, limit int) ([]models.HistoryEntry, error) {
+	return a.service.SearchHistory(params, limit)
+}
+
 // GetHistoryEntry returns a single history entry by ID.
 func (a *App) GetHistoryEntry(id string) (*models.RequestHistory, error) {
 	return a.service.GetHistoryEntry(id)

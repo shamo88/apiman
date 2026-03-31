@@ -7,7 +7,7 @@ import type { UploadProps } from 'antd';
 import { Button, Card, Checkbox, Col, Divider, Dropdown, Empty, Input, InputRef, message, Modal, Radio, Row, Select, Space, Spin, Table, Tabs, Tooltip, Upload } from 'antd';
 import type { DataNode } from 'antd/es/tree';
 import React, { useEffect, useState } from 'react';
-import { AddGlobalCookies, AddRequestCase, CopyRequest, CreateEnvironment, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteEnvironment, DeleteFolder, DeleteGlobalCookie, DeleteProject, DeleteProjectScript, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts, ExecuteHTTPRequestWithProject, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, ListProjectScripts, LoadAppConfig, LoadEnvironments, LoadGlobalCookies, MoveFolder, MoveRequest, PullGitRepo, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, SaveAppConfig, SaveGlobalCookies, UpdateEnvironment, UpdateProjectScript, UpdateRequest, UpdateRequestScripts, LoadMCPConfig, SaveMCPConfig, StartMCP, StopMCP, GetMCPStatus, ListHistory, GetHistoryEntry, DeleteHistory, ClearHistory } from '../wailsjs/go/main/App';
+import { AddGlobalCookies, AddRequestCase, CopyRequest, CreateEnvironment, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteEnvironment, DeleteFolder, DeleteGlobalCookie, DeleteProject, DeleteProjectScript, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts, ExecuteHTTPRequestWithProject, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, ListProjectScripts, LoadAppConfig, LoadEnvironments, LoadGlobalCookies, MoveFolder, MoveRequest, PullGitRepo, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, SaveAppConfig, SaveGlobalCookies, UpdateEnvironment, UpdateProjectScript, UpdateRequest, UpdateRequestScripts, LoadMCPConfig, SaveMCPConfig, StartMCP, StopMCP, GetMCPStatus, ListHistory, GetHistoryEntry, DeleteHistory, ClearHistory, SearchHistory } from '../wailsjs/go/main/App';
 import { models } from '../wailsjs/go/models';
 import './App.css';
 import { ScriptHelpWindow } from './components/ScriptHelpWindow';
@@ -774,8 +774,66 @@ function App() {
     const [historyList, setHistoryList] = useState<any[]>([]);
     const [historyDetail, setHistoryDetail] = useState<any | null>(null);
     const [historyLoading, setHistoryLoading] = useState(false);
-    const [mcpConfig, setMCPConfig] = useState<any>({ enabled: false, port: 3847, project_id: '', api_key: '' });
+    const [historySearchProject, setHistorySearchProject] = useState('');
+    const [historySearchName, setHistorySearchName] = useState('');
+    const [historySearchURL, setHistorySearchURL] = useState('');
+    const [historySearchMethod, setHistorySearchMethod] = useState('');
+    const [historySearchStatus, setHistorySearchStatus] = useState('');
+    const [historySearchSource, setHistorySearchSource] = useState('');
+
+    // Build search params from individual fields
+    const buildHistorySearchParams = (): any => {
+        const params: any = {};
+        if (historySearchProject) params.project = historySearchProject;
+        if (historySearchName) params.name = historySearchName;
+        if (historySearchURL) params.url = historySearchURL;
+        if (historySearchMethod) params.method = historySearchMethod.toUpperCase();
+        if (historySearchStatus) params.status = parseInt(historySearchStatus, 10) || 0;
+        if (historySearchSource) params.source = historySearchSource.toUpperCase();
+        return params;
+    };
+
+    // Search history with current filters
+    const searchHistory = async () => {
+        setHistoryLoading(true);
+        try {
+            const params = buildHistorySearchParams();
+            const list = await SearchHistory(params, 100);
+            setHistoryList(list || []);
+        } catch (e) {
+            console.error('Failed to search history:', e);
+        } finally {
+            setHistoryLoading(false);
+        }
+    };
+
+    // Load history list
+    const loadHistoryList = async () => {
+        setHistoryLoading(true);
+        try {
+            const list = await ListHistory(100);
+            setHistoryList(list || []);
+        } catch (e) {
+            console.error('Failed to load history:', e);
+        } finally {
+            setHistoryLoading(false);
+        }
+    };
+
+    // Clear all search fields
+    const clearHistorySearch = () => {
+        setHistorySearchProject('');
+        setHistorySearchName('');
+        setHistorySearchURL('');
+        setHistorySearchMethod('');
+        setHistorySearchStatus('');
+        setHistorySearchSource('');
+        loadHistoryList();
+    };
+
+    const [mcpConfig, setMCPConfig] = useState<any>({ enabled: false, port: 3847, project_id: '', environment_id: '', api_key: '' });
     const [mcpStatus, setMCPStatus] = useState<'stopped' | 'running' | 'error'>('stopped');
+    const [mcpEnvironments, setMCPEnvironments] = useState<Environment[]>([]);
     const [projectTabs, setProjectTabs] = useState<ProjectTab[]>([]);
     const [activeTab, setActiveTab] = useState<string>('home');
     const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
@@ -2138,6 +2196,20 @@ function App() {
             }
         } catch (err) {
             console.error('Failed to load MCP config:', err);
+        }
+    };
+
+    const loadMCPEnvironments = async (projectId: string) => {
+        try {
+            const data = await LoadEnvironments(projectId);
+            if (data) {
+                setMCPEnvironments(data);
+            } else {
+                setMCPEnvironments([]);
+            }
+        } catch (err) {
+            console.error('Failed to load MCP environments:', err);
+            setMCPEnvironments([]);
         }
     };
 
@@ -4832,9 +4904,12 @@ token=xyz789; Domain=api.example.com; Path=/api`}
                 onSave={handleSaveMCPConfig}
                 currentStatus={mcpStatus}
                 appTheme={appTheme}
+                environments={mcpEnvironments}
+                onLoadEnvironments={loadMCPEnvironments}
             />
 
             <Modal
+                title="历史记录"
                 open={historyModalVisible}
                 onCancel={() => { setHistoryModalVisible(false); setHistoryDetail(null); }}
                 footer={null}
@@ -4883,8 +4958,7 @@ token=xyz789; Domain=api.example.com; Path=/api`}
                     </div>
                 ) : (
                     <div>
-                        <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span>共 {historyList.length} 条记录</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                             <Button size='small' danger onClick={async () => {
                                 Modal.confirm({
                                     title: '确认清空',
@@ -4896,12 +4970,87 @@ token=xyz789; Domain=api.example.com; Path=/api`}
                                 });
                             }}>清空全部</Button>
                         </div>
+                        <div>
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                                <Input
+                                    size='small'
+                                    placeholder='项目'
+                                    value={historySearchProject}
+                                    onChange={(e) => setHistorySearchProject(e.target.value)}
+                                    onPressEnter={searchHistory}
+                                    style={{ width: 120 }}
+                                    allowClear
+                                    onClear={() => { setHistorySearchProject(''); }}
+                                />
+                                <Input
+                                    size='small'
+                                    placeholder='请求名称'
+                                    value={historySearchName}
+                                    onChange={(e) => setHistorySearchName(e.target.value)}
+                                    onPressEnter={searchHistory}
+                                    style={{ width: 120 }}
+                                    allowClear
+                                    onClear={() => { setHistorySearchName(''); }}
+                                />
+                                <Input
+                                    size='small'
+                                    placeholder='URL'
+                                    value={historySearchURL}
+                                    onChange={(e) => setHistorySearchURL(e.target.value)}
+                                    onPressEnter={searchHistory}
+                                    style={{ flex: 1 }}
+                                    allowClear
+                                    onClear={() => { setHistorySearchURL(''); }}
+                                />
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                                <Select
+                                    size='small'
+                                    placeholder='方法'
+                                    value={historySearchMethod || undefined}
+                                    onChange={(v) => setHistorySearchMethod(v || '')}
+                                    style={{ width: 100 }}
+                                    allowClear
+                                >
+                                    <Select.Option value="GET">GET</Select.Option>
+                                    <Select.Option value="POST">POST</Select.Option>
+                                    <Select.Option value="PUT">PUT</Select.Option>
+                                    <Select.Option value="DELETE">DELETE</Select.Option>
+                                    <Select.Option value="PATCH">PATCH</Select.Option>
+                                    <Select.Option value="OPTIONS">OPTIONS</Select.Option>
+                                    <Select.Option value="HEAD">HEAD</Select.Option>
+                                </Select>
+                                <Input
+                                    size='small'
+                                    placeholder='状态码'
+                                    value={historySearchStatus}
+                                    onChange={(e) => setHistorySearchStatus(e.target.value)}
+                                    onPressEnter={searchHistory}
+                                    style={{ width: 80 }}
+                                    allowClear
+                                    onClear={() => { setHistorySearchStatus(''); }}
+                                />
+                                <Select
+                                    size='small'
+                                    placeholder='来源'
+                                    value={historySearchSource || undefined}
+                                    onChange={(v) => setHistorySearchSource(v || '')}
+                                    style={{ width: 100 }}
+                                    allowClear
+                                >
+                                    <Select.Option value="GUI">GUI</Select.Option>
+                                    <Select.Option value="MCP">MCP</Select.Option>
+                                </Select>
+                                <Button size='small' type='primary' onClick={searchHistory} icon={<SearchOutlined />}>搜索</Button>
+                                <Button size='small' onClick={clearHistorySearch}>重置</Button>
+                            </div>
+                        </div>
                         <Table
                             dataSource={historyList}
                             rowKey='id'
                             size='small'
                             loading={historyLoading}
-                            pagination={{ pageSize: 10 }}
+                            pagination={{ pageSize: 10, showTotal: (total: number) => `共 ${total} 条记录` }}
                             onRow={(record) => ({
                                 onClick: async () => {
                                     setHistoryLoading(true);
@@ -4918,12 +5067,20 @@ token=xyz789; Domain=api.example.com; Path=/api`}
                             })}
                             columns={[
                                 { title: '时间', dataIndex: 'created_at', width: 150, render: (v) => v ? new Date(v).toLocaleString() : '' },
-                                { title: '项目', dataIndex: 'project_name', width: 120, ellipsis: true },
+                                {
+                                    title: '来源', dataIndex: 'source', width: 70, render: (v, record) => {
+                                        if (v === 'MCP') {
+                                            return <span style={{ color: '#49cc90', fontSize: 11 }} title={record.source_tool}>{v}</span>;
+                                        }
+                                        return <span style={{ color: '#61affe', fontSize: 11 }}>{v}</span>;
+                                    }
+                                },
+                                { title: '项目', dataIndex: 'project_name', width: 100, ellipsis: true },
                                 { title: '请求', dataIndex: 'request_name', width: 120, ellipsis: true },
-                                { title: '方法', dataIndex: 'method', width: 70, render: (v) => <span style={{ color: getMethodColor(v) }}>{v}</span> },
+                                { title: '方法', dataIndex: 'method', width: 60, render: (v) => <span style={{ color: getMethodColor(v) }}>{v}</span> },
                                 { title: 'URL', dataIndex: 'url', ellipsis: true },
-                                { title: '状态', dataIndex: 'status_code', width: 70, render: (v) => <span style={{ color: getStatusColor(v) }}>{v || '-'}</span> },
-                                { title: '耗时', dataIndex: 'duration', width: 80, render: (v) => v ? `${v}ms` : '-' },
+                                { title: '状态', dataIndex: 'status_code', width: 60, render: (v) => <span style={{ color: getStatusColor(v) }}>{v || '-'}</span> },
+                                { title: '耗时', dataIndex: 'duration', width: 70, render: (v) => v ? `${v}ms` : '-' },
                             ]}
                         />
                     </div>
@@ -4948,15 +5105,7 @@ token=xyz789; Domain=api.example.com; Path=/api`}
                     icon={<FileTextOutlined />}
                     onClick={async () => {
                         setHistoryModalVisible(true);
-                        setHistoryLoading(true);
-                        try {
-                            const list = await ListHistory(100);
-                            setHistoryList(list || []);
-                        } catch (e) {
-                            console.error('Failed to load history:', e);
-                        } finally {
-                            setHistoryLoading(false);
-                        }
+                        clearHistorySearch();
                     }}
                 >
                     Log

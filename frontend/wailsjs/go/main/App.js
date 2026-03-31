@@ -234,6 +234,10 @@ export function SaveProjectGroupsState(arg1) {
   return window['go']['main']['App']['SaveProjectGroupsState'](arg1);
 }
 
+export function SearchHistory(arg1, arg2) {
+  return window['go']['main']['App']['SearchHistory'](arg1, arg2);
+}
+
 export function StartMCP() {
   return window['go']['main']['App']['StartMCP']();
 }

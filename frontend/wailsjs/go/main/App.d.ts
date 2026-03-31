@@ -120,6 +120,8 @@ export function SaveMCPConfig(arg1:config.MCPConfig):Promise<void>;
 
 export function SaveProjectGroupsState(arg1:project.ProjectGroupsState):Promise<void>;
 
+export function SearchHistory(arg1:models.HistorySearchParams,arg2:number):Promise<Array<models.HistoryEntry>>;
+
 export function StartMCP():Promise<void>;
 
 export function StopMCP():Promise<void>;

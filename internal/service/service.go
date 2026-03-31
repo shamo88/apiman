@@ -120,6 +120,19 @@ func (s *Service) ListProjects() ([]models.Project, error) {
 	return s.ProjectMgr.ListProjects()
 }
 
+func (s *Service) GetProjectName(projectID string) (string, error) {
+	projects, err := s.ProjectMgr.ListProjects()
+	if err != nil {
+		return "", err
+	}
+	for _, p := range projects {
+		if p.ID == projectID {
+			return p.Name, nil
+		}
+	}
+	return "", nil
+}
+
 func (s *Service) CreateProject(name string) (*models.Project, error) {
 	project, err := s.ProjectMgr.CreateProject(name)
 	if err == nil && s.shouldAutoSync() {
@@ -521,6 +534,22 @@ func (s *Service) ExecuteHTTPRequestWithScripts(
 	preScriptIDs []string,
 	postScriptIDs []string,
 ) (*models.CurlResponse, error) {
+	return s.ExecuteHTTPRequestWithScriptsWithSource(
+		projectID, projectName, requestName, requestPath,
+		environmentID, spec, preScriptIDs, postScriptIDs,
+		models.HistorySourceGUI, "",
+	)
+}
+
+func (s *Service) ExecuteHTTPRequestWithScriptsWithSource(
+	projectID, projectName, requestName, requestPath string,
+	environmentID string,
+	spec models.HttpRequestSpec,
+	preScriptIDs []string,
+	postScriptIDs []string,
+	source models.HistorySourceType,
+	sourceTool string,
+) (*models.CurlResponse, error) {
 	var preScriptContents, postScriptContents []string
 	var preScriptNames, postScriptNames []string
 
@@ -632,7 +661,7 @@ func (s *Service) ExecuteHTTPRequestWithScripts(
 	}
 
 	// 记录历史
-	if recordErr := s.RecordHistory(projectID, projectName, requestName, requestPath, spec, resp); recordErr != nil {
+	if recordErr := s.RecordHistoryWithSource(projectID, projectName, requestName, requestPath, spec, resp, source, sourceTool); recordErr != nil {
 		// 历史记录失败不影响主流程
 	}
 
@@ -926,6 +955,14 @@ func (s *Service) ListHistory(limit int) ([]models.HistoryEntry, error) {
 	return s.HistoryMgr.ListEntries(limit)
 }
 
+// SearchHistory searches request history with filter parameters.
+func (s *Service) SearchHistory(params models.HistorySearchParams, limit int) ([]models.HistoryEntry, error) {
+	if s.HistoryMgr == nil {
+		return []models.HistoryEntry{}, nil
+	}
+	return s.HistoryMgr.SearchEntries(params, limit)
+}
+
 // GetHistoryEntry returns a single history entry by ID.
 func (s *Service) GetHistoryEntry(id string) (*models.RequestHistory, error) {
 	if s.HistoryMgr == nil {
@@ -952,10 +989,17 @@ func (s *Service) ClearHistory() error {
 
 // RecordHistory saves a request execution to history.
 func (s *Service) RecordHistory(projectID, projectName, requestName, requestPath string, spec models.HttpRequestSpec, resp *models.CurlResponse) error {
+	return s.RecordHistoryWithSource(projectID, projectName, requestName, requestPath, spec, resp, models.HistorySourceGUI, "")
+}
+
+// RecordHistoryWithSource saves a request execution to history with source information.
+func (s *Service) RecordHistoryWithSource(projectID, projectName, requestName, requestPath string, spec models.HttpRequestSpec, resp *models.CurlResponse, source models.HistorySourceType, sourceTool string) error {
 	if s.HistoryMgr == nil {
 		return nil
 	}
 	entry := &models.RequestHistory{
+		Source:      source,
+		SourceTool:  sourceTool,
 		ProjectID:   projectID,
 		ProjectName: projectName,
 		RequestName: requestName,
