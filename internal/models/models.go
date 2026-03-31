@@ -205,3 +205,29 @@ type MCPCaseData struct {
 	Name string            `json:"name"`
 	Spec HttpRequestSpec  `json:"spec"`
 }
+
+// RequestHistory records a single HTTP request execution.
+type RequestHistory struct {
+	ID          string          `json:"id"`
+	ProjectID   string          `json:"project_id"`
+	ProjectName string          `json:"project_name"`
+	RequestName string          `json:"request_name"`
+	RequestPath string          `json:"request_path"`
+	Method      string          `json:"method"`
+	URL         string          `json:"url"`
+	Spec        HttpRequestSpec `json:"spec"`
+	Response    *CurlResponse   `json:"response"`
+	CreatedAt   time.Time       `json:"created_at"`
+}
+
+// HistoryEntry is a lightweight summary for listing.
+type HistoryEntry struct {
+	ID          string    `json:"id"`
+	ProjectName string    `json:"project_name"`
+	RequestName string    `json:"request_name"`
+	Method      string    `json:"method"`
+	URL         string    `json:"url"`
+	StatusCode  int       `json:"status_code"`
+	Duration    int64     `json:"duration"`
+	CreatedAt   time.Time `json:"created_at"`
+}

@@ -475,6 +475,51 @@ export namespace models {
 		    return a;
 		}
 	}
+	export class HistoryEntry {
+	    id: string;
+	    project_name: string;
+	    request_name: string;
+	    method: string;
+	    url: string;
+	    status_code: number;
+	    duration: number;
+	    // Go type: time
+	    created_at: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new HistoryEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.project_name = source["project_name"];
+	        this.request_name = source["request_name"];
+	        this.method = source["method"];
+	        this.url = source["url"];
+	        this.status_code = source["status_code"];
+	        this.duration = source["duration"];
+	        this.created_at = this.convertValues(source["created_at"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	
 	export class Project {
@@ -541,6 +586,55 @@ export namespace models {
 	        this.content = source["content"];
 	        this.created_at = this.convertValues(source["created_at"], null);
 	        this.updated_at = this.convertValues(source["updated_at"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class RequestHistory {
+	    id: string;
+	    project_id: string;
+	    project_name: string;
+	    request_name: string;
+	    request_path: string;
+	    method: string;
+	    url: string;
+	    spec: HttpRequestSpec;
+	    response?: CurlResponse;
+	    // Go type: time
+	    created_at: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new RequestHistory(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.project_id = source["project_id"];
+	        this.project_name = source["project_name"];
+	        this.request_name = source["request_name"];
+	        this.request_path = source["request_path"];
+	        this.method = source["method"];
+	        this.url = source["url"];
+	        this.spec = this.convertValues(source["spec"], HttpRequestSpec);
+	        this.response = this.convertValues(source["response"], CurlResponse);
+	        this.created_at = this.convertValues(source["created_at"], null);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

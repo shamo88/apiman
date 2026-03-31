@@ -1952,6 +1952,7 @@ body,
 .json-view-container {
     overflow: auto;
     max-height: 100%;
+    text-align: left;
 }
 
 .response-content {

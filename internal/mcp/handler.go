@@ -324,6 +324,9 @@ func (h *Handler) executeRequest(path, caseID string) (*MCPToolResult, error) {
 	// Execute with scripts
 	resp, err := h.svc.ExecuteHTTPRequestWithScripts(
 		projectID,
+		"", // projectName
+		curlReq.Name,
+		curlReq.Path,
 		"", // environment ID - could be extended
 		models.SpecFromCurlRequest(curlReq),
 		nil, // preScriptIDs

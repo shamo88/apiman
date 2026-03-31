@@ -8,6 +8,8 @@ export function AddGlobalCookies(arg1:string):Promise<void>;
 
 export function AddRequestCase(arg1:string,arg2:string):Promise<models.CurlRequest>;
 
+export function ClearHistory():Promise<void>;
+
 export function CopyRequest(arg1:string):Promise<models.CurlRequest>;
 
 export function CreateEnvironment(arg1:string,arg2:string,arg3:Record<string, string>):Promise<models.Environment>;
@@ -25,6 +27,8 @@ export function DeleteEnvironment(arg1:string,arg2:string):Promise<void>;
 export function DeleteFolder(arg1:string):Promise<void>;
 
 export function DeleteGlobalCookie(arg1:string):Promise<void>;
+
+export function DeleteHistory(arg1:string):Promise<void>;
 
 export function DeleteProject(arg1:string):Promise<void>;
 
@@ -44,15 +48,19 @@ export function ExecuteCurl(arg1:string):Promise<models.CurlResponse>;
 
 export function ExecuteHTTPRequest(arg1:models.HttpRequestSpec):Promise<models.CurlResponse>;
 
-export function ExecuteHTTPRequestWithScripts(arg1:string,arg2:string,arg3:models.HttpRequestSpec,arg4:Array<string>,arg5:Array<string>):Promise<models.CurlResponse>;
+export function ExecuteHTTPRequestWithProject(arg1:string,arg2:string,arg3:string,arg4:string,arg5:models.HttpRequestSpec):Promise<models.CurlResponse>;
 
-export function ExecuteHTTPRequestWithScriptsInline(arg1:string,arg2:string,arg3:models.HttpRequestSpec,arg4:string,arg5:string):Promise<models.CurlResponse>;
+export function ExecuteHTTPRequestWithScripts(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:models.HttpRequestSpec,arg7:Array<string>,arg8:Array<string>):Promise<models.CurlResponse>;
+
+export function ExecuteHTTPRequestWithScriptsInline(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:models.HttpRequestSpec,arg7:string,arg8:string):Promise<models.CurlResponse>;
 
 export function ExtractVariables(arg1:string):Promise<Array<string>>;
 
 export function GetConfigDir():Promise<string>;
 
 export function GetGlobalVariables():Promise<Record<string, string>>;
+
+export function GetHistoryEntry(arg1:string):Promise<models.RequestHistory>;
 
 export function GetMCPStatus():Promise<string>;
 
@@ -67,6 +75,8 @@ export function ImportPostmanCollection(arg1:string):Promise<models.Project>;
 export function InitGitRepo():Promise<void>;
 
 export function InitProjectsDir():Promise<void>;
+
+export function ListHistory(arg1:number):Promise<Array<models.HistoryEntry>>;
 
 export function ListProjectScripts(arg1:string):Promise<Array<models.ProjectScript>>;
 

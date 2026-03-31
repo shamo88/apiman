@@ -1,4 +1,4 @@
-import { ApiOutlined, CloseOutlined, CopyOutlined, DownOutlined, EditOutlined, ExperimentOutlined, FileOutlined, FolderOutlined, HomeOutlined, ImportOutlined, MoreOutlined, PlusOutlined, ProjectOutlined, QuestionCircleOutlined, RightOutlined, SearchOutlined, EnvironmentOutlined, CodeOutlined, SafetyOutlined } from '@ant-design/icons';
+import { ApiOutlined, CloseOutlined, CopyOutlined, DownOutlined, EditOutlined, ExperimentOutlined, FileOutlined, FolderOutlined, HomeOutlined, ImportOutlined, MoreOutlined, PlusOutlined, ProjectOutlined, QuestionCircleOutlined, RightOutlined, SearchOutlined, EnvironmentOutlined, CodeOutlined, SafetyOutlined, FileTextOutlined } from '@ant-design/icons';
 import { javascript } from '@codemirror/lang-javascript';
 import CodeMirror from '@uiw/react-codemirror';
 import { JsonView, darkStyles, allExpanded } from 'react-json-view-lite';
@@ -7,7 +7,7 @@ import type { UploadProps } from 'antd';
 import { Button, Card, Checkbox, Col, Divider, Dropdown, Empty, Input, InputRef, message, Modal, Radio, Row, Select, Space, Spin, Table, Tabs, Tooltip, Upload } from 'antd';
 import type { DataNode } from 'antd/es/tree';
 import React, { useEffect, useState } from 'react';
-import { AddGlobalCookies, AddRequestCase, CopyRequest, CreateEnvironment, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteEnvironment, DeleteFolder, DeleteGlobalCookie, DeleteProject, DeleteProjectScript, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, ListProjectScripts, LoadAppConfig, LoadEnvironments, LoadGlobalCookies, MoveFolder, MoveRequest, PullGitRepo, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, SaveAppConfig, SaveGlobalCookies, UpdateEnvironment, UpdateProjectScript, UpdateRequest, UpdateRequestScripts, LoadMCPConfig, SaveMCPConfig, StartMCP, StopMCP, GetMCPStatus } from '../wailsjs/go/main/App';
+import { AddGlobalCookies, AddRequestCase, CopyRequest, CreateEnvironment, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteEnvironment, DeleteFolder, DeleteGlobalCookie, DeleteProject, DeleteProjectScript, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts, ExecuteHTTPRequestWithProject, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, ListProjectScripts, LoadAppConfig, LoadEnvironments, LoadGlobalCookies, MoveFolder, MoveRequest, PullGitRepo, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, SaveAppConfig, SaveGlobalCookies, UpdateEnvironment, UpdateProjectScript, UpdateRequest, UpdateRequestScripts, LoadMCPConfig, SaveMCPConfig, StartMCP, StopMCP, GetMCPStatus, ListHistory, GetHistoryEntry, DeleteHistory, ClearHistory } from '../wailsjs/go/main/App';
 import { models } from '../wailsjs/go/models';
 import './App.css';
 import { ScriptHelpWindow } from './components/ScriptHelpWindow';
@@ -770,6 +770,10 @@ function App() {
     const [cookieInput, setCookieInput] = useState('');
     const [globalCookies, setGlobalCookies] = useState<any[]>([]);
     const [mcpModalVisible, setMCpModalVisible] = useState(false);
+    const [historyModalVisible, setHistoryModalVisible] = useState(false);
+    const [historyList, setHistoryList] = useState<any[]>([]);
+    const [historyDetail, setHistoryDetail] = useState<any | null>(null);
+    const [historyLoading, setHistoryLoading] = useState(false);
     const [mcpConfig, setMCPConfig] = useState<any>({ enabled: false, port: 3847, project_id: '', api_key: '' });
     const [mcpStatus, setMCPStatus] = useState<'stopped' | 'running' | 'error'>('stopped');
     const [projectTabs, setProjectTabs] = useState<ProjectTab[]>([]);
@@ -2860,7 +2864,10 @@ function App() {
             return;
         }
 
-        const projectId = projectTabs.find(t => t.id === activeTab)?.project?.id;
+        const projectId = currentProject?.id || '';
+        const projectName = currentProject?.name || '';
+        const requestName = currentRequest?.name || '';
+        const requestPath = currentRequest?.path || '';
 
         setExecuting(true);
         setResponse(null);
@@ -2869,13 +2876,22 @@ function App() {
             if (projectId && (apiConfig.preScripts.length > 0 || apiConfig.postScripts.length > 0)) {
                 result = await ExecuteHTTPRequestWithScripts(
                     projectId,
+                    projectName,
+                    requestName,
+                    requestPath,
                     selectedEnvironmentId,
                     toWailsHttpSpec(resolvedConfig),
                     apiConfig.preScripts,
                     apiConfig.postScripts
                 );
             } else {
-                result = await ExecuteHTTPRequest(toWailsHttpSpec(resolvedConfig));
+                result = await ExecuteHTTPRequestWithProject(
+                    projectId,
+                    projectName,
+                    requestName,
+                    requestPath,
+                    toWailsHttpSpec(resolvedConfig)
+                );
             }
             setResponse(result);
             // 格式化响应体
@@ -4818,6 +4834,102 @@ token=xyz789; Domain=api.example.com; Path=/api`}
                 appTheme={appTheme}
             />
 
+            <Modal
+                open={historyModalVisible}
+                onCancel={() => { setHistoryModalVisible(false); setHistoryDetail(null); }}
+                footer={null}
+                width={historyDetail ? 1500 : 1000}
+                destroyOnClose
+            >
+                {historyDetail ? (
+                    <div>
+                        <div style={{ marginBottom: 12 }}>
+                            <strong>{historyDetail.request_name || '未命名请求'}</strong>
+                            <span style={{ marginLeft: 12, color: getMethodColor(historyDetail.method) }}>{historyDetail.method}</span>
+                            <span style={{ marginLeft: 12 }}>{historyDetail.url}</span>
+                        </div>
+                        <Row gutter={12}>
+                            <Col span={12} style={{ textAlign: "left" }}>
+                                <h4>请求信息</h4>
+                                <div className="json-view-container" style={{ background: 'var(--bg-tertiary)', padding: 12, borderRadius: 4, maxHeight: 500, overflow: 'auto', minHeight: 250 }}>
+                                    <JsonView
+                                        data={historyDetail.spec || {}}
+                                        style={appTheme === 'dark' ? darkStyles : undefined}
+                                        shouldExpandNode={allExpanded}
+                                        clickToExpandNode
+                                    />
+                                </div>
+                            </Col>
+                            <Col span={12} style={{ textAlign: "left" }}>
+                                <div style={{ display: "flex" }}>
+                                    <h4>响应信息</h4>
+                                    <div style={{ marginLeft: 8, display: 'flex', gap: 12 }}>
+                                        <span style={{ color: getStatusColor(historyDetail.response?.status_code) }}>
+                                            Status: {historyDetail.response?.status_code || 'N/A'}
+                                        </span>
+                                        <span>Duration: {historyDetail.response?.duration || 0}ms</span>
+                                    </div>
+                                </div>
+                                <div className="json-view-container" style={{ background: 'var(--bg-tertiary)', padding: 12, borderRadius: 4, maxHeight: 470, overflow: 'auto', minHeight: 250 }}>
+                                    <JsonView
+                                        data={historyDetail.response || {}}
+                                        style={appTheme === 'dark' ? darkStyles : undefined}
+                                        shouldExpandNode={allExpanded}
+                                        clickToExpandNode
+                                    />
+                                </div>
+                            </Col>
+                        </Row>
+                    </div>
+                ) : (
+                    <div>
+                        <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span>共 {historyList.length} 条记录</span>
+                            <Button size='small' danger onClick={async () => {
+                                Modal.confirm({
+                                    title: '确认清空',
+                                    content: '确定要清空所有历史记录吗？',
+                                    onOk: async () => {
+                                        await ClearHistory();
+                                        setHistoryList([]);
+                                    }
+                                });
+                            }}>清空全部</Button>
+                        </div>
+                        <Table
+                            dataSource={historyList}
+                            rowKey='id'
+                            size='small'
+                            loading={historyLoading}
+                            pagination={{ pageSize: 10 }}
+                            onRow={(record) => ({
+                                onClick: async () => {
+                                    setHistoryLoading(true);
+                                    try {
+                                        const detail = await GetHistoryEntry(record.id);
+                                        setHistoryDetail(detail);
+                                    } catch (e) {
+                                        console.error('Failed to load history detail:', e);
+                                    } finally {
+                                        setHistoryLoading(false);
+                                    }
+                                },
+                                style: { cursor: 'pointer' }
+                            })}
+                            columns={[
+                                { title: '时间', dataIndex: 'created_at', width: 150, render: (v) => v ? new Date(v).toLocaleString() : '' },
+                                { title: '项目', dataIndex: 'project_name', width: 120, ellipsis: true },
+                                { title: '请求', dataIndex: 'request_name', width: 120, ellipsis: true },
+                                { title: '方法', dataIndex: 'method', width: 70, render: (v) => <span style={{ color: getMethodColor(v) }}>{v}</span> },
+                                { title: 'URL', dataIndex: 'url', ellipsis: true },
+                                { title: '状态', dataIndex: 'status_code', width: 70, render: (v) => <span style={{ color: getStatusColor(v) }}>{v || '-'}</span> },
+                                { title: '耗时', dataIndex: 'duration', width: 80, render: (v) => v ? `${v}ms` : '-' },
+                            ]}
+                        />
+                    </div>
+                )}
+            </Modal>
+
             <div className="app-footer">
                 <Button
                     icon={<SafetyOutlined />}
@@ -4831,6 +4943,23 @@ token=xyz789; Domain=api.example.com; Path=/api`}
                     onClick={() => { setMCpModalVisible(true); }}
                 >
                     {mcpStatus === 'running' ? 'MCP 运行中' : 'MCP'}
+                </Button>
+                <Button
+                    icon={<FileTextOutlined />}
+                    onClick={async () => {
+                        setHistoryModalVisible(true);
+                        setHistoryLoading(true);
+                        try {
+                            const list = await ListHistory(100);
+                            setHistoryList(list || []);
+                        } catch (e) {
+                            console.error('Failed to load history:', e);
+                        } finally {
+                            setHistoryLoading(false);
+                        }
+                    }}
+                >
+                    Log
                 </Button>
             </div>
         </div>
