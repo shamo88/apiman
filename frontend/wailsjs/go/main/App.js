@@ -10,10 +10,6 @@ export function AddRequestCase(arg1, arg2) {
   return window['go']['main']['App']['AddRequestCase'](arg1, arg2);
 }
 
-export function ClearHistory() {
-  return window['go']['main']['App']['ClearHistory']();
-}
-
 export function CopyRequest(arg1) {
   return window['go']['main']['App']['CopyRequest'](arg1);
 }
@@ -48,10 +44,6 @@ export function DeleteFolder(arg1) {
 
 export function DeleteGlobalCookie(arg1) {
   return window['go']['main']['App']['DeleteGlobalCookie'](arg1);
-}
-
-export function DeleteHistory(arg1) {
-  return window['go']['main']['App']['DeleteHistory'](arg1);
 }
 
 export function DeleteProject(arg1) {
@@ -90,16 +82,12 @@ export function ExecuteHTTPRequest(arg1) {
   return window['go']['main']['App']['ExecuteHTTPRequest'](arg1);
 }
 
-export function ExecuteHTTPRequestWithProject(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['main']['App']['ExecuteHTTPRequestWithProject'](arg1, arg2, arg3, arg4, arg5);
+export function ExecuteHTTPRequestWithScripts(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['ExecuteHTTPRequestWithScripts'](arg1, arg2, arg3, arg4, arg5);
 }
 
-export function ExecuteHTTPRequestWithScripts(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
-  return window['go']['main']['App']['ExecuteHTTPRequestWithScripts'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
-}
-
-export function ExecuteHTTPRequestWithScriptsInline(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
-  return window['go']['main']['App']['ExecuteHTTPRequestWithScriptsInline'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+export function ExecuteHTTPRequestWithScriptsInline(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['ExecuteHTTPRequestWithScriptsInline'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function ExtractVariables(arg1) {
@@ -112,10 +100,6 @@ export function GetConfigDir() {
 
 export function GetGlobalVariables() {
   return window['go']['main']['App']['GetGlobalVariables']();
-}
-
-export function GetHistoryEntry(arg1) {
-  return window['go']['main']['App']['GetHistoryEntry'](arg1);
 }
 
 export function GetMCPStatus() {
@@ -144,10 +128,6 @@ export function InitGitRepo() {
 
 export function InitProjectsDir() {
   return window['go']['main']['App']['InitProjectsDir']();
-}
-
-export function ListHistory(arg1) {
-  return window['go']['main']['App']['ListHistory'](arg1);
 }
 
 export function ListProjectScripts(arg1) {
@@ -232,10 +212,6 @@ export function SaveMCPConfig(arg1) {
 
 export function SaveProjectGroupsState(arg1) {
   return window['go']['main']['App']['SaveProjectGroupsState'](arg1);
-}
-
-export function SearchHistory(arg1, arg2) {
-  return window['go']['main']['App']['SearchHistory'](arg1, arg2);
 }
 
 export function StartMCP() {
