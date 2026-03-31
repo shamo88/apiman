@@ -129,13 +129,14 @@ func SpecFromCurlRequest(cr *CurlRequest) HttpRequestSpec {
 }
 
 type ProjectScript struct {
-	ID        string    `json:"id"`
-	ProjectID string    `json:"project_id"`
-	Name      string    `json:"name"`
-	Path      string    `json:"path"`
-	Content   string    `json:"content"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          string    `json:"id"`
+	ProjectID   string    `json:"project_id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Path        string    `json:"path"`
+	Content     string    `json:"content"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // ResponseCookie 响应Cookie结构

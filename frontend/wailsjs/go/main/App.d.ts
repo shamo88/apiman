@@ -16,7 +16,7 @@ export function CreateFolder(arg1:string,arg2:string,arg3:string):Promise<models
 
 export function CreateProject(arg1:string):Promise<models.Project>;
 
-export function CreateProjectScript(arg1:string,arg2:string,arg3:string):Promise<models.ProjectScript>;
+export function CreateProjectScript(arg1:string,arg2:string,arg3:string,arg4:string):Promise<models.ProjectScript>;
 
 export function CreateRequest(arg1:string,arg2:string,arg3:string,arg4:models.HttpRequestSpec):Promise<models.CurlRequest>;
 
@@ -108,7 +108,7 @@ export function SyncProjectToGit(arg1:string):Promise<void>;
 
 export function UpdateEnvironment(arg1:string,arg2:string,arg3:string,arg4:Record<string, string>):Promise<void>;
 
-export function UpdateProjectScript(arg1:string,arg2:string,arg3:string,arg4:string):Promise<models.ProjectScript>;
+export function UpdateProjectScript(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<models.ProjectScript>;
 
 export function UpdateRequest(arg1:string,arg2:models.HttpRequestSpec,arg3:Array<models.HttpRequestCase>,arg4:string):Promise<void>;
 

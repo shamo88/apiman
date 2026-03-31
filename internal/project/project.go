@@ -52,10 +52,11 @@ type ProjectTree struct {
 }
 
 type scriptMeta struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type ProjectGroupsState struct {
@@ -1254,20 +1255,21 @@ func (pm *ProjectManager) ListProjectScripts(projectID string) ([]models.Project
 		scriptPath := filepath.Join(scriptsDir, buildSlugUUIDName(meta.Name, meta.ID)+".js")
 		scriptContent, _ := os.ReadFile(scriptPath)
 		scripts = append(scripts, models.ProjectScript{
-			ID:        meta.ID,
-			ProjectID: projectID,
-			Name:      meta.Name,
-			Path:      scriptPath,
-			Content:   string(scriptContent),
-			CreatedAt: meta.CreatedAt,
-			UpdatedAt: meta.UpdatedAt,
+			ID:          meta.ID,
+			ProjectID:   projectID,
+			Name:        meta.Name,
+			Description: meta.Description,
+			Path:        scriptPath,
+			Content:     string(scriptContent),
+			CreatedAt:   meta.CreatedAt,
+			UpdatedAt:   meta.UpdatedAt,
 		})
 	}
 	sort.Slice(scripts, func(i, j int) bool { return scripts[i].UpdatedAt.After(scripts[j].UpdatedAt) })
 	return scripts, nil
 }
 
-func (pm *ProjectManager) CreateProjectScript(projectID, name, content string) (*models.ProjectScript, error) {
+func (pm *ProjectManager) CreateProjectScript(projectID, name, description, content string) (*models.ProjectScript, error) {
 	projectPath, err := pm.findProjectPathByID(projectID)
 	if err != nil {
 		return nil, err
@@ -1287,26 +1289,28 @@ func (pm *ProjectManager) CreateProjectScript(projectID, name, content string) (
 		return nil, err
 	}
 	meta := &scriptMeta{
-		ID:        scriptID,
-		Name:      name,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:          scriptID,
+		Name:        name,
+		Description: description,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 	if err := saveScriptMeta(filepath.Join(scriptsDir, scriptID+".meta"), meta); err != nil {
 		return nil, err
 	}
 	return &models.ProjectScript{
-		ID:        scriptID,
-		ProjectID: projectID,
-		Name:      name,
-		Path:      scriptPath,
-		Content:   content,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:          scriptID,
+		ProjectID:   projectID,
+		Name:        name,
+		Description: description,
+		Path:        scriptPath,
+		Content:     content,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}, nil
 }
 
-func (pm *ProjectManager) UpdateProjectScript(projectID, scriptID, name, content string) (*models.ProjectScript, error) {
+func (pm *ProjectManager) UpdateProjectScript(projectID, scriptID, name, description, content string) (*models.ProjectScript, error) {
 	projectPath, err := pm.findProjectPathByID(projectID)
 	if err != nil {
 		return nil, err
@@ -1321,6 +1325,7 @@ func (pm *ProjectManager) UpdateProjectScript(projectID, scriptID, name, content
 	if strings.TrimSpace(name) != "" {
 		meta.Name = strings.TrimSpace(name)
 	}
+	meta.Description = description
 	oldPath := filepath.Join(scriptsDir, buildSlugUUIDName(oldName, meta.ID)+".js")
 	if _, statErr := os.Stat(oldPath); statErr != nil {
 		oldPath = filepath.Join(scriptsDir, meta.ID+".js")
@@ -1337,13 +1342,14 @@ func (pm *ProjectManager) UpdateProjectScript(projectID, scriptID, name, content
 		return nil, err
 	}
 	return &models.ProjectScript{
-		ID:        meta.ID,
-		ProjectID: projectID,
-		Name:      meta.Name,
-		Path:      newPath,
-		Content:   content,
-		CreatedAt: meta.CreatedAt,
-		UpdatedAt: meta.UpdatedAt,
+		ID:          meta.ID,
+		ProjectID:   projectID,
+		Name:        meta.Name,
+		Description: meta.Description,
+		Path:        newPath,
+		Content:     content,
+		CreatedAt:   meta.CreatedAt,
+		UpdatedAt:   meta.UpdatedAt,
 	}, nil
 }
 

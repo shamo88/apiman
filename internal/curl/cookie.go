@@ -3,6 +3,7 @@ package curl
 import (
 	"apiman/internal/models"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -55,10 +56,24 @@ func ParseSetCookie(setCookie string) (*models.GlobalCookie, error) {
 					break
 				}
 			}
+		} else if strings.HasPrefix(lower, "max-age=") {
+			maxAgeStr := part[len("max-age="):]
+			if maxAge, err := strconv.ParseInt(maxAgeStr, 10, 64); err == nil {
+				if maxAge > 0 {
+					cookie.Expires = time.Now().Add(time.Duration(maxAge) * time.Second)
+				} else {
+					// max-age=0 表示立即过期
+					cookie.Expires = time.Now().Add(-1 * time.Second)
+				}
+			}
 		} else if lower == "httponly" {
 			cookie.HttpOnly = true
 		} else if lower == "secure" {
 			cookie.Secure = true
+		} else if strings.HasPrefix(lower, "samesite=") {
+			cookie.SameSite = strings.ToLower(part[len("samesite="):])
+		} else if strings.HasPrefix(lower, "priority=") {
+			cookie.Priority = strings.ToLower(part[len("priority="):])
 		}
 	}
 

@@ -102,6 +102,7 @@ interface ProjectScript {
     id: string;
     project_id: string;
     name: string;
+    description: string;
     path: string;
     content: string;
 }
@@ -856,6 +857,7 @@ function App() {
     const [projectScripts, setProjectScripts] = useState<ProjectScript[]>([]);
     const [editingScriptId, setEditingScriptId] = useState<string>('');
     const [scriptFormName, setScriptFormName] = useState('');
+    const [scriptFormDescription, setScriptFormDescription] = useState('');
     const [scriptFormContent, setScriptFormContent] = useState('// 在这里编写 JavaScript 脚本\n');
     const [scriptsLoading, setScriptsLoading] = useState(false);
     const [scriptSaving, setScriptSaving] = useState(false);
@@ -1156,10 +1158,12 @@ function App() {
                 const target = scripts.find(item => item.id === editingScriptId) || scripts[0];
                 setEditingScriptId(target.id);
                 setScriptFormName(target.name);
+                setScriptFormDescription(target.description || '');
                 setScriptFormContent(target.content || '');
             } else {
                 setEditingScriptId('');
                 setScriptFormName('');
+                setScriptFormDescription('');
                 setScriptFormContent('// 在这里编写 JavaScript 脚本\n');
             }
         } catch (error: any) {
@@ -1175,11 +1179,12 @@ function App() {
         const scriptName = `脚本${projectScripts.length + 1}`;
         setScriptSaving(true);
         try {
-            const created = await CreateProjectScript(currentProject.id, scriptName, '// 在这里编写 JavaScript 脚本\n');
+            const created = await CreateProjectScript(currentProject.id, scriptName, '', '// 在这里编写 JavaScript 脚本\n');
             message.success('脚本已创建');
             await loadProjectScriptsData(currentProject.id);
             setEditingScriptId(created.id);
             setScriptFormName(created.name);
+            setScriptFormDescription(created.description || '');
             setScriptFormContent(created.content || '');
             setSidebarMenu('scripts');
         } catch (error: any) {
@@ -1192,6 +1197,7 @@ function App() {
     const handleSelectScriptEditor = (script: ProjectScript) => {
         setEditingScriptId(script.id);
         setScriptFormName(script.name);
+        setScriptFormDescription(script.description || '');
         setScriptFormContent(script.content || '');
     };
 
@@ -1204,7 +1210,7 @@ function App() {
         }
         setScriptSaving(true);
         try {
-            await UpdateProjectScript(currentProject.id, editingScriptId, name, scriptFormContent);
+            await UpdateProjectScript(currentProject.id, editingScriptId, name, scriptFormDescription, scriptFormContent);
             message.success('脚本已保存');
             await loadProjectScriptsData(currentProject.id);
         } catch (error: any) {
@@ -1807,6 +1813,7 @@ function App() {
             setProjectScripts([]);
             setEditingScriptId('');
             setScriptFormName('');
+            setScriptFormDescription('');
             setScriptFormContent('// 在这里编写 JavaScript 脚本\n');
             setEnvironments([]);
             setEnvironmentsInitiallyLoaded(false);
@@ -2133,15 +2140,13 @@ function App() {
     };
 
     const handleDeleteCookie = async (id: string) => {
-        console.log('Deleting cookie:', id);
         try {
-            const result = await DeleteGlobalCookie(id);
-            console.log('Delete result:', result);
+            await DeleteGlobalCookie(id);
             message.success('Cookie 已删除');
             loadGlobalCookies();
-        } catch (err) {
+        } catch (err: any) {
             console.error('Delete error:', err);
-            message.error(`删除失败: ${err}`);
+            message.error(`删除失败: ${err?.message || err}`);
         }
     };
 
@@ -3200,9 +3205,6 @@ function App() {
                                 <Button icon={<FolderOutlined />} onClick={() => setCreateGroupModal(true)}>
                                     新建分组
                                 </Button>
-                                <Button icon={<SafetyOutlined />} onClick={() => { setCookieModalVisible(true); loadGlobalCookies(); }}>
-                                    设置Cookie
-                                </Button>
                                 <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateProjectModal(true)}>
                                     新建项目
                                 </Button>
@@ -3685,12 +3687,21 @@ function App() {
                                     {editingScriptId ? (
                                         <div className="environment-panel script-panel">
                                             <div className="script-editor-header">
-                                                <Input
-                                                    placeholder="脚本名称"
-                                                    value={scriptFormName}
-                                                    onChange={(e) => setScriptFormName(e.target.value)}
-                                                    style={{ maxWidth: 360 }}
-                                                />
+                                                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                                                    <Input
+                                                        placeholder="脚本名称"
+                                                        value={scriptFormName}
+                                                        onChange={(e) => setScriptFormName(e.target.value)}
+                                                        style={{ maxWidth: 200 }}
+                                                    />
+                                                    <Input.TextArea
+                                                        placeholder="描述（可选）"
+                                                        value={scriptFormDescription}
+                                                        onChange={(e) => setScriptFormDescription(e.target.value)}
+                                                        style={{ maxWidth: 300, minWidth: 200, minHeight: 60, maxHeight: 120 }}
+                                                        autoSize={{ minRows: 2, maxRows: 4 }}
+                                                    />
+                                                </div>
                                                 <Space>
                                                     <Tooltip title="脚本开发指南">
                                                         <Button
@@ -4695,6 +4706,7 @@ token=xyz789; Domain=api.example.com; Path=/api`}
                             dataSource={globalCookies}
                             rowKey="id"
                             pagination={false}
+                            scroll={{ y: 200 }}
                             columns={[
                                 { title: 'Name', dataIndex: 'name', key: 'name', width: 120, ellipsis: true },
                                 { title: 'Domain', dataIndex: 'domain', key: 'domain', width: 120, ellipsis: true },
@@ -4707,6 +4719,8 @@ token=xyz789; Domain=api.example.com; Path=/api`}
                                     ellipsis: true,
                                     render: (val: string) => val ? new Date(val).toLocaleString() : 'Session'
                                 },
+                                { title: 'SameSite', dataIndex: 'same_site', key: 'same_site', width: 80, ellipsis: true },
+                                { title: 'Priority', dataIndex: 'priority', key: 'priority', width: 80, ellipsis: true },
                                 {
                                     title: 'Action',
                                     key: 'action',
@@ -4733,6 +4747,14 @@ token=xyz789; Domain=api.example.com; Path=/api`}
                 onClose={() => setScriptHelpVisible(false)}
             />
 
+            <div className="app-footer">
+                <Button
+                    icon={<SafetyOutlined />}
+                    onClick={() => { setCookieModalVisible(true); loadGlobalCookies(); }}
+                >
+                    Cookie
+                </Button>
+            </div>
         </div>
     );
 }

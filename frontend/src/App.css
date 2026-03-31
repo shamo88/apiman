@@ -57,6 +57,45 @@ body,
     color: var(--text-primary);
 }
 
+.app-footer {
+    height: 28px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+    font-size: 11px;
+}
+
+.app-footer .ant-btn {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    font-size: 11px;
+    line-height: 1;
+    padding: 0;
+}
+
+.app-footer .ant-btn:hover {
+    border: none !important;
+    background: transparent !important;
+    outline: none !important;
+}
+
+.app-footer .ant-btn .anticon {
+    font-size: 12px;
+}
+
+.app-footer .ant-btn .ant-btn-icon {
+    margin-right: 0;
+}
+
+.app-footer .ant-btn span + span {
+    margin-left: 2px;
+}
+
 .app-header {
     height: 56px;
     background: var(--bg-secondary);
@@ -2713,6 +2752,11 @@ body,
 .theme-dark .app-container {
     background: var(--bg-primary);
     color: var(--text-primary);
+}
+
+.theme-dark .app-footer {
+    background: var(--bg-secondary);
+    border-top-color: var(--border-subtle);
 }
 
 .theme-dark .title-bar {

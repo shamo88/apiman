@@ -49,6 +49,7 @@ export interface ProjectScript {
     id: string;
     project_id: string;
     name: string;
+    description: string;
     path: string;
     content: string;
     created_at?: string;

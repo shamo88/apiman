@@ -180,12 +180,12 @@ func (a *App) ListProjectScripts(projectID string) ([]models.ProjectScript, erro
 	return a.service.ListProjectScripts(projectID)
 }
 
-func (a *App) CreateProjectScript(projectID, name, content string) (*models.ProjectScript, error) {
-	return a.service.CreateProjectScript(projectID, name, content)
+func (a *App) CreateProjectScript(projectID, name, description, content string) (*models.ProjectScript, error) {
+	return a.service.CreateProjectScript(projectID, name, description, content)
 }
 
-func (a *App) UpdateProjectScript(projectID, scriptID, name, content string) (*models.ProjectScript, error) {
-	return a.service.UpdateProjectScript(projectID, scriptID, name, content)
+func (a *App) UpdateProjectScript(projectID, scriptID, name, description, content string) (*models.ProjectScript, error) {
+	return a.service.UpdateProjectScript(projectID, scriptID, name, description, content)
 }
 
 func (a *App) DeleteProjectScript(projectID, scriptID string) error {

@@ -418,5 +418,9 @@ func (c *ConfigManager) DeleteGlobalCookie(id string) error {
 		}
 	}
 
-	return c.SaveGlobalCookies(cookies)
+	data, err = json.MarshalIndent(cookies, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(cookieFile, data, 0644)
 }

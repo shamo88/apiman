@@ -498,6 +498,7 @@ export namespace models {
 	    id: string;
 	    project_id: string;
 	    name: string;
+	    description: string;
 	    path: string;
 	    content: string;
 	    // Go type: time
@@ -514,6 +515,7 @@ export namespace models {
 	        this.id = source["id"];
 	        this.project_id = source["project_id"];
 	        this.name = source["name"];
+	        this.description = source["description"];
 	        this.path = source["path"];
 	        this.content = source["content"];
 	        this.created_at = this.convertValues(source["created_at"], null);

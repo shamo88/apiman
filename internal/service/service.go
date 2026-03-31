@@ -452,16 +452,16 @@ func (s *Service) ListProjectScripts(projectID string) ([]models.ProjectScript, 
 	return s.ProjectMgr.ListProjectScripts(projectID)
 }
 
-func (s *Service) CreateProjectScript(projectID, name, content string) (*models.ProjectScript, error) {
-	script, err := s.ProjectMgr.CreateProjectScript(projectID, name, content)
+func (s *Service) CreateProjectScript(projectID, name, description, content string) (*models.ProjectScript, error) {
+	script, err := s.ProjectMgr.CreateProjectScript(projectID, name, description, content)
 	if err == nil && s.shouldAutoSync() {
 		go s.SyncProjectToGit(projectID)
 	}
 	return script, err
 }
 
-func (s *Service) UpdateProjectScript(projectID, scriptID, name, content string) (*models.ProjectScript, error) {
-	script, err := s.ProjectMgr.UpdateProjectScript(projectID, scriptID, name, content)
+func (s *Service) UpdateProjectScript(projectID, scriptID, name, description, content string) (*models.ProjectScript, error) {
+	script, err := s.ProjectMgr.UpdateProjectScript(projectID, scriptID, name, description, content)
 	if err == nil && s.shouldAutoSync() {
 		// Wait 1 second before syncing to ensure file write is completed
 		go func() {
