@@ -4,6 +4,7 @@ import (
 	"apiman/internal/config"
 	"apiman/internal/curl"
 	"apiman/internal/git"
+	"apiman/internal/history"
 	"apiman/internal/models"
 	"apiman/internal/postman"
 	"apiman/internal/project"
@@ -23,6 +24,7 @@ type Service struct {
 	ScriptableExecutor  *curl.ScriptableExecutor
 	GlobalVarStore      *script.GlobalVariableStore
 	GitSyncMgr          *git.GitSyncManager
+	HistoryMgr          *history.HistoryManager
 	gitSyncMu           sync.Mutex // 防止并发 Git 操作
 }
 
@@ -36,6 +38,7 @@ func NewService() *Service {
 	globals, _ := cfgMgr.GetGlobalVariables()
 	globalVarStore := script.NewGlobalVariableStore(globals)
 	gitSyncMgr := git.NewGitSyncManager(cfgMgr.GetConfigDir())
+	historyMgr, _ := history.NewHistoryManager(cfgMgr.GetConfigDir())
 
 	return &Service{
 		ConfigManager:      cfgMgr,
@@ -45,6 +48,7 @@ func NewService() *Service {
 		ScriptableExecutor: scriptExec,
 		GlobalVarStore:     globalVarStore,
 		GitSyncMgr:         gitSyncMgr,
+		HistoryMgr:         historyMgr,
 	}
 }
 
@@ -114,6 +118,19 @@ func (s *Service) SaveGlobalVariables(variables map[string]string) error {
 
 func (s *Service) ListProjects() ([]models.Project, error) {
 	return s.ProjectMgr.ListProjects()
+}
+
+func (s *Service) GetProjectName(projectID string) (string, error) {
+	projects, err := s.ProjectMgr.ListProjects()
+	if err != nil {
+		return "", err
+	}
+	for _, p := range projects {
+		if p.ID == projectID {
+			return p.Name, nil
+		}
+	}
+	return "", nil
 }
 
 func (s *Service) CreateProject(name string) (*models.Project, error) {
@@ -320,6 +337,36 @@ func (s *Service) ExecuteHTTPRequest(spec models.HttpRequestSpec) (*models.CurlR
 	return s.CurlExecutor.ExecuteHTTPRequestWithProxy(&spec, proxyOpts)
 }
 
+// ExecuteHTTPRequestWithProject executes HTTP request and records history with project context.
+func (s *Service) ExecuteHTTPRequestWithProject(projectID, projectName, requestName, requestPath string, spec models.HttpRequestSpec) (*models.CurlResponse, error) {
+	// 注入全局 Cookie
+	spec = s.injectGlobalCookies(spec)
+
+	appCfg, err := s.ConfigManager.LoadAppConfig()
+	var resp *models.CurlResponse
+	if err != nil || appCfg == nil {
+		resp, err = s.CurlExecutor.ExecuteHTTPRequest(&spec)
+	} else {
+		proxyOpts := &curl.ProxyOptions{
+			Enabled:    appCfg.Proxy.Enabled,
+			HTTPHost:   appCfg.Proxy.HTTPHost,
+			HTTPPort:   appCfg.Proxy.HTTPPort,
+			HTTPSHost:  appCfg.Proxy.HTTPSHost,
+			HTTPSPort:  appCfg.Proxy.HTTPSPort,
+			SOCKS5Host: appCfg.Proxy.SOCKS5Host,
+			SOCKS5Port: appCfg.Proxy.SOCKS5Port,
+		}
+		resp, err = s.CurlExecutor.ExecuteHTTPRequestWithProxy(&spec, proxyOpts)
+	}
+
+	// 记录历史
+	if recordErr := s.RecordHistory(projectID, projectName, requestName, requestPath, spec, resp); recordErr != nil {
+		// 历史记录失败不影响主流程
+	}
+
+	return resp, err
+}
+
 // injectGlobalCookies loads global cookies and injects matching ones into the request spec.
 func (s *Service) injectGlobalCookies(spec models.HttpRequestSpec) models.HttpRequestSpec {
 	// 构建完整 URL（含 params）
@@ -481,11 +528,27 @@ func (s *Service) DeleteProjectScript(projectID, scriptID string) error {
 }
 
 func (s *Service) ExecuteHTTPRequestWithScripts(
-	projectID string,
+	projectID, projectName, requestName, requestPath string,
 	environmentID string,
 	spec models.HttpRequestSpec,
 	preScriptIDs []string,
 	postScriptIDs []string,
+) (*models.CurlResponse, error) {
+	return s.ExecuteHTTPRequestWithScriptsWithSource(
+		projectID, projectName, requestName, requestPath,
+		environmentID, spec, preScriptIDs, postScriptIDs,
+		models.HistorySourceGUI, "",
+	)
+}
+
+func (s *Service) ExecuteHTTPRequestWithScriptsWithSource(
+	projectID, projectName, requestName, requestPath string,
+	environmentID string,
+	spec models.HttpRequestSpec,
+	preScriptIDs []string,
+	postScriptIDs []string,
+	source models.HistorySourceType,
+	sourceTool string,
 ) (*models.CurlResponse, error) {
 	var preScriptContents, postScriptContents []string
 	var preScriptNames, postScriptNames []string
@@ -597,11 +660,16 @@ func (s *Service) ExecuteHTTPRequestWithScripts(
 		}, err
 	}
 
+	// 记录历史
+	if recordErr := s.RecordHistoryWithSource(projectID, projectName, requestName, requestPath, spec, resp, source, sourceTool); recordErr != nil {
+		// 历史记录失败不影响主流程
+	}
+
 	return resp, nil
 }
 
 func (s *Service) ExecuteHTTPRequestWithScriptsInline(
-	projectID string,
+	projectID, projectName, requestName, requestPath string,
 	environmentID string,
 	spec models.HttpRequestSpec,
 	preScript string,
@@ -668,6 +736,11 @@ func (s *Service) ExecuteHTTPRequestWithScriptsInline(
 		return &models.CurlResponse{
 			Error: err.Error(),
 		}, err
+	}
+
+	// 记录历史
+	if recordErr := s.RecordHistory(projectID, projectName, requestName, requestPath, spec, resp); recordErr != nil {
+		// 历史记录失败不影响主流程
 	}
 
 	return resp, nil
@@ -872,4 +945,69 @@ func (s *Service) AddGlobalCookies(rawCookies string) error {
 // DeleteGlobalCookie deletes a cookie by its ID.
 func (s *Service) DeleteGlobalCookie(id string) error {
 	return s.ConfigManager.DeleteGlobalCookie(id)
+}
+
+// ListHistory returns recent request history entries.
+func (s *Service) ListHistory(limit int) ([]models.HistoryEntry, error) {
+	if s.HistoryMgr == nil {
+		return []models.HistoryEntry{}, nil
+	}
+	return s.HistoryMgr.ListEntries(limit)
+}
+
+// SearchHistory searches request history with filter parameters.
+func (s *Service) SearchHistory(params models.HistorySearchParams, limit int) ([]models.HistoryEntry, error) {
+	if s.HistoryMgr == nil {
+		return []models.HistoryEntry{}, nil
+	}
+	return s.HistoryMgr.SearchEntries(params, limit)
+}
+
+// GetHistoryEntry returns a single history entry by ID.
+func (s *Service) GetHistoryEntry(id string) (*models.RequestHistory, error) {
+	if s.HistoryMgr == nil {
+		return nil, nil
+	}
+	return s.HistoryMgr.GetEntry(id)
+}
+
+// DeleteHistory deletes a history entry by ID.
+func (s *Service) DeleteHistory(id string) error {
+	if s.HistoryMgr == nil {
+		return nil
+	}
+	return s.HistoryMgr.DeleteEntry(id)
+}
+
+// ClearHistory clears all history entries.
+func (s *Service) ClearHistory() error {
+	if s.HistoryMgr == nil {
+		return nil
+	}
+	return s.HistoryMgr.ClearAll()
+}
+
+// RecordHistory saves a request execution to history.
+func (s *Service) RecordHistory(projectID, projectName, requestName, requestPath string, spec models.HttpRequestSpec, resp *models.CurlResponse) error {
+	return s.RecordHistoryWithSource(projectID, projectName, requestName, requestPath, spec, resp, models.HistorySourceGUI, "")
+}
+
+// RecordHistoryWithSource saves a request execution to history with source information.
+func (s *Service) RecordHistoryWithSource(projectID, projectName, requestName, requestPath string, spec models.HttpRequestSpec, resp *models.CurlResponse, source models.HistorySourceType, sourceTool string) error {
+	if s.HistoryMgr == nil {
+		return nil
+	}
+	entry := &models.RequestHistory{
+		Source:      source,
+		SourceTool:  sourceTool,
+		ProjectID:   projectID,
+		ProjectName: projectName,
+		RequestName: requestName,
+		RequestPath: requestPath,
+		Method:      spec.Method,
+		URL:         spec.HttpURL,
+		Spec:        spec,
+		Response:    resp,
+	}
+	return s.HistoryMgr.AddEntry(entry)
 }

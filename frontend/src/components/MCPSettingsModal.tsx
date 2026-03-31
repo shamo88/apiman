@@ -6,10 +6,16 @@ interface MCPConfig {
     enabled: boolean;
     port: number;
     project_id: string;
+    environment_id: string;
     api_key: string;
 }
 
 interface Project {
+    id: string;
+    name: string;
+}
+
+interface Environment {
     id: string;
     name: string;
 }
@@ -22,6 +28,8 @@ interface MCPSettingsModalProps {
     onSave: (config: MCPConfig) => Promise<void>;
     currentStatus: 'stopped' | 'running' | 'error';
     appTheme?: string;
+    environments: Environment[];
+    onLoadEnvironments: (projectId: string) => Promise<void>;
 }
 
 export const MCPSettingsModal: React.FC<MCPSettingsModalProps> = ({
@@ -32,6 +40,8 @@ export const MCPSettingsModal: React.FC<MCPSettingsModalProps> = ({
     onSave,
     currentStatus,
     appTheme = 'light',
+    environments,
+    onLoadEnvironments,
 }) => {
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
@@ -53,12 +63,26 @@ export const MCPSettingsModal: React.FC<MCPSettingsModalProps> = ({
     const handleSave = async () => {
         try {
             const values = await form.validateFields();
+
+            // If enabled, project and environment are required
+            if (values.enabled) {
+                if (!values.project_id) {
+                    message.error('启用 MCP 服务时，请选择项目');
+                    return;
+                }
+                if (!values.environment_id) {
+                    message.error('启用 MCP 服务时，请选择环境');
+                    return;
+                }
+            }
+
             setLoading(true);
 
             const config: MCPConfig = {
                 enabled: values.enabled,
                 port: values.port,
                 project_id: values.project_id,
+                environment_id: values.environment_id,
                 api_key: values.api_key,
             };
 
@@ -86,10 +110,21 @@ export const MCPSettingsModal: React.FC<MCPSettingsModalProps> = ({
                 enabled: mcpConfig.enabled ?? false,
                 port: mcpConfig.port ?? 3847,
                 project_id: mcpConfig.project_id || (projects.length > 0 ? projects[0].id : ''),
+                environment_id: mcpConfig.environment_id || '',
                 api_key: mcpConfig.api_key || '',
             });
+            // Load environments for the selected project
+            if (mcpConfig.project_id) {
+                onLoadEnvironments(mcpConfig.project_id);
+            }
         }
     }, [visible, mcpConfig, projects]);
+
+    // Handle project change to load environments
+    const handleProjectChange = (projectId: string) => {
+        form.setFieldValue('environment_id', '');
+        onLoadEnvironments(projectId);
+    };
 
     return (
         <Modal
@@ -145,10 +180,24 @@ export const MCPSettingsModal: React.FC<MCPSettingsModalProps> = ({
                     label="绑定项目"
                     extra="MCP 将绑定到该项目，提供 API 和脚本管理"
                 >
-                    <Select style={{ width: '100%' }} placeholder="选择项目">
+                    <Select style={{ width: '100%' }} placeholder="选择项目" onChange={handleProjectChange}>
                         {projects.map((p) => (
                             <Select.Option key={p.id} value={p.id}>
                                 {p.name}
+                            </Select.Option>
+                        ))}
+                    </Select>
+                </Form.Item>
+
+                <Form.Item
+                    name="environment_id"
+                    label="环境"
+                    extra="选择要使用的环境变量集合"
+                >
+                    <Select style={{ width: '100%' }} placeholder="选择环境" allowClear>
+                        {environments.map((env) => (
+                            <Select.Option key={env.id} value={env.id}>
+                                {env.name}
                             </Select.Option>
                         ))}
                     </Select>

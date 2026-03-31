@@ -149,6 +149,10 @@ func (a *App) ExecuteHTTPRequest(spec models.HttpRequestSpec) (*models.CurlRespo
 	return a.service.ExecuteHTTPRequest(spec)
 }
 
+func (a *App) ExecuteHTTPRequestWithProject(projectID, projectName, requestName, requestPath string, spec models.HttpRequestSpec) (*models.CurlResponse, error) {
+	return a.service.ExecuteHTTPRequestWithProject(projectID, projectName, requestName, requestPath, spec)
+}
+
 func (a *App) ExtractVariables(text string) []string {
 	return a.service.ExtractVariables(text)
 }
@@ -194,23 +198,23 @@ func (a *App) DeleteProjectScript(projectID, scriptID string) error {
 }
 
 func (a *App) ExecuteHTTPRequestWithScripts(
-	projectID string,
+	projectID, projectName, requestName, requestPath string,
 	environmentID string,
 	spec models.HttpRequestSpec,
 	preScriptIDs []string,
 	postScriptIDs []string,
 ) (*models.CurlResponse, error) {
-	return a.service.ExecuteHTTPRequestWithScripts(projectID, environmentID, spec, preScriptIDs, postScriptIDs)
+	return a.service.ExecuteHTTPRequestWithScripts(projectID, projectName, requestName, requestPath, environmentID, spec, preScriptIDs, postScriptIDs)
 }
 
 func (a *App) ExecuteHTTPRequestWithScriptsInline(
-	projectID string,
+	projectID, projectName, requestName, requestPath string,
 	environmentID string,
 	spec models.HttpRequestSpec,
 	preScript string,
 	postScript string,
 ) (*models.CurlResponse, error) {
-	return a.service.ExecuteHTTPRequestWithScriptsInline(projectID, environmentID, spec, preScript, postScript)
+	return a.service.ExecuteHTTPRequestWithScriptsInline(projectID, projectName, requestName, requestPath, environmentID, spec, preScript, postScript)
 }
 
 func (a *App) SyncProjectToGit(projectID string) error {
@@ -345,5 +349,30 @@ func (a *App) GetMCPStatus() string {
 // ListProjectsForMCP lists all projects for MCP configuration.
 func (a *App) ListProjectsForMCP() ([]models.Project, error) {
 	return a.service.ListProjects()
+}
+
+// ListHistory returns recent request history entries.
+func (a *App) ListHistory(limit int) ([]models.HistoryEntry, error) {
+	return a.service.ListHistory(limit)
+}
+
+// SearchHistory searches request history with filter parameters.
+func (a *App) SearchHistory(params models.HistorySearchParams, limit int) ([]models.HistoryEntry, error) {
+	return a.service.SearchHistory(params, limit)
+}
+
+// GetHistoryEntry returns a single history entry by ID.
+func (a *App) GetHistoryEntry(id string) (*models.RequestHistory, error) {
+	return a.service.GetHistoryEntry(id)
+}
+
+// DeleteHistory deletes a history entry by ID.
+func (a *App) DeleteHistory(id string) error {
+	return a.service.DeleteHistory(id)
+}
+
+// ClearHistory clears all history entries.
+func (a *App) ClearHistory() error {
+	return a.service.ClearHistory()
 }
 

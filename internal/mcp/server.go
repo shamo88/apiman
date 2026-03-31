@@ -27,7 +27,7 @@ func NewServer(svc *service.Service, cfg *config.MCPConfig) *Server {
 	return &Server{
 		svc:     svc,
 		config:  cfg,
-		handler: NewHandler(svc, cfg.ProjectID),
+		handler: NewHandler(svc, cfg.ProjectID, cfg.EnvironmentID),
 	}
 }
 
@@ -103,7 +103,7 @@ func (s *Server) IsRunning() bool {
 func (s *Server) UpdateConfig(cfg *config.MCPConfig) error {
 	s.mu.Lock()
 	s.config = cfg
-	s.handler = NewHandler(s.svc, cfg.ProjectID)
+	s.handler = NewHandler(s.svc, cfg.ProjectID, cfg.EnvironmentID)
 	s.mu.Unlock()
 
 	// If running, restart with new config
