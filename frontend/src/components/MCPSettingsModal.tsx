@@ -18,18 +18,20 @@ interface MCPSettingsModalProps {
     visible: boolean;
     onClose: () => void;
     projects: Project[];
-    onStartMCP: (config: MCPConfig) => void;
-    onStopMCP: () => void;
+    mcpConfig: MCPConfig;
+    onSave: (config: MCPConfig) => Promise<void>;
     currentStatus: 'stopped' | 'running' | 'error';
+    appTheme?: string;
 }
 
 export const MCPSettingsModal: React.FC<MCPSettingsModalProps> = ({
     visible,
     onClose,
     projects,
-    onStartMCP,
-    onStopMCP,
+    mcpConfig,
+    onSave,
     currentStatus,
+    appTheme = 'light',
 }) => {
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
@@ -54,25 +56,21 @@ export const MCPSettingsModal: React.FC<MCPSettingsModalProps> = ({
             setLoading(true);
 
             const config: MCPConfig = {
-                enabled: true,
+                enabled: values.enabled,
                 port: values.port,
                 project_id: values.project_id,
                 api_key: values.api_key,
             };
 
-            onStartMCP(config);
-            message.success('MCP Server 已启动');
+            await onSave(config);
+            message.success('配置已保存');
             onClose();
         } catch (error) {
             console.error('Validation failed:', error);
+            message.error('保存失败');
         } finally {
             setLoading(false);
         }
-    };
-
-    const handleStop = () => {
-        onStopMCP();
-        message.success('MCP Server 已停止');
     };
 
     const handleCopyUrl = () => {
@@ -83,10 +81,15 @@ export const MCPSettingsModal: React.FC<MCPSettingsModalProps> = ({
     };
 
     useEffect(() => {
-        if (visible && projects.length > 0 && !form.getFieldValue('project_id')) {
-            form.setFieldValue('project_id', projects[0].id);
+        if (visible && mcpConfig) {
+            form.setFieldsValue({
+                enabled: mcpConfig.enabled ?? false,
+                port: mcpConfig.port ?? 3847,
+                project_id: mcpConfig.project_id || (projects.length > 0 ? projects[0].id : ''),
+                api_key: mcpConfig.api_key || '',
+            });
         }
-    }, [visible, projects]);
+    }, [visible, mcpConfig, projects]);
 
     return (
         <Modal
@@ -95,23 +98,19 @@ export const MCPSettingsModal: React.FC<MCPSettingsModalProps> = ({
             onCancel={onClose}
             footer={
                 <Space>
-                    {currentStatus === 'running' ? (
-                        <Button danger onClick={handleStop}>
-                            停止服务
-                        </Button>
-                    ) : (
-                        <Button type="primary" onClick={handleSave} loading={loading}>
-                            保存并启动
-                        </Button>
-                    )}
+                    <Button type="primary" onClick={handleSave} loading={loading}>
+                        保存
+                    </Button>
                     <Button onClick={onClose}>取消</Button>
                 </Space>
             }
             width={520}
+            className={`mcp-modal theme-${appTheme}`}
         >
             <Form
                 form={form}
                 layout="vertical"
+                className="mcp-form"
                 initialValues={{
                     enabled: false,
                     port: 3847,
@@ -129,7 +128,6 @@ export const MCPSettingsModal: React.FC<MCPSettingsModalProps> = ({
                 <Form.Item
                     name="port"
                     label="端口"
-                    extra="MCP Server 监听的端口"
                 >
                     <Input
                         type="number"
@@ -147,7 +145,7 @@ export const MCPSettingsModal: React.FC<MCPSettingsModalProps> = ({
                     label="绑定项目"
                     extra="MCP 将绑定到该项目，提供 API 和脚本管理"
                 >
-                    <Select style={{ width: 300 }} placeholder="选择项目">
+                    <Select style={{ width: '100%' }} placeholder="选择项目">
                         {projects.map((p) => (
                             <Select.Option key={p.id} value={p.id}>
                                 {p.name}
@@ -160,8 +158,8 @@ export const MCPSettingsModal: React.FC<MCPSettingsModalProps> = ({
                     name="api_key"
                     label="API 密钥"
                     extra={
-                        <span>
-                            用于 AI 客户端认证Bearer Token 认证
+                        <span className="mcp-extra">
+                            AI 客户端认证 Bearer Token
                             <Button
                                 type="link"
                                 size="small"
@@ -175,7 +173,7 @@ export const MCPSettingsModal: React.FC<MCPSettingsModalProps> = ({
                     }
                 >
                     <Input.Password
-                        style={{ width: 300 }}
+                        style={{ width: '100%' }}
                         addonAfter={
                             <Button type="text" size="small" onClick={generateRandomKey}>
                                 随机生成
@@ -185,7 +183,7 @@ export const MCPSettingsModal: React.FC<MCPSettingsModalProps> = ({
                 </Form.Item>
 
                 {currentStatus === 'running' && (
-                    <div style={{ color: '#49cc90', marginTop: 16 }}>
+                    <div className="mcp-status-running">
                         <ApiOutlined /> MCP Server 运行中
                     </div>
                 )}

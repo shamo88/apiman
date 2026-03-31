@@ -295,7 +295,7 @@ func (a *App) SaveMCPConfig(cfg *config.MCPConfig) error {
 	return a.service.SaveAppConfig(appCfg)
 }
 
-// StartMCP starts the MCP server.
+// StartMCP starts the MCP server with current config.
 func (a *App) StartMCP() error {
 	cfg, err := a.LoadMCPConfig()
 	if err != nil {
@@ -314,9 +314,12 @@ func (a *App) StartMCP() error {
 		}
 	}
 
-	if mcpServer == nil {
-		mcpServer = mcp.NewServer(a.service, cfg)
+	// Stop existing server if running
+	if mcpServer != nil && mcpServer.IsRunning() {
+		mcpServer.Stop()
 	}
+
+	mcpServer = mcp.NewServer(a.service, cfg)
 	return mcpServer.Start()
 }
 

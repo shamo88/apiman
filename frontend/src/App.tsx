@@ -2137,16 +2137,24 @@ function App() {
         }
     };
 
-    const handleStartMCP = async (config: any) => {
+    const handleSaveMCPConfig = async (config: any) => {
         try {
+            // Save config first
             await SaveMCPConfig(config);
-            await StartMCP();
-            setMCPStatus('running');
             setMCPConfig(config);
+
+            // Then start or stop based on enabled flag
+            if (config.enabled) {
+                await StartMCP();
+                setMCPStatus('running');
+            } else {
+                await StopMCP();
+                setMCPStatus('stopped');
+            }
         } catch (err) {
-            console.error('Failed to start MCP:', err);
+            console.error('Failed to save MCP config:', err);
             setMCPStatus('error');
-            message.error('启动 MCP 失败');
+            throw err;
         }
     };
 
@@ -4804,9 +4812,10 @@ token=xyz789; Domain=api.example.com; Path=/api`}
                 visible={mcpModalVisible}
                 onClose={() => setMCpModalVisible(false)}
                 projects={projects}
-                onStartMCP={handleStartMCP}
-                onStopMCP={handleStopMCP}
+                mcpConfig={mcpConfig}
+                onSave={handleSaveMCPConfig}
                 currentStatus={mcpStatus}
+                appTheme={appTheme}
             />
 
             <div className="app-footer">
@@ -4821,7 +4830,7 @@ token=xyz789; Domain=api.example.com; Path=/api`}
                     className={`mcp-status ${mcpStatus}`}
                     onClick={() => { setMCpModalVisible(true); }}
                 >
-                    {mcpStatus === 'running' ? '●' : ''} MCP {mcpStatus === 'running' ? '运行中' : ''}
+                    {mcpStatus === 'running' ? 'MCP 运行中' : 'MCP'}
                 </Button>
             </div>
         </div>
