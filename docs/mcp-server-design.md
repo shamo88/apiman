@@ -570,8 +570,8 @@ func ensureMCPProject(service *Service, config *MCPConfig) error {
 ## 实现步骤
 
 ### Phase 1: 数据层
-- [ ] `config/config.go` - 新增 `MCPConfig` 结构体和 Load/Save 方法
-- [ ] `models/models.go` - 新增 MCP 相关类型
+- [x] `config/config.go` - 新增 `MCPConfig` 结构体和 Load/Save 方法
+- [x] `models/models.go` - 新增 MCP 相关类型
 
 ### Phase 2: MCP 协议层
 - [x] `internal/mcp/types.go` - MCP 协议类型定义
@@ -586,17 +586,16 @@ func ensureMCPProject(service *Service, config *MCPConfig) error {
 - [x] `mcp_create_folder` - 创建文件夹
 
 ### Phase 3: 服务集成
-- [ ] `app.go` - 新增 MCP 相关方法
-- [ ] `main.go` - 启动时根据配置恢复 MCP 状态
+- [x] `app.go` - 新增 MCP 相关方法
+- [x] `main.go` - 启动时根据配置恢复 MCP 状态
 
 ### Phase 4: 前端
-- [ ] `App.css` - MCP 底栏按钮样式
-- [ ] `App.tsx` - 底栏按钮 + 状态管理
-- [ ] `components/MCPSettingsModal.tsx` - 设置弹窗组件
+- [x] `App.css` - MCP 底栏按钮样式
+- [x] `App.tsx` - 底栏按钮 + 状态管理
+- [x] `components/MCPSettingsModal.tsx` - 设置弹窗组件
 
 ### Phase 5: 测试
-- [ ] MCP 协议测试
-- [ ] Claude Code 集成测试
+- [x] MCP 协议测试（已通过 Claude Code 调用验证）
 
 ---
 
