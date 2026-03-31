@@ -96,6 +96,19 @@ body,
     margin-left: 2px;
 }
 
+/* MCP status indicator */
+.app-footer .mcp-status {
+    color: var(--text-secondary);
+}
+
+.app-footer .mcp-status.running {
+    color: #49cc90;
+}
+
+.app-footer .mcp-status.error {
+    color: #f93e3e;
+}
+
 .app-header {
     height: 56px;
     background: var(--bg-secondary);

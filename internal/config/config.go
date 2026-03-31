@@ -269,10 +269,18 @@ type GitSyncConfig struct {
 	WorkDir   string `json:"workDir,omitempty"` // 当前工作目录路径
 }
 
+type MCPConfig struct {
+	Enabled   bool   `json:"enabled"`
+	Port     int    `json:"port"`
+	ProjectID string `json:"project_id"`
+	APIKey   string `json:"api_key"`
+}
+
 type AppConfig struct {
 	Proxy    ProxyConfig    `json:"proxy"`
 	UI       UIConfig      `json:"ui"`
 	GitSync  GitSyncConfig `json:"gitSync"`
+	MCP      MCPConfig     `json:"mcp"`
 }
 
 type UIConfig struct {
@@ -312,6 +320,10 @@ func (c *ConfigManager) LoadAppConfig() (*AppConfig, error) {
 	}
 	if config.GitSync.Branch == "" {
 		config.GitSync.Branch = "main"
+	}
+	// MCP defaults
+	if config.MCP.Port == 0 {
+		config.MCP.Port = 3847
 	}
 
 	// Deobfuscate password/token when loading

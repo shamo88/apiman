@@ -7,11 +7,12 @@ import type { UploadProps } from 'antd';
 import { Button, Card, Checkbox, Col, Divider, Dropdown, Empty, Input, InputRef, message, Modal, Radio, Row, Select, Space, Spin, Table, Tabs, Tooltip, Upload } from 'antd';
 import type { DataNode } from 'antd/es/tree';
 import React, { useEffect, useState } from 'react';
-import { AddGlobalCookies, AddRequestCase, CopyRequest, CreateEnvironment, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteEnvironment, DeleteFolder, DeleteGlobalCookie, DeleteProject, DeleteProjectScript, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, ListProjectScripts, LoadAppConfig, LoadEnvironments, LoadGlobalCookies, MoveFolder, MoveRequest, PullGitRepo, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, SaveAppConfig, SaveGlobalCookies, UpdateEnvironment, UpdateProjectScript, UpdateRequest, UpdateRequestScripts } from '../wailsjs/go/main/App';
+import { AddGlobalCookies, AddRequestCase, CopyRequest, CreateEnvironment, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteEnvironment, DeleteFolder, DeleteGlobalCookie, DeleteProject, DeleteProjectScript, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, ListProjectScripts, LoadAppConfig, LoadEnvironments, LoadGlobalCookies, MoveFolder, MoveRequest, PullGitRepo, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, SaveAppConfig, SaveGlobalCookies, UpdateEnvironment, UpdateProjectScript, UpdateRequest, UpdateRequestScripts, LoadMCPConfig, SaveMCPConfig, StartMCP, StopMCP, GetMCPStatus } from '../wailsjs/go/main/App';
 import { models } from '../wailsjs/go/models';
 import './App.css';
 import { ScriptHelpWindow } from './components/ScriptHelpWindow';
 import { TitleBar } from './components/TitleBar';
+import { MCPSettingsModal } from './components/MCPSettingsModal';
 
 interface Project {
     id: string;
@@ -768,6 +769,9 @@ function App() {
     const [cookieModalVisible, setCookieModalVisible] = useState(false);
     const [cookieInput, setCookieInput] = useState('');
     const [globalCookies, setGlobalCookies] = useState<any[]>([]);
+    const [mcpModalVisible, setMCpModalVisible] = useState(false);
+    const [mcpConfig, setMCPConfig] = useState<any>({ enabled: false, port: 3847, project_id: '', api_key: '' });
+    const [mcpStatus, setMCPStatus] = useState<'stopped' | 'running' | 'error'>('stopped');
     const [projectTabs, setProjectTabs] = useState<ProjectTab[]>([]);
     const [activeTab, setActiveTab] = useState<string>('home');
     const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
@@ -1778,6 +1782,8 @@ function App() {
             loadProjects();
             loadUiConfig();
             loadProjectGroupsState();
+            loadMCPStatus();
+            loadMCPConfig();
         };
         init();
     }, []);
@@ -2108,6 +2114,53 @@ function App() {
         setCreateGroupModal(false);
         setNewGroupName('');
         message.success('分组创建成功');
+    };
+
+    const loadMCPStatus = async () => {
+        try {
+            const status = await GetMCPStatus();
+            setMCPStatus(status as 'stopped' | 'running' | 'error');
+        } catch (err) {
+            console.error('Failed to get MCP status:', err);
+            setMCPStatus('stopped');
+        }
+    };
+
+    const loadMCPConfig = async () => {
+        try {
+            const config = await LoadMCPConfig();
+            if (config) {
+                setMCPConfig(config);
+            }
+        } catch (err) {
+            console.error('Failed to load MCP config:', err);
+        }
+    };
+
+    const handleStartMCP = async (config: any) => {
+        try {
+            await SaveMCPConfig(config);
+            await StartMCP();
+            setMCPStatus('running');
+            setMCPConfig(config);
+        } catch (err) {
+            console.error('Failed to start MCP:', err);
+            setMCPStatus('error');
+            message.error('启动 MCP 失败');
+        }
+    };
+
+    const handleStopMCP = async () => {
+        try {
+            await StopMCP();
+            setMCPStatus('stopped');
+            const config = { ...mcpConfig, enabled: false };
+            await SaveMCPConfig(config);
+            setMCPConfig(config);
+        } catch (err) {
+            console.error('Failed to stop MCP:', err);
+            message.error('停止 MCP 失败');
+        }
     };
 
     const loadGlobalCookies = async () => {
@@ -4747,12 +4800,28 @@ token=xyz789; Domain=api.example.com; Path=/api`}
                 onClose={() => setScriptHelpVisible(false)}
             />
 
+            <MCPSettingsModal
+                visible={mcpModalVisible}
+                onClose={() => setMCpModalVisible(false)}
+                projects={projects}
+                onStartMCP={handleStartMCP}
+                onStopMCP={handleStopMCP}
+                currentStatus={mcpStatus}
+            />
+
             <div className="app-footer">
                 <Button
                     icon={<SafetyOutlined />}
                     onClick={() => { setCookieModalVisible(true); loadGlobalCookies(); }}
                 >
                     Cookie
+                </Button>
+                <Button
+                    icon={<ApiOutlined />}
+                    className={`mcp-status ${mcpStatus}`}
+                    onClick={() => { setMCpModalVisible(true); }}
+                >
+                    {mcpStatus === 'running' ? '●' : ''} MCP {mcpStatus === 'running' ? '运行中' : ''}
                 </Button>
             </div>
         </div>

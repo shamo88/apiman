@@ -167,3 +167,41 @@ type TestResult struct {
 	Message  string `json:"message,omitempty"`
 	Duration int64  `json:"duration"`
 }
+
+// MCPAPIInfo represents an API item in the project tree (for MCP).
+type MCPAPIInfo struct {
+	ID       string         `json:"id"`
+	Name     string         `json:"name"`
+	Method   string         `json:"method,omitempty"`
+	URL      string         `json:"url,omitempty"`
+	Path     string         `json:"path,omitempty"`
+	Children []*MCPAPIInfo  `json:"children,omitempty"`
+}
+
+// MCPScriptInfo represents a script's metadata (for MCP list_scripts).
+type MCPScriptInfo struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// MCPRequestDetail represents full request details (for MCP get_request).
+type MCPRequestDetail struct {
+	ID          string               `json:"id"`
+	Name        string               `json:"name"`
+	Method      string               `json:"method"`
+	URL         string               `json:"url"`
+	Headers     []RequestKeyVal      `json:"headers"`
+	Params      []RequestKeyVal      `json:"params"`
+	Body        string               `json:"body"`
+	BodyType    string               `json:"body_type"`
+	PreScripts  []string             `json:"pre_scripts"`
+	PostScripts []string             `json:"post_scripts"`
+	Cases       []HttpRequestCase    `json:"cases"`
+}
+
+// MCPCaseData represents case creation input (for MCP create_case).
+type MCPCaseData struct {
+	Name string            `json:"name"`
+	Spec HttpRequestSpec  `json:"spec"`
+}

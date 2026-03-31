@@ -102,6 +102,10 @@ export function GetGlobalVariables() {
   return window['go']['main']['App']['GetGlobalVariables']();
 }
 
+export function GetMCPStatus() {
+  return window['go']['main']['App']['GetMCPStatus']();
+}
+
 export function GetProjectTree(arg1) {
   return window['go']['main']['App']['GetProjectTree'](arg1);
 }
@@ -134,6 +138,10 @@ export function ListProjects() {
   return window['go']['main']['App']['ListProjects']();
 }
 
+export function ListProjectsForMCP() {
+  return window['go']['main']['App']['ListProjectsForMCP']();
+}
+
 export function LoadAppConfig() {
   return window['go']['main']['App']['LoadAppConfig']();
 }
@@ -144,6 +152,10 @@ export function LoadEnvironments(arg1) {
 
 export function LoadGlobalCookies() {
   return window['go']['main']['App']['LoadGlobalCookies']();
+}
+
+export function LoadMCPConfig() {
+  return window['go']['main']['App']['LoadMCPConfig']();
 }
 
 export function LoadProjectGroupsState() {
@@ -194,8 +206,20 @@ export function SaveGlobalVariables(arg1) {
   return window['go']['main']['App']['SaveGlobalVariables'](arg1);
 }
 
+export function SaveMCPConfig(arg1) {
+  return window['go']['main']['App']['SaveMCPConfig'](arg1);
+}
+
 export function SaveProjectGroupsState(arg1) {
   return window['go']['main']['App']['SaveProjectGroupsState'](arg1);
+}
+
+export function StartMCP() {
+  return window['go']['main']['App']['StartMCP']();
+}
+
+export function StopMCP() {
+  return window['go']['main']['App']['StopMCP']();
 }
 
 export function SyncAllProjectsToGit() {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"apiman/internal/config"
+	"apiman/internal/mcp"
 	"apiman/internal/models"
 	"apiman/internal/project"
 	"apiman/internal/service"
@@ -270,5 +271,76 @@ func (a *App) AddGlobalCookies(rawCookies string) error {
 // DeleteGlobalCookie deletes a cookie by its ID.
 func (a *App) DeleteGlobalCookie(id string) error {
 	return a.service.DeleteGlobalCookie(id)
+}
+
+// MCP Server instance (set from main.go)
+var mcpServer *mcp.Server
+
+// LoadMCPConfig loads the MCP configuration.
+func (a *App) LoadMCPConfig() (*config.MCPConfig, error) {
+	cfg, err := a.service.LoadAppConfig()
+	if err != nil {
+		return nil, err
+	}
+	return &cfg.MCP, nil
+}
+
+// SaveMCPConfig saves the MCP configuration.
+func (a *App) SaveMCPConfig(cfg *config.MCPConfig) error {
+	appCfg, err := a.service.LoadAppConfig()
+	if err != nil {
+		appCfg = &config.AppConfig{}
+	}
+	appCfg.MCP = *cfg
+	return a.service.SaveAppConfig(appCfg)
+}
+
+// StartMCP starts the MCP server.
+func (a *App) StartMCP() error {
+	cfg, err := a.LoadMCPConfig()
+	if err != nil {
+		return err
+	}
+
+	// Ensure project exists
+	if cfg.ProjectID == "" {
+		project, err := a.service.CreateProject("MCP Default Project")
+		if err != nil {
+			return err
+		}
+		cfg.ProjectID = project.ID
+		if err := a.SaveMCPConfig(cfg); err != nil {
+			return err
+		}
+	}
+
+	if mcpServer == nil {
+		mcpServer = mcp.NewServer(a.service, cfg)
+	}
+	return mcpServer.Start()
+}
+
+// StopMCP stops the MCP server.
+func (a *App) StopMCP() error {
+	if mcpServer != nil {
+		return mcpServer.Stop()
+	}
+	return nil
+}
+
+// GetMCPStatus returns the MCP server status.
+func (a *App) GetMCPStatus() string {
+	if mcpServer == nil {
+		return "stopped"
+	}
+	if mcpServer.IsRunning() {
+		return "running"
+	}
+	return "stopped"
+}
+
+// ListProjectsForMCP lists all projects for MCP configuration.
+func (a *App) ListProjectsForMCP() ([]models.Project, error) {
+	return a.service.ListProjects()
 }
 
