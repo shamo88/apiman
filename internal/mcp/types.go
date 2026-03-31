@@ -83,3 +83,24 @@ type MCPCreateCaseResponse struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
+
+// Create Request Response
+
+type MCPCreateRequestResponse struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// Create Folder Response
+
+type MCPCreateFolderResponse struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// Update Case Response
+
+type MCPUpdateCaseResponse struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}

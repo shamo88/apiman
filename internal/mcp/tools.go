@@ -68,6 +68,88 @@ func GetToolDefinitions() []MCPTool {
 			},
 		},
 		{
+			Name:        "mcp_update_case",
+			Description: "Update an existing test case for a specific request.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "Request path in format 'request|project-id|request-id'",
+					},
+					"case_id": map[string]interface{}{
+						"type":        "string",
+						"description": "The ID of the case to update",
+					},
+					"case_data": map[string]interface{}{
+						"type": "object",
+						"properties": map[string]interface{}{
+							"name": map[string]interface{}{
+								"type": "string",
+							},
+							"spec": map[string]interface{}{
+								"type": "object",
+								"properties": map[string]interface{}{
+									"method":    map[string]interface{}{"type": "string"},
+									"http_url":   map[string]interface{}{"type": "string"},
+									"headers":    map[string]interface{}{"type": "array"},
+									"params":     map[string]interface{}{"type": "array"},
+									"body":       map[string]interface{}{"type": "string"},
+									"body_type":  map[string]interface{}{"type": "string"},
+								},
+							},
+						},
+					},
+				},
+				"required": []string{"path", "case_id", "case_data"},
+			},
+		},
+		{
+			Name:        "mcp_create_request",
+			Description: "Create a new API request in the bound project.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"parent_id": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional parent folder ID. If not specified, creates at root level.",
+					},
+					"spec": map[string]interface{}{
+						"type": "object",
+						"properties": map[string]interface{}{
+							"name":      map[string]interface{}{"type": "string"},
+							"method":    map[string]interface{}{"type": "string"},
+							"http_url":  map[string]interface{}{"type": "string"},
+							"headers":   map[string]interface{}{"type": "array"},
+							"params":    map[string]interface{}{"type": "array"},
+							"body":      map[string]interface{}{"type": "string"},
+							"body_type": map[string]interface{}{"type": "string"},
+						},
+						"required": []string{"name", "method", "http_url"},
+					},
+				},
+				"required": []string{"spec"},
+			},
+		},
+		{
+			Name:        "mcp_create_folder",
+			Description: "Create a new folder in the bound project.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"parent_id": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional parent folder ID. If not specified, creates at root level.",
+					},
+					"name": map[string]interface{}{
+						"type":        "string",
+						"description": "The name of the folder to create",
+					},
+				},
+				"required": []string{"name"},
+			},
+		},
+		{
 			Name:        "mcp_execute_request",
 			Description: "Execute an HTTP request by its path. Optionally specify a case_id to use that test case, and pre/post script IDs for script execution.",
 			InputSchema: map[string]interface{}{

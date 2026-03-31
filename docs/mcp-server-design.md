@@ -119,8 +119,11 @@ type MCPCaseData struct {
 |--------|------|------|------|
 | `mcp_list_apis` | 查询项目下所有接口（含多级目录） | `{}` | `{folders: [], requests: []}` |
 | `mcp_list_scripts` | 查询项目下所有脚本 | `{}` | `MCPScriptInfo[]` |
+| `mcp_create_request` | 创建接口 | `{parent_id?, spec}` | `{id, name}` |
 | `mcp_get_request` | 获取请求详情（包含脚本） | `{path: string}` | `MCPRequestDetail` |
 | `mcp_create_case` | 创建接口用例 | `{path, case_data}` | `{id, name}` |
+| `mcp_update_case` | 更新接口用例 | `{path, case_id, case_data}` | `{id, name}` |
+| `mcp_create_folder` | 创建文件夹 | `{parent_id?, name}` | `{id, name}` |
 | `mcp_execute_request` | 执行 HTTP 请求 | `{path, case_id?}` | `CurlResponse` |
 | `mcp_execute_raw` | 执行原始 HTTP 请求 | `HttpRequestSpec` | `CurlResponse` |
 
@@ -174,7 +177,35 @@ type MCPCaseData struct {
 ]
 ```
 
-#### 3. mcp_get_request
+#### 3. mcp_create_request
+
+在绑定项目中创建新接口。
+
+**输入：**
+```json
+{
+  "parent_id": "folder-uuid",  // 可选，指定父文件夹 ID，不填则创建在根目录
+  "spec": {
+    "name": "登录接口",
+    "method": "POST",
+    "http_url": "{{baseUrl}}/api/login",
+    "headers": [{"key": "Content-Type", "value": "application/json", "enabled": true}],
+    "params": [],
+    "body": "{\"username\": \"{{username}}\", \"password\": \"{{password}}\"}",
+    "body_type": "raw"
+  }
+}
+```
+
+**输出：**
+```json
+{
+  "id": "new-request-uuid",
+  "name": "登录接口"
+}
+```
+
+#### 4. mcp_get_request
 
 获取请求的完整详情。
 
@@ -207,7 +238,7 @@ type MCPCaseData struct {
 }
 ```
 
-#### 4. mcp_create_case
+#### 5. mcp_create_case
 
 为指定请求创建新用例。
 
@@ -235,7 +266,58 @@ type MCPCaseData struct {
 }
 ```
 
-#### 5. mcp_execute_request
+#### 6. mcp_update_case
+
+更新指定请求的已有用例。
+
+**输入：**
+```json
+{
+  "path": "request|project-id|request-id",
+  "case_id": "case-uuid",
+  "case_data": {
+    "name": "更新后的用例名",
+    "spec": {
+      "method": "POST",
+      "http_url": "{{baseUrl}}/api/login",
+      "headers": [{"key": "Content-Type", "value": "application/json", "enabled": true}],
+      "body": "{\"username\": \"admin\", \"password\": \"right\"}",
+      "params": [],
+      "body_type": "raw"
+    }
+  }
+}
+```
+
+**输出：**
+```json
+{
+  "id": "case-uuid",
+  "name": "更新后的用例名"
+}
+```
+
+#### 7. mcp_create_folder
+
+在绑定项目中创建新文件夹。
+
+**输入：**
+```json
+{
+  "parent_id": "folder-uuid",  // 可选，指定父文件夹 ID，不填则创建在根目录
+  "name": "用户模块"
+}
+```
+
+**输出：**
+```json
+{
+  "id": "new-folder-uuid",
+  "name": "用户模块"
+}
+```
+
+#### 8. mcp_execute_request
 
 执行指定请求（支持选择用例）。
 
@@ -261,7 +343,7 @@ type MCPCaseData struct {
 }
 ```
 
-#### 6. mcp_execute_raw
+#### 9. mcp_execute_raw
 
 执行原始 HTTP 请求（不依赖已保存的请求）。
 
@@ -492,11 +574,16 @@ func ensureMCPProject(service *Service, config *MCPConfig) error {
 - [ ] `models/models.go` - 新增 MCP 相关类型
 
 ### Phase 2: MCP 协议层
-- [ ] `internal/mcp/types.go` - MCP 协议类型定义
-- [ ] `internal/mcp/tools.go` - 工具定义
-- [ ] `internal/mcp/middleware.go` - API Key 认证中间件
-- [ ] `internal/mcp/handler.go` - 工具调用 → service 映射
-- [ ] `internal/mcp/server.go` - HTTP Streamable Server 主循环
+- [x] `internal/mcp/types.go` - MCP 协议类型定义
+- [x] `internal/mcp/tools.go` - 工具定义
+- [x] `internal/mcp/middleware.go` - API Key 认证中间件
+- [x] `internal/mcp/handler.go` - 工具调用 → service 映射
+- [x] `internal/mcp/server.go` - HTTP Streamable Server 主循环
+
+### Phase 2.1: 新增工具实现
+- [x] `mcp_update_case` - 更新接口用例
+- [x] `mcp_create_request` - 创建接口
+- [x] `mcp_create_folder` - 创建文件夹
 
 ### Phase 3: 服务集成
 - [ ] `app.go` - 新增 MCP 相关方法
