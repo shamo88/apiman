@@ -1,5 +1,5 @@
 import React from 'react';
-import { getStatusColor } from '../utils/ui';
+import { getStatusColor } from '../../utils/ui';
 
 interface ResponseStatusProps {
     statusCode: number;

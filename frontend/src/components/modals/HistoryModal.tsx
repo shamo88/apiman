@@ -2,8 +2,8 @@ import React, { useEffect } from 'react';
 import { Modal, Table, Button, Input, Select, Row, Col } from 'antd';
 import { JsonView, darkStyles, allExpanded } from 'react-json-view-lite';
 import 'react-json-view-lite/dist/index.css';
-import { ClearHistory, GetHistoryEntry, SearchHistory, ListHistory } from '../../wailsjs/go/main/App';
-import { getMethodColor, getStatusColor } from '../utils/ui';
+import { ClearHistory, GetHistoryEntry, SearchHistory, ListHistory } from '../../../wailsjs/go/main/App';
+import { getMethodColor, getStatusColor } from '../../utils/ui';
 
 interface HistoryModalProps {
     visible: boolean;

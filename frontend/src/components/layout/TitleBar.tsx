@@ -1,9 +1,9 @@
 import { AppstoreOutlined, CloseOutlined, GithubOutlined, GlobalOutlined, InfoCircleOutlined, MinusOutlined, SettingOutlined } from '@ant-design/icons';
 import { Button, Col, Divider, Form, Input, InputNumber, message, Modal, Radio, Row, Select, Space, Switch, Tabs } from 'antd';
 import React from 'react';
-import { DisableGitSync, EnableGitSync, InitGitRepo, InitProjectsDir, LoadAppConfig, SaveAppConfig, SyncAllProjectsToGit } from '../../wailsjs/go/main/App';
-import { config as wailsConfig } from '../../wailsjs/go/models';
-import { Quit, WindowMinimise, WindowToggleMaximise } from '../../wailsjs/runtime/runtime';
+import { DisableGitSync, EnableGitSync, InitGitRepo, InitProjectsDir, LoadAppConfig, SaveAppConfig, SyncAllProjectsToGit } from '../../../wailsjs/go/main/App';
+import { config as wailsConfig } from '../../../wailsjs/go/models';
+import { Quit, WindowMinimise, WindowToggleMaximise } from '../../../wailsjs/runtime/runtime';
 
 interface TitleBarProps {
     title?: string;

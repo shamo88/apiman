@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getVariableSuggestions, renderHighlightedVariableHtml, setCaretOffset, getCaretOffset, builtInGenerators } from '../utils/variableUtils';
+import { getVariableSuggestions, renderHighlightedVariableHtml, setCaretOffset, getCaretOffset, builtInGenerators } from '../../utils/variableUtils';
 
 interface VariableEditableInputProps {
     value: string;

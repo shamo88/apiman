@@ -1,8 +1,6 @@
 import { ApiOutlined, CloseOutlined, CopyOutlined, DownOutlined, EditOutlined, ExperimentOutlined, FileOutlined, FolderOutlined, HomeOutlined, ImportOutlined, MoreOutlined, PlusOutlined, ProjectOutlined, QuestionCircleOutlined, RightOutlined, SearchOutlined, EnvironmentOutlined, CodeOutlined, SafetyOutlined, FileTextOutlined } from '@ant-design/icons';
 import { javascript } from '@codemirror/lang-javascript';
 import CodeMirror from '@uiw/react-codemirror';
-import { JsonView, darkStyles, allExpanded } from 'react-json-view-lite';
-import 'react-json-view-lite/dist/index.css';
 import type { UploadProps } from 'antd';
 import { Button, Card, Checkbox, Col, Divider, Dropdown, Empty, Input, InputRef, message, Modal, Radio, Row, Select, Space, Spin, Table, Tabs, Tooltip, Upload } from 'antd';
 import type { DataNode } from 'antd/es/tree';
@@ -10,30 +8,12 @@ import React, { useEffect, useState } from 'react';
 import { AddGlobalCookies, AddRequestCase, CopyRequest, CreateEnvironment, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteEnvironment, DeleteFolder, DeleteGlobalCookie, DeleteProject, DeleteProjectScript, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts, ExecuteHTTPRequestWithProject, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, ListProjectScripts, LoadAppConfig, LoadEnvironments, LoadGlobalCookies, MoveFolder, MoveRequest, PullGitRepo, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, SaveAppConfig, SaveGlobalCookies, UpdateEnvironment, UpdateProjectScript, UpdateRequest, UpdateRequestScripts, LoadMCPConfig, SaveMCPConfig, StartMCP, StopMCP, GetMCPStatus, ListHistory, GetHistoryEntry, DeleteHistory, ClearHistory, SearchHistory } from '../wailsjs/go/main/App';
 import { models } from '../wailsjs/go/models';
 import './App.css';
-import { ScriptHelpWindow } from './components/ScriptHelpWindow';
-import { TitleBar } from './components/TitleBar';
-import { MCPSettingsModal } from './components/MCPSettingsModal';
-import { HistoryModal } from './components/HistoryModal';
-import { CookieModal } from './components/CookieModal';
-import { AddCaseModal, RenameCaseModal } from './components/CaseModal';
-import { CreateFolderModal, CreateRequestModal, RenameModal } from './components/CreateModal';
-import { CreateProjectModal, CreateGroupModal, RenameProjectModal, RenameGroupModal } from './components/ProjectModal';
-import { AppFooter } from './components/AppFooter';
-import { VariableEditableInput } from './components/VariableEditableInput';
-import { SidebarMenuHeader } from './components/SidebarMenuHeader';
-import { RequestTabsBar } from './components/RequestTabsBar';
-import { ApiListFilters } from './components/ApiListFilters';
-import { SidebarList } from './components/SidebarList';
-import { ResponseCookies } from './components/ResponseCookies';
-import { ResponseHeaders } from './components/ResponseHeaders';
-import { ResponseStatus } from './components/ResponseStatus';
-import { EmptyState } from './components/EmptyState';
-import { MethodSelector } from './components/MethodSelector';
-import { BodyTypeSelector } from './components/BodyTypeSelector';
-import { ScriptEditor } from './components/ScriptEditor';
-import { ProjectSearchBar } from './components/ProjectSearchBar';
-import { EnvironmentVarEditor } from './components/EnvironmentVarRow';
-import { KeyValueEditor } from './components/KeyValueEditor';
+import { ScriptHelpWindow, TitleBar } from './components/layout';
+import { MCPSettingsModal, HistoryModal, CookieModal, AddCaseModal, RenameCaseModal, CreateFolderModal, CreateRequestModal, RenameModal, CreateProjectModal, CreateGroupModal, RenameProjectModal, RenameGroupModal } from './components/modals';
+import { AppFooter, EmptyState, EnvironmentVarEditor, ProjectSearchBar } from './components/home';
+import { SidebarMenuHeader, RequestTabsBar, ApiListFilters, SidebarList } from './components/sidebar';
+import { ResponseCookies, ResponseHeaders, ResponseStatus, ResponseBodyViewer } from './components/response';
+import { MethodSelector, BodyTypeSelector, ScriptEditor, ScriptBindingList, KeyValueEditor, ApiRequestBar, VariableEditableInput } from './components/request';
 
 interface Project {
     id: string;
@@ -3646,24 +3626,16 @@ function App() {
                                                 : `当前用例：${requestCases.find((c) => c.id === activeCaseId)?.name ?? '—'}`}
                                         </div>
                                     )}
-                                    <div className="api-request-bar">
-                                        <MethodSelector
-                                            value={apiConfig.method}
-                                            onChange={(value) => setApiConfig({ ...apiConfig, method: value })}
-                                        />
-                                        {renderVariableAwareInput(
-                                            apiConfig.url,
-                                            (value) => setApiConfig({ ...apiConfig, url: value }),
-                                            '输入请求 URL',
-                                            { flex: 1 }
-                                        )}
-                                        <Button type="primary" onClick={handleExecuteCurl} loading={executing}>
-                                            发送
-                                        </Button>
-                                        <Button onClick={handleSaveRequest}>
-                                            保存
-                                        </Button>
-                                    </div>
+                                    <ApiRequestBar
+                                        method={apiConfig.method}
+                                        url={apiConfig.url}
+                                        executing={executing}
+                                        environmentVariables={currentEnvironmentVariables}
+                                        onMethodChange={(value) => setApiConfig({ ...apiConfig, method: value })}
+                                        onUrlChange={(value) => setApiConfig({ ...apiConfig, url: value })}
+                                        onSend={handleExecuteCurl}
+                                        onSave={handleSaveRequest}
+                                    />
                                     <div className="api-config-section">
                                         <Tabs
                                             defaultActiveKey="params"
@@ -3789,76 +3761,27 @@ function App() {
                                                     label: '前置脚本',
                                                     children: (
                                                         <div className="script-binding-panel">
-                                                            <div className="script-list-container">
-                                                                {apiConfig.preScripts.length === 0 && (
-                                                                    <div className="script-list-empty">暂无前置脚本</div>
-                                                                )}
-                                                                {apiConfig.preScripts.map((scriptId, index) => {
-                                                                    const script = projectScripts.find(s => s.id === scriptId);
-                                                                    return (
-                                                                        <div key={scriptId} className="script-list-item">
-                                                                            <span className="script-list-index">{index + 1}</span>
-                                                                            <span className="script-list-name">{script?.name || '未知脚本'}</span>
-                                                                            <div className="script-list-actions">
-                                                                                <Button
-                                                                                    type="text"
-                                                                                    size="small"
-                                                                                    disabled={index === 0}
-                                                                                    onClick={() => {
-                                                                                        if (index > 0) {
-                                                                                            const newScripts = [...apiConfig.preScripts];
-                                                                                            [newScripts[index - 1], newScripts[index]] = [newScripts[index], newScripts[index - 1]];
-                                                                                            setApiConfig({ ...apiConfig, preScripts: newScripts });
-                                                                                        }
-                                                                                    }}
-                                                                                >↑</Button>
-                                                                                <Button
-                                                                                    type="text"
-                                                                                    size="small"
-                                                                                    disabled={index === apiConfig.preScripts.length - 1}
-                                                                                    onClick={() => {
-                                                                                        if (index < apiConfig.preScripts.length - 1) {
-                                                                                            const newScripts = [...apiConfig.preScripts];
-                                                                                            [newScripts[index], newScripts[index + 1]] = [newScripts[index + 1], newScripts[index]];
-                                                                                            setApiConfig({ ...apiConfig, preScripts: newScripts });
-                                                                                        }
-                                                                                    }}
-                                                                                >↓</Button>
-                                                                                <Button
-                                                                                    type="text"
-                                                                                    danger
-                                                                                    size="small"
-                                                                                    onClick={() => {
-                                                                                        setApiConfig({
-                                                                                            ...apiConfig,
-                                                                                            preScripts: apiConfig.preScripts.filter(id => id !== scriptId)
-                                                                                        });
-                                                                                    }}
-                                                                                >×</Button>
-                                                                            </div>
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                                <Select
-                                                                    placeholder="+ 添加前置脚本"
-                                                                    value=""
-                                                                    onChange={(value: string) => {
-                                                                        if (value && !apiConfig.preScripts.includes(value)) {
-                                                                            setApiConfig({
-                                                                                ...apiConfig,
-                                                                                preScripts: [...apiConfig.preScripts, value]
-                                                                            });
-                                                                        }
-                                                                    }}
-                                                                    style={{ width: '100%', marginTop: 8 }}
-                                                                    options={[
-                                                                        { label: '+ 添加前置脚本', value: '' },
-                                                                        ...projectScripts
-                                                                            .filter(s => !apiConfig.preScripts.includes(s.id))
-                                                                            .map(s => ({ label: s.name, value: s.id }))
-                                                                    ]}
-                                                                />
-                                                            </div>
+                                                            <ScriptBindingList
+                                                                scripts={apiConfig.preScripts}
+                                                                projectScripts={projectScripts}
+                                                                onAdd={(scriptId) => setApiConfig({ ...apiConfig, preScripts: [...apiConfig.preScripts, scriptId] })}
+                                                                onRemove={(scriptId) => setApiConfig({ ...apiConfig, preScripts: apiConfig.preScripts.filter(id => id !== scriptId) })}
+                                                                onMoveUp={(index) => {
+                                                                    if (index > 0) {
+                                                                        const newScripts = [...apiConfig.preScripts];
+                                                                        [newScripts[index - 1], newScripts[index]] = [newScripts[index], newScripts[index - 1]];
+                                                                        setApiConfig({ ...apiConfig, preScripts: newScripts });
+                                                                    }
+                                                                }}
+                                                                onMoveDown={(index) => {
+                                                                    if (index < apiConfig.preScripts.length - 1) {
+                                                                        const newScripts = [...apiConfig.preScripts];
+                                                                        [newScripts[index], newScripts[index + 1]] = [newScripts[index + 1], newScripts[index]];
+                                                                        setApiConfig({ ...apiConfig, preScripts: newScripts });
+                                                                    }
+                                                                }}
+                                                                emptyText="暂无前置脚本"
+                                                            />
                                                         </div>
                                                     ),
                                                 },
@@ -3867,76 +3790,27 @@ function App() {
                                                     label: '后置脚本',
                                                     children: (
                                                         <div className="script-binding-panel">
-                                                            <div className="script-list-container">
-                                                                {apiConfig.postScripts.length === 0 && (
-                                                                    <div className="script-list-empty">暂无后置脚本</div>
-                                                                )}
-                                                                {apiConfig.postScripts.map((scriptId, index) => {
-                                                                    const script = projectScripts.find(s => s.id === scriptId);
-                                                                    return (
-                                                                        <div key={scriptId} className="script-list-item">
-                                                                            <span className="script-list-index">{index + 1}</span>
-                                                                            <span className="script-list-name">{script?.name || '未知脚本'}</span>
-                                                                            <div className="script-list-actions">
-                                                                                <Button
-                                                                                    type="text"
-                                                                                    size="small"
-                                                                                    disabled={index === 0}
-                                                                                    onClick={() => {
-                                                                                        if (index > 0) {
-                                                                                            const newScripts = [...apiConfig.postScripts];
-                                                                                            [newScripts[index - 1], newScripts[index]] = [newScripts[index], newScripts[index - 1]];
-                                                                                            setApiConfig({ ...apiConfig, postScripts: newScripts });
-                                                                                        }
-                                                                                    }}
-                                                                                >↑</Button>
-                                                                                <Button
-                                                                                    type="text"
-                                                                                    size="small"
-                                                                                    disabled={index === apiConfig.postScripts.length - 1}
-                                                                                    onClick={() => {
-                                                                                        if (index < apiConfig.postScripts.length - 1) {
-                                                                                            const newScripts = [...apiConfig.postScripts];
-                                                                                            [newScripts[index], newScripts[index + 1]] = [newScripts[index + 1], newScripts[index]];
-                                                                                            setApiConfig({ ...apiConfig, postScripts: newScripts });
-                                                                                        }
-                                                                                    }}
-                                                                                >↓</Button>
-                                                                                <Button
-                                                                                    type="text"
-                                                                                    danger
-                                                                                    size="small"
-                                                                                    onClick={() => {
-                                                                                        setApiConfig({
-                                                                                            ...apiConfig,
-                                                                                            postScripts: apiConfig.postScripts.filter(id => id !== scriptId)
-                                                                                        });
-                                                                                    }}
-                                                                                >×</Button>
-                                                                            </div>
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                                <Select
-                                                                    placeholder="+ 添加后置脚本"
-                                                                    value=""
-                                                                    onChange={(value: string) => {
-                                                                        if (value && !apiConfig.postScripts.includes(value)) {
-                                                                            setApiConfig({
-                                                                                ...apiConfig,
-                                                                                postScripts: [...apiConfig.postScripts, value]
-                                                                            });
-                                                                        }
-                                                                    }}
-                                                                    style={{ width: '100%', marginTop: 8 }}
-                                                                    options={[
-                                                                        { label: '+ 添加后置脚本', value: '' },
-                                                                        ...projectScripts
-                                                                            .filter(s => !apiConfig.postScripts.includes(s.id))
-                                                                            .map(s => ({ label: s.name, value: s.id }))
-                                                                    ]}
-                                                                />
-                                                            </div>
+                                                            <ScriptBindingList
+                                                                scripts={apiConfig.postScripts}
+                                                                projectScripts={projectScripts}
+                                                                onAdd={(scriptId) => setApiConfig({ ...apiConfig, postScripts: [...apiConfig.postScripts, scriptId] })}
+                                                                onRemove={(scriptId) => setApiConfig({ ...apiConfig, postScripts: apiConfig.postScripts.filter(id => id !== scriptId) })}
+                                                                onMoveUp={(index) => {
+                                                                    if (index > 0) {
+                                                                        const newScripts = [...apiConfig.postScripts];
+                                                                        [newScripts[index - 1], newScripts[index]] = [newScripts[index], newScripts[index - 1]];
+                                                                        setApiConfig({ ...apiConfig, postScripts: newScripts });
+                                                                    }
+                                                                }}
+                                                                onMoveDown={(index) => {
+                                                                    if (index < apiConfig.postScripts.length - 1) {
+                                                                        const newScripts = [...apiConfig.postScripts];
+                                                                        [newScripts[index], newScripts[index + 1]] = [newScripts[index + 1], newScripts[index]];
+                                                                        setApiConfig({ ...apiConfig, postScripts: newScripts });
+                                                                    }
+                                                                }}
+                                                                emptyText="暂无后置脚本"
+                                                            />
                                                         </div>
                                                     ),
                                                 },
@@ -4030,11 +3904,13 @@ function App() {
                                                         key: 'body',
                                                         label: 'Body',
                                                         children: (
-                                                            <div className="response-body" style={{ height: responseBodyHeight }}>
-                                                                <pre className="response-content">
-                                                                    {response.body || response.error || 'No response body'}
-                                                                </pre>
-                                                            </div>
+                                                            <ResponseBodyViewer
+                                                                body={response.body}
+                                                                error={response.error}
+                                                                height={responseBodyHeight}
+                                                                appTheme={appTheme}
+                                                                viewMode="body"
+                                                            />
                                                         ),
                                                     },
                                                     {
@@ -4048,25 +3924,13 @@ function App() {
                                                         key: 'formatted',
                                                         label: 'JsonView',
                                                         children: (
-                                                            <div className="response-body response-json" style={{ height: responseBodyHeight }}>
-                                                                {(() => {
-                                                                    try {
-                                                                        const data = JSON.parse(response.body || '{}');
-                                                                        return (
-                                                                            <div className="json-view-container">
-                                                                                <JsonView
-                                                                                    data={data}
-                                                                                    style={appTheme === 'dark' ? darkStyles : undefined}
-                                                                                    shouldExpandNode={allExpanded}
-                                                                                    clickToExpandNode
-                                                                                />
-                                                                            </div>
-                                                                        );
-                                                                    } catch {
-                                                                        return <pre className="response-content">{formattedResponse || '非 JSON 格式或无响应内容'}</pre>;
-                                                                    }
-                                                                })()}
-                                                            </div>
+                                                            <ResponseBodyViewer
+                                                                body={response.body}
+                                                                formattedResponse={formattedResponse}
+                                                                height={responseBodyHeight}
+                                                                appTheme={appTheme}
+                                                                viewMode="json"
+                                                            />
                                                         ),
                                                     },
                                                     {

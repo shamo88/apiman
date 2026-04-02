@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Modal, Input, Button, Table, Divider, message } from 'antd';
-import { AddGlobalCookies, DeleteGlobalCookie } from '../../wailsjs/go/main/App';
+import { AddGlobalCookies, DeleteGlobalCookie } from '../../../wailsjs/go/main/App';
 
 interface CookieModalProps {
     visible: boolean;
