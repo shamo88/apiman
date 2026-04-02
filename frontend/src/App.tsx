@@ -23,6 +23,8 @@ import { VariableEditableInput } from './components/VariableEditableInput';
 import { SidebarMenuHeader } from './components/SidebarMenuHeader';
 import { RequestTabsBar } from './components/RequestTabsBar';
 import { ApiListFilters } from './components/ApiListFilters';
+import { SidebarList } from './components/SidebarList';
+import { KeyValueEditor } from './components/KeyValueEditor';
 
 interface Project {
     id: string;
@@ -2272,7 +2274,7 @@ function App() {
         Modal.confirm({
             title: '删除分组',
             content: affectedCount > 0
-                ? `该分组下有 ${affectedCount} 个项目，删除后将自动移动到“${DEFAULT_PROJECT_GROUP}”。是否继续？`
+                ? `该分组下有 ${affectedCount} 个项目，删除后将自动移动到"${DEFAULT_PROJECT_GROUP}"。是否继续？`
                 : '确定删除该分组吗？',
             onOk: () => {
                 setProjectGroups(prev => prev.filter(name => name !== groupName));
@@ -3504,49 +3506,23 @@ function App() {
                                     </div>
                                 </>
                             ) : sidebarMenu === 'environments' ? (
-                                <div className="sidebar-content environment-sidebar-content">
-                                    <Spin spinning={envLoading}>
-                                        <div className="environment-list">
-                                            {environments.map(env => (
-                                                <button
-                                                    key={env.id}
-                                                    className={`environment-list-item ${editingEnvironmentId === env.id ? 'active' : ''}`}
-                                                    onClick={() => openEnvironmentEditor(env)}
-                                                >
-                                                    <span className="environment-list-item-icon">
-                                                        <EnvironmentOutlined />
-                                                    </span>
-                                                    <span className="environment-list-item-name">{env.name}</span>
-                                                </button>
-                                            ))}
-                                            {environments.length === 0 && (
-                                                <div className="empty-sidebar">暂无环境，点击右上角“新建”创建</div>
-                                            )}
-                                        </div>
-                                    </Spin>
-                                </div>
+                                <SidebarList
+                                    items={environments}
+                                    activeId={editingEnvironmentId}
+                                    type="environment"
+                                    loading={envLoading}
+                                    onSelect={openEnvironmentEditor}
+                                    emptyText={'暂无环境，点击右上角"新建"创建'}
+                                />
                             ) : (
-                                <div className="sidebar-content environment-sidebar-content">
-                                    <Spin spinning={scriptsLoading}>
-                                        <div className="environment-list">
-                                            {projectScripts.map(script => (
-                                                <button
-                                                    key={script.id}
-                                                    className={`environment-list-item ${editingScriptId === script.id ? 'active' : ''}`}
-                                                    onClick={() => handleSelectScriptEditor(script)}
-                                                >
-                                                    <span className="environment-list-item-icon">
-                                                        <CodeOutlined />
-                                                    </span>
-                                                    <span className="environment-list-item-name">{script.name}</span>
-                                                </button>
-                                            ))}
-                                            {projectScripts.length === 0 && (
-                                                <div className="empty-sidebar">暂无脚本，点击右上角“新建”创建</div>
-                                            )}
-                                        </div>
-                                    </Spin>
-                                </div>
+                                <SidebarList
+                                    items={projectScripts}
+                                    activeId={editingScriptId}
+                                    type="script"
+                                    loading={scriptsLoading}
+                                    onSelect={handleSelectScriptEditor}
+                                    emptyText={'暂无脚本，点击右上角"新建"创建'}
+                                />
                             )}
                         </div>
 
@@ -3743,126 +3719,44 @@ function App() {
                                                     key: 'params',
                                                     label: 'Params',
                                                     children: (
-                                                        <div className="kv-editor">
-                                                            {apiConfig.params.map((param, index) => (
-                                                                <div key={index} className="kv-row kv-row-params">
-                                                                    <Checkbox
-                                                                        className="kv-param-enabled"
-                                                                        checked={param.enabled !== false}
-                                                                        onChange={(e) => {
-                                                                            const newParams = [...apiConfig.params];
-                                                                            newParams[index].enabled = e.target.checked;
-                                                                            setApiConfig({ ...apiConfig, params: newParams });
-                                                                        }}
-                                                                        title="发送请求时包含该参数"
-                                                                    />
-                                                                    <Input
-                                                                        placeholder="Key"
-                                                                        value={param.key}
-                                                                        onChange={(e) => {
-                                                                            const newParams = [...apiConfig.params];
-                                                                            newParams[index].key = e.target.value;
-                                                                            setApiConfig({ ...apiConfig, params: newParams });
-                                                                        }}
-                                                                    />
-                                                                    {renderVariableAwareInput(
-                                                                        param.value,
-                                                                        (value) => {
-                                                                            const newParams = [...apiConfig.params];
-                                                                            newParams[index].value = value;
-                                                                            setApiConfig({ ...apiConfig, params: newParams });
-                                                                        },
-                                                                        'Value',
-                                                                        { flex: 1 }
-                                                                    )}
-                                                                    <Button
-                                                                        type="text"
-                                                                        danger
-                                                                        onClick={() => {
-                                                                            const newParams = apiConfig.params.filter((_, i) => i !== index);
-                                                                            setApiConfig({ ...apiConfig, params: newParams });
-                                                                        }}
-                                                                    >
-                                                                        ×
-                                                                    </Button>
-                                                                </div>
-                                                            ))}
-                                                            <Button
-                                                                type="link"
-                                                                icon={<PlusOutlined />}
-                                                                onClick={() => {
-                                                                    setApiConfig({
-                                                                        ...apiConfig,
-                                                                        params: [...apiConfig.params, { key: '', value: '', enabled: true }]
-                                                                    });
-                                                                }}
-                                                            >
-                                                                添加参数
-                                                            </Button>
-                                                        </div>
+                                                        <KeyValueEditor
+                                                            items={apiConfig.params}
+                                                            onAdd={() => setApiConfig({ ...apiConfig, params: [...apiConfig.params, { key: '', value: '', enabled: true }] })}
+                                                            onRemove={(index) => setApiConfig({ ...apiConfig, params: apiConfig.params.filter((_, i) => i !== index) })}
+                                                            onUpdate={(index, field, value) => {
+                                                                const newParams = [...apiConfig.params];
+                                                                if (field === 'enabled') {
+                                                                    newParams[index].enabled = value as boolean;
+                                                                } else {
+                                                                    (newParams[index] as any)[field] = value;
+                                                                }
+                                                                setApiConfig({ ...apiConfig, params: newParams });
+                                                            }}
+                                                            renderValueInput={(index, value, onChange) => renderVariableAwareInput(value, onChange, 'Value', { flex: 1 })}
+                                                            addButtonText="添加参数"
+                                                        />
                                                     ),
                                                 },
                                                 {
                                                     key: 'headers',
                                                     label: 'Headers',
                                                     children: (
-                                                        <div className="kv-editor">
-                                                            {apiConfig.headers.map((header, index) => (
-                                                                <div key={index} className="kv-row kv-row-params">
-                                                                    <Checkbox
-                                                                        className="kv-param-enabled"
-                                                                        checked={header.enabled !== false}
-                                                                        onChange={(e) => {
-                                                                            const newHeaders = [...apiConfig.headers];
-                                                                            newHeaders[index].enabled = e.target.checked;
-                                                                            setApiConfig({ ...apiConfig, headers: newHeaders });
-                                                                        }}
-                                                                        title="发送请求时包含该header"
-                                                                    />
-                                                                    <Input
-                                                                        placeholder="Key"
-                                                                        value={header.key}
-                                                                        onChange={(e) => {
-                                                                            const newHeaders = [...apiConfig.headers];
-                                                                            newHeaders[index].key = e.target.value;
-                                                                            setApiConfig({ ...apiConfig, headers: newHeaders });
-                                                                        }}
-                                                                    />
-                                                                    {renderVariableAwareInput(
-                                                                        header.value,
-                                                                        (value) => {
-                                                                            const newHeaders = [...apiConfig.headers];
-                                                                            newHeaders[index].value = value;
-                                                                            setApiConfig({ ...apiConfig, headers: newHeaders });
-                                                                        },
-                                                                        'Value',
-                                                                        { flex: 1 }
-                                                                    )}
-                                                                    <Button
-                                                                        type="text"
-                                                                        danger
-                                                                        onClick={() => {
-                                                                            const newHeaders = apiConfig.headers.filter((_, i) => i !== index);
-                                                                            setApiConfig({ ...apiConfig, headers: newHeaders });
-                                                                        }}
-                                                                    >
-                                                                        ×
-                                                                    </Button>
-                                                                </div>
-                                                            ))}
-                                                            <Button
-                                                                type="link"
-                                                                icon={<PlusOutlined />}
-                                                                onClick={() => {
-                                                                    setApiConfig({
-                                                                        ...apiConfig,
-                                                                        headers: [...apiConfig.headers, { key: '', value: '', enabled: true }]
-                                                                    });
-                                                                }}
-                                                            >
-                                                                添加请求头
-                                                            </Button>
-                                                        </div>
+                                                        <KeyValueEditor
+                                                            items={apiConfig.headers}
+                                                            onAdd={() => setApiConfig({ ...apiConfig, headers: [...apiConfig.headers, { key: '', value: '', enabled: true }] })}
+                                                            onRemove={(index) => setApiConfig({ ...apiConfig, headers: apiConfig.headers.filter((_, i) => i !== index) })}
+                                                            onUpdate={(index, field, value) => {
+                                                                const newHeaders = [...apiConfig.headers];
+                                                                if (field === 'enabled') {
+                                                                    newHeaders[index].enabled = value as boolean;
+                                                                } else {
+                                                                    (newHeaders[index] as any)[field] = value;
+                                                                }
+                                                                setApiConfig({ ...apiConfig, headers: newHeaders });
+                                                            }}
+                                                            renderValueInput={(index, value, onChange) => renderVariableAwareInput(value, onChange, 'Value', { flex: 1 })}
+                                                            addButtonText="添加请求头"
+                                                        />
                                                     ),
                                                 },
                                                 {
@@ -3890,72 +3784,35 @@ function App() {
                                                                 <div className="body-empty">This request does not have a body</div>
                                                             )}
                                                             {(apiConfig.bodyType === 'form-data' || apiConfig.bodyType === 'x-www-form-urlencoded') && (
-                                                                <div className="kv-editor">
-                                                                    {(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded).map((item, index) => (
-                                                                        <div key={index} className="kv-row kv-row-params">
-                                                                            <Checkbox
-                                                                                className="kv-param-enabled"
-                                                                                checked={item.enabled !== false}
-                                                                                onChange={(e) => {
-                                                                                    const newData = [...(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded)];
-                                                                                    newData[index].enabled = e.target.checked;
-                                                                                    setApiConfig(apiConfig.bodyType === 'form-data'
-                                                                                        ? { ...apiConfig, formData: newData }
-                                                                                        : { ...apiConfig, urlencoded: newData });
-                                                                                }}
-                                                                                title="发送请求时包含该字段"
-                                                                            />
-                                                                            {renderVariableAwareInput(
-                                                                                item.key,
-                                                                                (value) => {
-                                                                                    const newData = [...(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded)];
-                                                                                    newData[index].key = value;
-                                                                                    setApiConfig(apiConfig.bodyType === 'form-data'
-                                                                                        ? { ...apiConfig, formData: newData }
-                                                                                        : { ...apiConfig, urlencoded: newData });
-                                                                                },
-                                                                                'Key',
-                                                                                { flex: 1 }
-                                                                            )}
-                                                                            {renderVariableAwareInput(
-                                                                                item.value,
-                                                                                (value) => {
-                                                                                    const newData = [...(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded)];
-                                                                                    newData[index].value = value;
-                                                                                    setApiConfig(apiConfig.bodyType === 'form-data'
-                                                                                        ? { ...apiConfig, formData: newData }
-                                                                                        : { ...apiConfig, urlencoded: newData });
-                                                                                },
-                                                                                'Value',
-                                                                                { flex: 1 }
-                                                                            )}
-                                                                            <Button
-                                                                                type="text"
-                                                                                danger
-                                                                                onClick={() => {
-                                                                                    const newData = (apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded).filter((_, i) => i !== index);
-                                                                                    setApiConfig(apiConfig.bodyType === 'form-data'
-                                                                                        ? { ...apiConfig, formData: newData }
-                                                                                        : { ...apiConfig, urlencoded: newData });
-                                                                                }}
-                                                                            >
-                                                                                ×
-                                                                            </Button>
-                                                                        </div>
-                                                                    ))}
-                                                                    <Button
-                                                                        type="link"
-                                                                        icon={<PlusOutlined />}
-                                                                        onClick={() => {
-                                                                            const newData = [...(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded), { key: '', value: '', enabled: true }];
-                                                                            setApiConfig(apiConfig.bodyType === 'form-data'
-                                                                                ? { ...apiConfig, formData: newData }
-                                                                                : { ...apiConfig, urlencoded: newData });
-                                                                        }}
-                                                                    >
-                                                                        添加字段
-                                                                    </Button>
-                                                                </div>
+                                                                <KeyValueEditor
+                                                                    items={apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded}
+                                                                    onAdd={() => {
+                                                                        const newData = [...(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded), { key: '', value: '', enabled: true }];
+                                                                        setApiConfig(apiConfig.bodyType === 'form-data'
+                                                                            ? { ...apiConfig, formData: newData }
+                                                                            : { ...apiConfig, urlencoded: newData });
+                                                                    }}
+                                                                    onRemove={(index) => {
+                                                                        const newData = (apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded).filter((_, i) => i !== index);
+                                                                        setApiConfig(apiConfig.bodyType === 'form-data'
+                                                                            ? { ...apiConfig, formData: newData }
+                                                                            : { ...apiConfig, urlencoded: newData });
+                                                                    }}
+                                                                    onUpdate={(index, field, value) => {
+                                                                        const newData = [...(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded)];
+                                                                        if (field === 'enabled') {
+                                                                            newData[index].enabled = value as boolean;
+                                                                        } else {
+                                                                            (newData[index] as any)[field] = value;
+                                                                        }
+                                                                        setApiConfig(apiConfig.bodyType === 'form-data'
+                                                                            ? { ...apiConfig, formData: newData }
+                                                                            : { ...apiConfig, urlencoded: newData });
+                                                                    }}
+                                                                    renderKeyInput={(index, value, onChange) => renderVariableAwareInput(value, onChange, 'Key', { flex: 1 })}
+                                                                    renderValueInput={(index, value, onChange) => renderVariableAwareInput(value, onChange, 'Value', { flex: 1 })}
+                                                                    addButtonText="添加字段"
+                                                                />
                                                             )}
                                                             {(apiConfig.bodyType === 'json' || apiConfig.bodyType === 'xml' || apiConfig.bodyType === 'raw') && (
                                                                 <>
