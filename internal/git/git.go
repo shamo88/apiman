@@ -8,7 +8,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -16,6 +18,17 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 )
+
+// hideWindowCmd creates an exec.Cmd that hides the window on Windows
+func hideWindowCmd(name string, args ...string) *exec.Cmd {
+	cmd := exec.Command(name, args...)
+	if runtime.GOOS == "windows" {
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			HideWindow: true,
+		}
+	}
+	return cmd
+}
 
 // Simple obfuscation key - not true encryption but better than plain text
 // In production, consider using system keychain or DPAPI
@@ -328,7 +341,7 @@ func (g *GitSyncManager) gitPush(branch, password string) error {
 		log.Printf("[GitSync] Embedding credentials in URL")
 
 		// Set the remote URL with credentials
-		cmd := exec.Command("git", "remote", "set-url", "origin", credURL)
+		cmd := hideWindowCmd("git", "remote", "set-url", "origin", credURL)
 		cmd.Dir = g.repoPath
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("failed to set remote URL: %w", err)
@@ -341,7 +354,7 @@ func (g *GitSyncManager) gitPush(branch, password string) error {
 	log.Printf("[GitSync] Using URL: %s", maskURL(remoteURL))
 
 	// Push
-	cmd := exec.Command("git", "push", "-u", "origin", branch)
+	cmd := hideWindowCmd("git", "push", "-u", "origin", branch)
 	cmd.Dir = g.repoPath
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -353,13 +366,13 @@ func (g *GitSyncManager) gitPush(branch, password string) error {
 		if strings.Contains(errMsg, "src refspec") && strings.Contains(errMsg, "does not match any") {
 			log.Printf("[GitSync] Branch %s does not exist, creating it", branch)
 			// Create the branch
-			cmd = exec.Command("git", "checkout", "-b", branch)
+			cmd = hideWindowCmd("git", "checkout", "-b", branch)
 			cmd.Dir = g.repoPath
 			if err := cmd.Run(); err != nil {
 				return fmt.Errorf("failed to create branch: %w", err)
 			}
 			// Retry push
-			cmd = exec.Command("git", "push", "-u", "origin", branch)
+			cmd = hideWindowCmd("git", "push", "-u", "origin", branch)
 			cmd.Dir = g.repoPath
 			cmd.Stderr = &stderr
 			if err := cmd.Run(); err != nil {
@@ -398,7 +411,7 @@ func (g *GitSyncManager) createInitialCommit(branch, password string) error {
 	log.Printf("[GitSync] README stat: size=%d, err=%v", info.Size(), err)
 
 	// Use git exec to add and commit directly
-	cmd := exec.Command("git", "add", "README.md")
+	cmd := hideWindowCmd("git", "add", "README.md")
 	cmd.Dir = g.repoPath
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to git add: %w", err)
@@ -406,13 +419,13 @@ func (g *GitSyncManager) createInitialCommit(branch, password string) error {
 	log.Printf("[GitSync] git add succeeded")
 
 	// Check git status before commit
-	cmd = exec.Command("git", "status")
+	cmd = hideWindowCmd("git", "status")
 	cmd.Dir = g.repoPath
 	out, _ := cmd.Output()
 	log.Printf("[GitSync] git status before commit: %s", string(out))
 
 	// Check if there's already a commit
-	cmd = exec.Command("git", "rev-parse", "HEAD")
+	cmd = hideWindowCmd("git", "rev-parse", "HEAD")
 	cmd.Dir = g.repoPath
 	if err := cmd.Run(); err != nil {
 		log.Printf("[GitSync] No HEAD commit exists, will create initial commit")
@@ -422,7 +435,7 @@ func (g *GitSyncManager) createInitialCommit(branch, password string) error {
 	}
 
 	// Create commit
-	cmd = exec.Command("git", "commit", "-m", "Initial commit")
+	cmd = hideWindowCmd("git", "commit", "-m", "Initial commit")
 	cmd.Dir = g.repoPath
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to git commit: %w", err)
@@ -446,7 +459,7 @@ func (g *GitSyncManager) CommitAndPush(files []string, message, branch, password
 	}
 
 	// Add all files with git add .
-	cmd := exec.Command("git", "add", ".")
+	cmd := hideWindowCmd("git", "add", ".")
 	cmd.Dir = g.repoPath
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to git add: %w", err)
