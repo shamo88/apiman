@@ -31,6 +31,8 @@ import { EmptyState } from './components/EmptyState';
 import { MethodSelector } from './components/MethodSelector';
 import { BodyTypeSelector } from './components/BodyTypeSelector';
 import { ScriptEditor } from './components/ScriptEditor';
+import { ProjectSearchBar } from './components/ProjectSearchBar';
+import { EnvironmentVarEditor } from './components/EnvironmentVarRow';
 import { KeyValueEditor } from './components/KeyValueEditor';
 
 interface Project {
@@ -3246,30 +3248,15 @@ function App() {
             <div className="app-content">
                 {activeTab === 'home' ? (
                     <div className="home-page">
-                        <div className="home-header">
-                            <h2>我的项目</h2>
-                            <Space>
-                                <Input
-                                    allowClear
-                                    value={projectSearchKeyword}
-                                    onChange={(e) => setProjectSearchKeyword(e.target.value)}
-                                    prefix={<SearchOutlined style={{ color: '#8b8b9a' }} />}
-                                    placeholder="搜索项目..."
-                                    style={{ width: 260 }}
-                                />
-                                <Upload {...uploadProps}>
-                                    <Button icon={<ImportOutlined />} loading={importing}>
-                                        导入 Postman
-                                    </Button>
-                                </Upload>
-                                <Button icon={<FolderOutlined />} onClick={() => setCreateGroupModal(true)}>
-                                    新建分组
-                                </Button>
-                                <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateProjectModal(true)}>
-                                    新建项目
-                                </Button>
-                            </Space>
-                        </div>
+                        <ProjectSearchBar
+                            searchKeyword={projectSearchKeyword}
+                            onSearchChange={setProjectSearchKeyword}
+                            onCreateGroup={() => setCreateGroupModal(true)}
+                            onCreateProject={() => setCreateProjectModal(true)}
+                            uploadProps={uploadProps}
+                            importing={importing}
+                            onImport={() => {}}
+                        />
 
                         {loading && <Spin style={{ display: 'block', margin: '40px auto' }} />}
 
@@ -3582,38 +3569,15 @@ function App() {
                                                         添加
                                                     </Button>
                                                 </div>
-                                                <div className="environment-vars-list">
-                                                    {environmentFormVariables.map((item) => (
-                                                        <div className="environment-var-row" key={item.id}>
-                                                            <Input
-                                                                placeholder="变量名"
-                                                                value={item.key}
-                                                                onChange={(e) => {
-                                                                    setEnvironmentFormVariables(prev => prev.map((row) => row.id === item.id ? { ...row, key: e.target.value } : row));
-                                                                }}
-                                                            />
-                                                            <Input
-                                                                placeholder="变量值"
-                                                                value={item.value}
-                                                                onChange={(e) => {
-                                                                    setEnvironmentFormVariables(prev => prev.map((row) => row.id === item.id ? { ...row, value: e.target.value } : row));
-                                                                }}
-                                                            />
-                                                            <Button
-                                                                type="text"
-                                                                danger
-                                                                onClick={() => {
-                                                                    setEnvironmentFormVariables(prev => {
-                                                                        const next = prev.filter((row) => row.id !== item.id);
-                                                                        return next.length > 0 ? next : [createEnvironmentVariableRow()];
-                                                                    });
-                                                                }}
-                                                            >
-                                                                ×
-                                                            </Button>
-                                                        </div>
-                                                    ))}
-                                                </div>
+                                                <EnvironmentVarEditor
+                                                    variables={environmentFormVariables}
+                                                    onUpdate={(id, field, value) => setEnvironmentFormVariables(prev => prev.map((row) => row.id === id ? { ...row, [field]: value } : row))}
+                                                    onRemove={(id) => setEnvironmentFormVariables(prev => {
+                                                        const next = prev.filter((row) => row.id !== id);
+                                                        return next.length > 0 ? next : [createEnvironmentVariableRow()];
+                                                    })}
+                                                    onAdd={() => setEnvironmentFormVariables(prev => [...prev, createEnvironmentVariableRow()])}
+                                                />
                                                 <Space style={{ width: '100%', justifyContent: 'space-between', marginTop: 12 }}>
                                                     <Button onClick={resetEnvironmentEditor}>清空</Button>
                                                     <Space>
