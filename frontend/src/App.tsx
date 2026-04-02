@@ -17,6 +17,12 @@ import { HistoryModal } from './components/HistoryModal';
 import { CookieModal } from './components/CookieModal';
 import { AddCaseModal, RenameCaseModal } from './components/CaseModal';
 import { CreateFolderModal, CreateRequestModal, RenameModal } from './components/CreateModal';
+import { CreateProjectModal, CreateGroupModal, RenameProjectModal, RenameGroupModal } from './components/ProjectModal';
+import { AppFooter } from './components/AppFooter';
+import { VariableEditableInput } from './components/VariableEditableInput';
+import { SidebarMenuHeader } from './components/SidebarMenuHeader';
+import { RequestTabsBar } from './components/RequestTabsBar';
+import { ApiListFilters } from './components/ApiListFilters';
 
 interface Project {
     id: string;
@@ -576,192 +582,6 @@ const getVariableSuggestions = (text: string, caretIndex: number, environmentVar
         rangeStart: beforeCaret.length - match[0].length,
         rangeEnd: beforeCaret.length,
     };
-};
-
-const VariableEditableInput: React.FC<{
-    value: string;
-    onChange: (next: string) => void;
-    placeholder: string;
-    style?: React.CSSProperties;
-    environmentVariables: Record<string, string>;
-    multiline?: boolean;
-}> = ({ value, onChange, placeholder, style, environmentVariables, multiline = false }) => {
-    const editorRef = React.useRef<HTMLDivElement | null>(null);
-    const [caretIndex, setCaretIndex] = useState<number>((value || '').length);
-    const [focused, setFocused] = useState(false);
-    const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
-    const [forceSuggestAll, setForceSuggestAll] = useState(false);
-    const [suggestionPos, setSuggestionPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
-    const suggestions = getVariableSuggestions(value, caretIndex, environmentVariables);
-    const suggestionItems = forceSuggestAll ? Object.keys(environmentVariables) : suggestions.items;
-
-    const updateCaretPosition = () => {
-        const editor = editorRef.current;
-        if (!editor) return;
-        const rect = editor.getBoundingClientRect();
-        const range = window.getSelection()?.rangeCount ? window.getSelection()?.getRangeAt(0) : null;
-        if (range) {
-            const caretRect = range.getBoundingClientRect();
-            // Position to the right of caret, within the editor wrapper
-            setSuggestionPos({
-                top: caretRect.top - rect.top + 20,
-                left: caretRect.right - rect.left + 5,
-            });
-        } else {
-            // Fallback: position below cursor line
-            setSuggestionPos({
-                top: 20,
-                left: 5,
-            });
-        }
-    };
-
-    useEffect(() => {
-        const editor = editorRef.current;
-        if (!editor) return;
-        const html = renderHighlightedVariableHtml(value, environmentVariables);
-        if (editor.innerHTML !== html) {
-            editor.innerHTML = html;
-            if (focused) {
-                setCaretOffset(editor, Math.min(caretIndex, (value || '').length));
-            }
-        }
-    }, [value, focused, caretIndex, environmentVariables]);
-
-    useEffect(() => {
-        if (suggestionItems.length === 0) {
-            setActiveSuggestionIndex(0);
-            return;
-        }
-        setActiveSuggestionIndex((prev) => Math.min(prev, suggestionItems.length - 1));
-    }, [suggestionItems.length]);
-
-    useEffect(() => {
-        if (focused && suggestionItems.length > 0) {
-            updateCaretPosition();
-        }
-    }, [caretIndex, focused, suggestionItems.length]);
-
-    const applySuggestion = (name: string) => {
-        const token = `{{${name}}}`;
-        let next = value || '';
-        let nextCaret = caretIndex;
-        if (suggestions.rangeStart >= 0 && suggestions.rangeEnd >= 0) {
-            next = (value || '').slice(0, suggestions.rangeStart) + token + (value || '').slice(suggestions.rangeEnd);
-            nextCaret = suggestions.rangeStart + token.length;
-        } else {
-            next = (value || '').slice(0, Math.max(0, caretIndex)) + token + (value || '').slice(Math.max(0, caretIndex));
-            nextCaret = Math.max(0, caretIndex) + token.length;
-        }
-        onChange(next);
-        setCaretIndex(nextCaret);
-        setForceSuggestAll(false);
-        window.requestAnimationFrame(() => {
-            if (editorRef.current) {
-                setCaretOffset(editorRef.current, nextCaret);
-                editorRef.current.focus();
-            }
-        });
-    };
-
-    return (
-        <div className="variable-editable-wrapper" style={style}>
-            <div
-                ref={editorRef}
-                className="variable-editable"
-                data-multiline={multiline ? 'true' : 'false'}
-                contentEditable
-                suppressContentEditableWarning
-                data-placeholder={placeholder}
-                onFocus={() => {
-                    setFocused(true);
-                    updateCaretPosition();
-                }}
-                onBlur={() => {
-                    setFocused(false);
-                    setForceSuggestAll(false);
-                }}
-                onDoubleClick={(e) => {
-                    setCaretIndex(getCaretOffset(e.currentTarget));
-                    setForceSuggestAll(true);
-                    updateCaretPosition();
-                }}
-                onInput={(e) => {
-                    const nextText = multiline
-                        ? (e.currentTarget.textContent || '')
-                        : (e.currentTarget.textContent || '').replace(/\n/g, '');
-                    onChange(nextText);
-                    setCaretIndex(getCaretOffset(e.currentTarget));
-                    setForceSuggestAll(false);
-                    updateCaretPosition();
-                }}
-                onKeyDown={(e) => {
-                    if (suggestionItems.length > 0) {
-                        if (e.key === 'ArrowDown') {
-                            e.preventDefault();
-                            setActiveSuggestionIndex((prev) => (prev + 1) % suggestionItems.length);
-                            return;
-                        }
-                        if (e.key === 'ArrowUp') {
-                            e.preventDefault();
-                            setActiveSuggestionIndex((prev) => (prev - 1 + suggestionItems.length) % suggestionItems.length);
-                            return;
-                        }
-                        if (e.key === 'Enter') {
-                            e.preventDefault();
-                            const name = suggestionItems[activeSuggestionIndex];
-                            if (name) {
-                                applySuggestion(name);
-                            }
-                            return;
-                        }
-                        if (e.key === 'Escape') {
-                            e.preventDefault();
-                            setActiveSuggestionIndex(0);
-                            setForceSuggestAll(false);
-                            return;
-                        }
-                    }
-                    if (!multiline && e.key === 'Enter') e.preventDefault();
-                }}
-                onKeyUp={(e) => {
-                    setCaretIndex(getCaretOffset(e.currentTarget));
-                    updateCaretPosition();
-                }}
-            />
-            {focused && suggestionItems.length > 0 && (
-                <div
-                    className="variable-editable-suggestions"
-                    style={{
-                        position: 'absolute',
-                        top: suggestionPos.top,
-                        left: suggestionPos.left,
-                        zIndex: 1200,
-                    }}
-                >
-                    {suggestionItems.map((name, idx) => {
-                        const builtIn = builtInGenerators.find(g => g.name === name);
-                        const isEnvironmentVar = environmentVariables && name in environmentVariables;
-                        const itemClass = builtIn ? 'built-in-generator' : (!isEnvironmentVar ? 'invalid-variable' : '');
-                        return (
-                            <div
-                                key={name}
-                                className={`variable-editable-suggestion-item ${idx === activeSuggestionIndex ? 'active' : ''} ${itemClass}`}
-                                onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    applySuggestion(name);
-                                }}
-                                onMouseEnter={() => setActiveSuggestionIndex(idx)}
-                            >
-                                <div className="suggestion-item-name">{`{{${name}}}`}</div>
-                                {builtIn && <div className="suggestion-item-desc">{builtIn.description}</div>}
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-        </div>
-    );
 };
 
 function App() {
@@ -2108,6 +1928,17 @@ function App() {
         }
     };
 
+    const createProjectWithName = async (name: string) => {
+        try {
+            await CreateProject(name);
+            message.success('项目创建成功');
+            loadProjects();
+        } catch (error: any) {
+            console.error('Failed to create project:', error);
+            message.error(`创建失败: ${error?.message || error}`);
+        }
+    };
+
     const handleDeleteProject = async (projectId: string, e?: React.MouseEvent) => {
         e?.stopPropagation();
         Modal.confirm({
@@ -2160,6 +1991,73 @@ function App() {
                 message.error(`重命名失败: ${msg}`);
             }
         }
+    };
+
+    const renameProjectWithName = async (name: string) => {
+        if (!renameProjectId) return;
+        const newName = name.trim();
+        if (!newName) return;
+        try {
+            const renamed = await RenameProject(renameProjectId, newName);
+            setProjectTabs(prev => prev.map(tab => (
+                tab.project.id === renameProjectId
+                    ? { ...tab, title: renamed.name, project: { ...tab.project, name: renamed.name } }
+                    : tab
+            )));
+            message.success('项目重命名成功');
+            await loadProjects();
+        } catch (error: any) {
+            const msg = String(error?.message || error || '');
+            if (msg.includes('同名') || msg.includes('已存在')) {
+                message.warning('重命名失败：已存在同名项目');
+            } else {
+                message.error(`重命名失败: ${msg}`);
+            }
+        }
+    };
+
+    const createGroupWithName = async (groupName: string) => {
+        const name = groupName.trim();
+        if (!name) {
+            message.warning('请输入分组名称');
+            return;
+        }
+        if (name === DEFAULT_PROJECT_GROUP) {
+            message.warning('该名称为系统默认分组，请使用其他名称');
+            return;
+        }
+        if (projectGroups.includes(name)) {
+            message.warning('分组名称已存在');
+            return;
+        }
+        setProjectGroups(prev => [...prev, name]);
+        message.success('分组创建成功');
+    };
+
+    const renameGroupWithName = async (groupName: string) => {
+        const oldName = editingGroupName;
+        const newName = groupName.trim();
+        if (!newName || !oldName) return;
+        if (newName === oldName) return;
+        if (newName === DEFAULT_PROJECT_GROUP) {
+            message.warning('该名称为系统默认分组，请使用其他名称');
+            return;
+        }
+        if (projectGroups.includes(newName)) {
+            message.warning('分组名称已存在');
+            return;
+        }
+        setProjectGroups(prev => prev.map(g => g === oldName ? newName : g));
+        setProjectGroupAssignments(prev => {
+            const next = { ...prev };
+            Object.keys(next).forEach(key => {
+                if (next[key] === oldName) {
+                    next[key] = newName;
+                }
+            });
+            return next;
+        });
+        message.success('分组重命名成功');
     };
 
     const handleCreateProjectGroup = () => {
@@ -2776,15 +2674,15 @@ function App() {
         setAddCaseModalOpen(true);
     };
 
-    const confirmAddCaseModal = async () => {
-        const name = addCaseNameInput.trim();
-        if (!name) {
+    const confirmAddCaseModal = async (name: string) => {
+        const trimmedName = name.trim();
+        if (!trimmedName) {
             message.warning('请输入用例名称');
             return Promise.reject();
         }
         const targetPath = addCaseTargetPath;
         try {
-            await AddRequestCase(targetPath, name);
+            await AddRequestCase(targetPath, trimmedName);
             message.success('已新增用例');
             setAddCaseModalOpen(false);
             setAddCaseTargetPath('');
@@ -2850,21 +2748,21 @@ function App() {
         setCaseRenameModalOpen(true);
     };
 
-    const confirmCaseRenameFromTree = async () => {
+    const confirmCaseRenameFromTree = async (name: string) => {
         const p = parseRequestCaseRef(caseRenameCasePath);
         if (!p) {
             setCaseRenameModalOpen(false);
-            return;
+            return Promise.reject();
         }
         const reqPath = requestRefFromIds(p.projectId, p.requestId);
-        const name = caseRenameInput.trim() || '未命名';
+        const trimmedName = name.trim() || '未命名';
         try {
-            await RenameRequestCase(reqPath, p.caseId, name);
+            await RenameRequestCase(reqPath, p.caseId, trimmedName);
             message.success('用例已重命名');
             setCaseRenameModalOpen(false);
             await refreshProjectTree();
             if (currentRequest?.path === reqPath) {
-                setRequestCases((prev) => prev.map((c) => (c.id === p.caseId ? { ...c, name } : c)));
+                setRequestCases((prev) => prev.map((c) => (c.id === p.caseId ? { ...c, name: trimmedName } : c)));
             }
         } catch (error: any) {
             message.error(`重命名失败: ${error?.message || error}`);
@@ -3540,78 +3438,24 @@ function App() {
                 ) : (
                     <div className="project-workspace">
                         <div className="project-sidebar">
-                            <div className="sidebar-header sidebar-menu-header">
-                                <div className="sidebar-top-menu">
-                                    <button
-                                        className={`sidebar-menu-item ${sidebarMenu === 'apis' ? 'active' : ''}`}
-                                        onClick={() => setSidebarMenu('apis')}
-                                    >
-                                        接口列表
-                                    </button>
-                                    <button
-                                        className={`sidebar-menu-item ${sidebarMenu === 'environments' ? 'active' : ''}`}
-                                        onClick={() => setSidebarMenu('environments')}
-                                    >
-                                        环境变量
-                                    </button>
-                                    <button
-                                        className={`sidebar-menu-item ${sidebarMenu === 'scripts' ? 'active' : ''}`}
-                                        onClick={() => setSidebarMenu('scripts')}
-                                    >
-                                        脚本
-                                    </button>
-                                </div>
-                                {sidebarMenu === 'apis' ? (
-                                    <Dropdown
-                                        menu={{
-                                            items: [
-                                                { key: 'folder', icon: <FolderOutlined />, label: '新建文件夹', onClick: () => setCreateFolderModal(true) },
-                                                { key: 'request', icon: <FileOutlined />, label: '新建请求', onClick: () => setCreateRequestModal(true) },
-                                            ]
-                                        }}
-                                        trigger={['click']}
-                                    >
-                                        <Button size="small" icon={<PlusOutlined />} />
-                                    </Dropdown>
-                                ) : sidebarMenu === 'environments' ? (
-                                    <Button size="small" icon={<PlusOutlined />} onClick={handleCreateEnvironmentClick} />
-                                ) : (
-                                    <Button size="small" icon={<PlusOutlined />} loading={scriptSaving} onClick={handleCreateScript} />
-                                )}
-                            </div>
+                            <SidebarMenuHeader
+                                activeMenu={sidebarMenu}
+                                onMenuChange={setSidebarMenu}
+                                onCreateFolder={() => setCreateFolderModal(true)}
+                                onCreateRequest={() => setCreateRequestModal(true)}
+                                onCreateEnvironment={handleCreateEnvironmentClick}
+                                onCreateScript={handleCreateScript}
+                                scriptSaving={scriptSaving}
+                            />
 
                             {sidebarMenu === 'apis' ? (
                                 <>
-                                    <div className="sidebar-search">
-                                        <Input
-                                            prefix={<SearchOutlined style={{ color: '#8b8b9a' }} />}
-                                            placeholder="搜索接口..."
-                                            value={searchKeyword}
-                                            onChange={(e) => {
-                                                setSearchKeyword(e.target.value);
-                                                setSearchVersion(v => v + 1);
-                                            }}
-                                            allowClear
-                                            size="small"
-                                        />
-                                    </div>
-
-                                    <div className="sidebar-filters">
-                                        <Select
-                                            value={filterMethod}
-                                            onChange={(value) => setFilterMethod(value)}
-                                            size="small"
-                                            style={{ width: '100%' }}
-                                            options={[
-                                                { value: 'ALL', label: '全部方法' },
-                                                { value: 'GET', label: 'GET' },
-                                                { value: 'POST', label: 'POST' },
-                                                { value: 'PUT', label: 'PUT' },
-                                                { value: 'DELETE', label: 'DELETE' },
-                                                { value: 'PATCH', label: 'PATCH' },
-                                            ]}
-                                        />
-                                    </div>
+                                    <ApiListFilters
+                                        searchKeyword={searchKeyword}
+                                        filterMethod={filterMethod}
+                                        onSearchChange={(v) => { setSearchKeyword(v); setSearchVersion(p => p + 1); }}
+                                        onMethodChange={setFilterMethod}
+                                    />
 
                                     <div
                                         className={`sidebar-content${(animationEnabled || forceListAnimation) ? ' animations-enabled' : ''}${dropTargetFolderPath === currentTree?.path ? ' root-drop-target' : ''}`}
@@ -3708,44 +3552,17 @@ function App() {
 
                         <div className="project-main">
                             {sidebarMenu === 'apis' && requestTabs.length > 0 && (
-                                <div className="request-tabs-row">
-                                    <div className="request-tabs-scroll-wrap">
-                                        <Tabs
-                                            activeKey={activeRequestTab}
-                                            onChange={(key) => {
-                                                setActiveRequestTab(key);
-                                                const tab = requestTabs.find(t => t.id === key);
-                                                if (tab) loadRequestContent(tab.path);
-                                            }}
-                                            type="editable-card"
-                                            hideAdd
-                                            onEdit={(targetKey, action) => {
-                                                if (action === 'remove') {
-                                                    handleCloseRequestTab(targetKey as string);
-                                                }
-                                            }}
-                                            items={requestTabs.map(tab => ({
-                                                key: tab.id,
-                                                label: tab.title,
-                                            }))}
-                                            size="small"
-                                            style={{ marginBottom: 0 }}
-                                            animated={(animationEnabled || forceListAnimation)}
-                                        />
-                                    </div>
-                                    <div className="request-tabs-environment-select">
-                                        <Select
-                                            size="small"
-                                            value={selectedEnvironmentId || '__none__'}
-                                            onChange={(value) => setSelectedEnvironmentId(value === '__none__' ? '' : value)}
-                                            options={[
-                                                { label: '不使用环境', value: '__none__' },
-                                                ...environments.map(env => ({ label: env.name, value: env.id }))
-                                            ]}
-                                            style={{ width: 133 }}
-                                        />
-                                    </div>
-                                </div>
+                                <RequestTabsBar
+                                    requestTabs={requestTabs}
+                                    activeRequestTab={activeRequestTab}
+                                    selectedEnvironmentId={selectedEnvironmentId}
+                                    environments={environments}
+                                    animationEnabled={animationEnabled || forceListAnimation}
+                                    onTabChange={setActiveRequestTab}
+                                    onTabClose={handleCloseRequestTab}
+                                    onEnvironmentChange={setSelectedEnvironmentId}
+                                    loadRequestContent={loadRequestContent}
+                                />
                             )}
 
                             {sidebarMenu === 'environments' ? (
@@ -4682,70 +4499,40 @@ function App() {
                 </div>
             )}
 
-            <Modal
-                title="创建新项目"
-                open={createProjectModal}
-                onOk={handleCreateProject}
-                onCancel={() => { setCreateProjectModal(false); setNewProjectName(''); }}
-                className={`create-project-modal ${appTheme === 'dark' ? 'theme-dark' : ''}`}
-            >
-                <Input
-                    placeholder="输入项目名称"
-                    value={newProjectName}
-                    onChange={(e) => setNewProjectName(e.target.value)}
-                    onPressEnter={handleCreateProject}
-                />
-            </Modal>
+            <CreateProjectModal
+                visible={createProjectModal}
+                onClose={() => { setCreateProjectModal(false); setNewProjectName(''); }}
+                onConfirm={createProjectWithName}
+                appTheme={appTheme}
+            />
 
-            <Modal
-                title="创建分组"
-                open={createGroupModal}
-                onOk={handleCreateProjectGroup}
-                onCancel={() => { setCreateGroupModal(false); setNewGroupName(''); }}
-            >
-                <Input
-                    placeholder="输入分组名称"
-                    value={newGroupName}
-                    onChange={(e) => setNewGroupName(e.target.value)}
-                    onPressEnter={handleCreateProjectGroup}
-                />
-            </Modal>
+            <CreateGroupModal
+                visible={createGroupModal}
+                onClose={() => { setCreateGroupModal(false); setNewGroupName(''); }}
+                onConfirm={createGroupWithName}
+            />
 
-            <Modal
-                title="重命名项目"
-                open={renameProjectModal}
-                onOk={handleRenameProject}
-                onCancel={() => {
+            <RenameProjectModal
+                visible={renameProjectModal}
+                onClose={() => {
                     setRenameProjectModal(false);
                     setRenameProjectId('');
                     setRenameProjectValue('');
                 }}
-            >
-                <Input
-                    placeholder="输入新项目名称"
-                    value={renameProjectValue}
-                    onChange={(e) => setRenameProjectValue(e.target.value)}
-                    onPressEnter={handleRenameProject}
-                />
-            </Modal>
+                onConfirm={renameProjectWithName}
+                initialValue={renameProjectValue}
+            />
 
-            <Modal
-                title="重命名分组"
-                open={renameGroupModal}
-                onOk={handleRenameProjectGroup}
-                onCancel={() => {
+            <RenameGroupModal
+                visible={renameGroupModal}
+                onClose={() => {
                     setRenameGroupModal(false);
                     setEditingGroupName('');
                     setRenameGroupValue('');
                 }}
-            >
-                <Input
-                    placeholder="输入新分组名称"
-                    value={renameGroupValue}
-                    onChange={(e) => setRenameGroupValue(e.target.value)}
-                    onPressEnter={handleRenameProjectGroup}
-                />
-            </Modal>
+                onConfirm={renameGroupWithName}
+                initialValue={renameGroupValue}
+            />
 
             <CreateFolderModal
                 visible={createFolderModal}
@@ -4842,30 +4629,12 @@ function App() {
                 onClearSearch={clearHistorySearch}
             />
 
-            <div className="app-footer">
-                <Button
-                    icon={<SafetyOutlined />}
-                    onClick={() => { setCookieModalVisible(true); loadGlobalCookies(); }}
-                >
-                    Cookie
-                </Button>
-                <Button
-                    icon={<ApiOutlined />}
-                    className={`mcp-status ${mcpStatus}`}
-                    onClick={() => { setMCpModalVisible(true); }}
-                >
-                    {mcpStatus === 'running' ? 'MCP 运行中' : 'MCP'}
-                </Button>
-                <Button
-                    icon={<FileTextOutlined />}
-                    onClick={async () => {
-                        setHistoryModalVisible(true);
-                        clearHistorySearch();
-                    }}
-                >
-                    Log
-                </Button>
-            </div>
+            <AppFooter
+                mcpStatus={mcpStatus}
+                onOpenCookie={() => { setCookieModalVisible(true); loadGlobalCookies(); }}
+                onOpenMCP={() => setMCpModalVisible(true)}
+                onOpenHistory={() => { setHistoryModalVisible(true); clearHistorySearch(); }}
+            />
         </div>
     );
 }

@@ -3,28 +3,7 @@ import { Modal, Table, Button, Input, Select, Row, Col } from 'antd';
 import { JsonView, darkStyles, allExpanded } from 'react-json-view-lite';
 import 'react-json-view-lite/dist/index.css';
 import { ClearHistory, GetHistoryEntry, SearchHistory, ListHistory } from '../../wailsjs/go/main/App';
-
-const getMethodColor = (method: string): string => {
-    const colors: Record<string, string> = {
-        GET: '#61affe',
-        POST: '#49cc90',
-        PUT: '#fca130',
-        DELETE: '#f93e3e',
-        PATCH: '#50e3c2',
-        OPTIONS: '#0d5aa7',
-        HEAD: '#9012fe',
-    };
-    return colors[method?.toUpperCase()] || '#666';
-};
-
-const getStatusColor = (status: number | undefined): string => {
-    if (!status) return '#666';
-    if (status >= 200 && status < 300) return '#49cc90';
-    if (status >= 300 && status < 400) return '#fca130';
-    if (status >= 400 && status < 500) return '#f93e3e';
-    if (status >= 500) return '#f93e3e';
-    return '#666';
-};
+import { getMethodColor, getStatusColor } from '../utils/ui';
 
 interface HistoryModalProps {
     visible: boolean;
