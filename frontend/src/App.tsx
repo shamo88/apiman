@@ -24,6 +24,13 @@ import { SidebarMenuHeader } from './components/SidebarMenuHeader';
 import { RequestTabsBar } from './components/RequestTabsBar';
 import { ApiListFilters } from './components/ApiListFilters';
 import { SidebarList } from './components/SidebarList';
+import { ResponseCookies } from './components/ResponseCookies';
+import { ResponseHeaders } from './components/ResponseHeaders';
+import { ResponseStatus } from './components/ResponseStatus';
+import { EmptyState } from './components/EmptyState';
+import { MethodSelector } from './components/MethodSelector';
+import { BodyTypeSelector } from './components/BodyTypeSelector';
+import { ScriptEditor } from './components/ScriptEditor';
 import { KeyValueEditor } from './components/KeyValueEditor';
 
 interface Project {
@@ -3267,17 +3274,11 @@ function App() {
                         {loading && <Spin style={{ display: 'block', margin: '40px auto' }} />}
 
                         {!loading && projects.length === 0 && (
-                            <div className="empty-state">
-                                <ApiOutlined className="empty-state-icon" />
-                                <div>暂无项目，点击"新建项目"创建一个</div>
-                            </div>
+                            <EmptyState text='暂无项目，点击"新建项目"创建一个' />
                         )}
 
                         {!loading && projects.length > 0 && filteredProjects.length === 0 && (
-                            <div className="empty-state">
-                                <ApiOutlined className="empty-state-icon" />
-                                <div>没有匹配的项目</div>
-                            </div>
+                            <EmptyState text="没有匹配的项目" />
                         )}
 
                         {!loading && groupedProjects.length > 0 && (
@@ -3661,12 +3662,10 @@ function App() {
                                                 </Space>
                                             </div>
                                             <div className="script-editor-wrapper">
-                                                <CodeMirror
+                                                <ScriptEditor
                                                     value={scriptFormContent}
-                                                    height="100%"
-                                                    theme={appTheme === 'dark' ? 'dark' : 'light'}
-                                                    extensions={[javascript()]}
-                                                    onChange={(value) => setScriptFormContent(value)}
+                                                    onChange={setScriptFormContent}
+                                                    theme={appTheme}
                                                 />
                                             </div>
                                         </div>
@@ -3684,19 +3683,9 @@ function App() {
                                         </div>
                                     )}
                                     <div className="api-request-bar">
-                                        <Select
+                                        <MethodSelector
                                             value={apiConfig.method}
                                             onChange={(value) => setApiConfig({ ...apiConfig, method: value })}
-                                            style={{ width: 100 }}
-                                            options={[
-                                                { value: 'GET', label: 'GET' },
-                                                { value: 'POST', label: 'POST' },
-                                                { value: 'PUT', label: 'PUT' },
-                                                { value: 'DELETE', label: 'DELETE' },
-                                                { value: 'PATCH', label: 'PATCH' },
-                                                { value: 'OPTIONS', label: 'OPTIONS' },
-                                                { value: 'HEAD', label: 'HEAD' },
-                                            ]}
                                         />
                                         {renderVariableAwareInput(
                                             apiConfig.url,
@@ -3765,20 +3754,10 @@ function App() {
                                                     children: (
                                                         <div className="body-editor">
                                                             <div className="body-type-selector">
-                                                                <Radio.Group
+                                                                <BodyTypeSelector
                                                                     value={apiConfig.bodyType || 'none'}
-                                                                    onChange={(e) => setApiConfig({ ...apiConfig, bodyType: e.target.value })}
-                                                                    optionType="button"
-                                                                    buttonStyle="solid"
-                                                                >
-                                                                    <Radio.Button value="none">none</Radio.Button>
-                                                                    <Radio.Button value="form-data">form-data</Radio.Button>
-                                                                    <Radio.Button value="x-www-form-urlencoded">x-www-form-urlencoded</Radio.Button>
-                                                                    <Radio.Button value="json">JSON</Radio.Button>
-                                                                    <Radio.Button value="xml">XML</Radio.Button>
-                                                                    <Radio.Button value="raw">Raw</Radio.Button>
-                                                                    <Radio.Button value="binary">Binary</Radio.Button>
-                                                                </Radio.Group>
+                                                                    onChange={(type) => setApiConfig({ ...apiConfig, bodyType: type })}
+                                                                />
                                                             </div>
                                                             {apiConfig.bodyType === 'none' && (
                                                                 <div className="body-empty">This request does not have a body</div>
@@ -4079,20 +4058,7 @@ function App() {
 
                                     {response && (
                                         <div className="response-panel">
-                                            <div className="response-header">
-                                                <span style={{
-                                                    padding: '2px 8px',
-                                                    borderRadius: 4,
-                                                    fontSize: 12,
-                                                    fontWeight: 500,
-                                                    background: getStatusColor(response.status_code) + '20',
-                                                    color: getStatusColor(response.status_code),
-                                                    border: `1px solid ${getStatusColor(response.status_code)}40`
-                                                }}>
-                                                    {response.status_code}
-                                                </span>
-                                                <span className="duration">{response.duration}ms</span>
-                                            </div>
+                                            <ResponseStatus statusCode={response.status_code} duration={response.duration} />
                                             <Tabs
                                                 defaultActiveKey="body"
                                                 items={[
@@ -4111,26 +4077,7 @@ function App() {
                                                         key: 'headers',
                                                         label: 'Header',
                                                         children: (
-                                                            <div className="response-body" style={{ height: responseBodyHeight }}>
-                                                                <div className="response-headers">
-                                                                    {response.headers && Object.entries(response.headers as Record<string, string[]>).map(([key, values]) => {
-                                                                        if (key.toLowerCase() === 'set-cookie') {
-                                                                            return values.map((cookie: string, i: number) => (
-                                                                                <div key={`${key}-${i}`} className="response-header-item">
-                                                                                    <span className="header-key">{i === 0 ? key : ''}</span>
-                                                                                    <span className="header-value set-cookie-value">{cookie}</span>
-                                                                                </div>
-                                                                            ));
-                                                                        }
-                                                                        return values.map((value: string, i: number) => (
-                                                                            <div key={`${key}-${i}`} className="response-header-item">
-                                                                                <span className="header-key">{i === 0 ? key : ''}</span>
-                                                                                <span className="header-value">{value}</span>
-                                                                            </div>
-                                                                        ));
-                                                                    })}
-                                                                </div>
-                                                            </div>
+                                                            <ResponseHeaders headers={response.headers} height={responseBodyHeight} />
                                                         ),
                                                     },
                                                     {
@@ -4162,47 +4109,7 @@ function App() {
                                                         key: 'cookies',
                                                         label: 'Cookie',
                                                         children: (
-                                                            <div className="response-body" style={{ height: responseBodyHeight }}>
-                                                                <div className="response-cookies">
-                                                                    {response.cookies && response.cookies.length > 0 ? (
-                                                                        <table className="cookie-table">
-                                                                            <thead>
-                                                                                <tr>
-                                                                                    <th>Name</th>
-                                                                                    <th>Value</th>
-                                                                                    <th>Domain</th>
-                                                                                    <th>Path</th>
-                                                                                    <th>Expires</th>
-                                                                                    <th>Flags</th>
-                                                                                </tr>
-                                                                            </thead>
-                                                                            <tbody>
-                                                                                {response.cookies.map((cookie: any, index: number) => (
-                                                                                    <tr key={index}>
-                                                                                        <td className="cookie-name-cell">{cookie.name}</td>
-                                                                                        <td className="cookie-value-cell">{cookie.value}</td>
-                                                                                        <td>{cookie.domain || '-'}</td>
-                                                                                        <td>{cookie.path || '-'}</td>
-                                                                                        <td className="cookie-expires-cell">
-                                                                                            {cookie.expires && cookie.expires !== '0001-01-01 00:00:00 +0000 UTC'
-                                                                                                ? new Date(cookie.expires).toLocaleString()
-                                                                                                : 'Session'}
-                                                                                        </td>
-                                                                                        <td>
-                                                                                            <div className="cookie-flags">
-                                                                                                {cookie.http_only && <span className="cookie-flag http-only">HttpOnly</span>}
-                                                                                                {cookie.secure && <span className="cookie-flag secure">Secure</span>}
-                                                                                            </div>
-                                                                                        </td>
-                                                                                    </tr>
-                                                                                ))}
-                                                                            </tbody>
-                                                                        </table>
-                                                                    ) : (
-                                                                        <div className="response-empty">No cookies in response</div>
-                                                                    )}
-                                                                </div>
-                                                            </div>
+                                                            <ResponseCookies cookies={response.cookies || []} height={responseBodyHeight} />
                                                         ),
                                                     },
                                                     ...(response.script_logs?.length || response.tests?.length ? [{
@@ -4334,10 +4241,7 @@ function App() {
                                     )}
                                 </div>
                             ) : (
-                                <div className="empty-state">
-                                    <ApiOutlined className="empty-state-icon" />
-                                    <div>选择一个请求开始测试</div>
-                                </div>
+                                <EmptyState text="选择一个请求开始测试" />
                             )}
                         </div>
                     </div>
