@@ -10,9 +10,9 @@ import { models } from '../wailsjs/go/models';
 import './App.css';
 import { ScriptHelpWindow, TitleBar } from './components/layout';
 import { MCPSettingsModal, HistoryModal, CookieModal, AddCaseModal, RenameCaseModal, CreateFolderModal, CreateRequestModal, RenameModal, CreateProjectModal, CreateGroupModal, RenameProjectModal, RenameGroupModal } from './components/modals';
-import { AppFooter, EmptyState, EnvironmentVarEditor, ProjectSearchBar } from './components/home';
+import { AppFooter, EmptyState, EnvironmentVarEditor, EnvironmentPanel, ProjectSearchBar, ScriptPanel } from './components/home';
 import { SidebarMenuHeader, RequestTabsBar, ApiListFilters, SidebarList } from './components/sidebar';
-import { ResponseCookies, ResponseHeaders, ResponseStatus, ResponseBodyViewer } from './components/response';
+import { ResponseCookies, ResponseHeaders, ResponseStatus, ResponseBodyViewer, ScriptResultsPanel } from './components/response';
 import { MethodSelector, BodyTypeSelector, ScriptEditor, ScriptBindingList, KeyValueEditor, ApiRequestBar, VariableEditableInput } from './components/request';
 
 interface Project {
@@ -3531,43 +3531,23 @@ function App() {
                                                 style={{ marginBottom: 12 }}
                                                 animated={(animationEnabled || forceListAnimation)}
                                             />
-                                            <div className="environment-panel">
-                                                <Input
-                                                    placeholder="环境名称"
-                                                    value={environmentFormName}
-                                                    onChange={(e) => setEnvironmentFormName(e.target.value)}
-                                                    style={{ marginBottom: 10 }}
-                                                />
-                                                <div className="environment-vars-header">
-                                                    <span>变量</span>
-                                                    <Button
-                                                        size="small"
-                                                        type="link"
-                                                        icon={<PlusOutlined />}
-                                                        onClick={() => setEnvironmentFormVariables(prev => [...prev, createEnvironmentVariableRow()])}
-                                                    >
-                                                        添加
-                                                    </Button>
-                                                </div>
-                                                <EnvironmentVarEditor
-                                                    variables={environmentFormVariables}
-                                                    onUpdate={(id, field, value) => setEnvironmentFormVariables(prev => prev.map((row) => row.id === id ? { ...row, [field]: value } : row))}
-                                                    onRemove={(id) => setEnvironmentFormVariables(prev => {
-                                                        const next = prev.filter((row) => row.id !== id);
-                                                        return next.length > 0 ? next : [createEnvironmentVariableRow()];
-                                                    })}
-                                                    onAdd={() => setEnvironmentFormVariables(prev => [...prev, createEnvironmentVariableRow()])}
-                                                />
-                                                <Space style={{ width: '100%', justifyContent: 'space-between', marginTop: 12 }}>
-                                                    <Button onClick={resetEnvironmentEditor}>清空</Button>
-                                                    <Space>
-                                                        {editingEnvironmentId && (
-                                                            <Button danger onClick={handleDeleteEnvironmentCurrent}>删除</Button>
-                                                        )}
-                                                        <Button type="primary" loading={envSaving} onClick={handleSaveEnvironment}>保存</Button>
-                                                    </Space>
-                                                </Space>
-                                            </div>
+                                            <EnvironmentPanel
+                                                environmentFormName={environmentFormName}
+                                                environmentFormVariables={environmentFormVariables}
+                                                envSaving={envSaving}
+                                                editingEnvironmentId={editingEnvironmentId}
+                                                onNameChange={setEnvironmentFormName}
+                                                onVariablesUpdate={(id, field, value) => setEnvironmentFormVariables(prev => prev.map((row) => row.id === id ? { ...row, [field]: value } : row))}
+                                                onVariablesRemove={(id) => setEnvironmentFormVariables(prev => {
+                                                    const next = prev.filter((row) => row.id !== id);
+                                                    return next.length > 0 ? next : [createEnvironmentVariableRow()];
+                                                })}
+                                                onVariablesAdd={() => setEnvironmentFormVariables(prev => [...prev, createEnvironmentVariableRow()])}
+                                                onReset={resetEnvironmentEditor}
+                                                onDelete={handleDeleteEnvironmentCurrent}
+                                                onSave={handleSaveEnvironment}
+                                                createEnvironmentVariableRow={createEnvironmentVariableRow}
+                                            />
                                         </>
                                     ) : (
                                         <Empty description="请先在左侧选择环境，或点击新建" />
@@ -3576,43 +3556,19 @@ function App() {
                             ) : sidebarMenu === 'scripts' ? (
                                 <div className="request-panel">
                                     {editingScriptId ? (
-                                        <div className="environment-panel script-panel">
-                                            <div className="script-editor-header">
-                                                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                                                    <Input
-                                                        placeholder="脚本名称"
-                                                        value={scriptFormName}
-                                                        onChange={(e) => setScriptFormName(e.target.value)}
-                                                        style={{ maxWidth: 200 }}
-                                                    />
-                                                    <Input.TextArea
-                                                        placeholder="描述（可选）"
-                                                        value={scriptFormDescription}
-                                                        onChange={(e) => setScriptFormDescription(e.target.value)}
-                                                        style={{ maxWidth: 300, minWidth: 200, minHeight: 60, maxHeight: 120 }}
-                                                        autoSize={{ minRows: 2, maxRows: 4 }}
-                                                    />
-                                                </div>
-                                                <Space>
-                                                    <Tooltip title="脚本开发指南">
-                                                        <Button
-                                                            type="text"
-                                                            icon={<QuestionCircleOutlined />}
-                                                            onClick={() => setScriptHelpVisible(true)}
-                                                        />
-                                                    </Tooltip>
-                                                    <Button danger onClick={handleDeleteScriptCurrent}>删除</Button>
-                                                    <Button type="primary" loading={scriptSaving} onClick={handleSaveScript}>保存脚本</Button>
-                                                </Space>
-                                            </div>
-                                            <div className="script-editor-wrapper">
-                                                <ScriptEditor
-                                                    value={scriptFormContent}
-                                                    onChange={setScriptFormContent}
-                                                    theme={appTheme}
-                                                />
-                                            </div>
-                                        </div>
+                                        <ScriptPanel
+                                            scriptFormName={scriptFormName}
+                                            scriptFormDescription={scriptFormDescription}
+                                            scriptFormContent={scriptFormContent}
+                                            scriptSaving={scriptSaving}
+                                            appTheme={appTheme}
+                                            onNameChange={setScriptFormName}
+                                            onDescriptionChange={setScriptFormDescription}
+                                            onContentChange={setScriptFormContent}
+                                            onHelpClick={() => setScriptHelpVisible(true)}
+                                            onDelete={handleDeleteScriptCurrent}
+                                            onSave={handleSaveScript}
+                                        />
                                     ) : (
                                         <Empty description="请先在左侧选择脚本，或点击新建" />
                                     )}
@@ -3944,122 +3900,15 @@ function App() {
                                                         key: 'scripts',
                                                         label: '脚本结果',
                                                         children: (
-                                                            <div className="script-results-panel" style={{ height: scriptResultsHeight }}>
-                                                                {response.script_logs && response.script_logs.length > 0 && (() => {
-                                                                    // Parse workflow items from logs
-                                                                    const workflowItems: { name: string; type: 'pre' | 'post' | 'http'; status: 'running' | 'success' | 'failed'; duration?: number }[] = [];
-                                                                    const logs = response.script_logs;
-                                                                    let currentScript = '';
-                                                                    let currentType: 'pre' | 'post' | 'http' = 'pre';
-                                                                    let currentStatus: 'running' | 'success' | 'failed' = 'running';
-
-                                                                    for (const log of logs) {
-                                                                        const startMatch = log.match(/\[([^\]]+)\] ▶ START/);
-                                                                        if (startMatch) {
-                                                                            currentScript = startMatch[1];
-                                                                            currentType = currentScript.toLowerCase().includes('pre') ? 'pre' : 'post';
-                                                                            currentStatus = 'running';
-                                                                            workflowItems.push({ name: currentScript, type: currentType, status: currentStatus });
-                                                                            continue;
-                                                                        }
-                                                                        const successMatch = log.match(/\[([^\]]+)\] ✓ SUCCESS/);
-                                                                        if (successMatch) {
-                                                                            currentStatus = 'success';
-                                                                            if (workflowItems.length > 0 && workflowItems[workflowItems.length - 1].status === 'running') {
-                                                                                workflowItems[workflowItems.length - 1].status = 'success';
-                                                                            } else {
-                                                                                workflowItems.push({ name: successMatch[1], type: 'http', status: 'success' });
-                                                                            }
-                                                                            continue;
-                                                                        }
-                                                                        const failedMatch = log.match(/\[([^\]]+)\] ✗ FAILED/);
-                                                                        if (failedMatch) {
-                                                                            currentStatus = 'failed';
-                                                                            if (workflowItems.length > 0 && workflowItems[workflowItems.length - 1].status === 'running') {
-                                                                                workflowItems[workflowItems.length - 1].status = 'failed';
-                                                                            } else {
-                                                                                workflowItems.push({ name: failedMatch[1], type: 'http', status: 'failed' });
-                                                                            }
-                                                                            continue;
-                                                                        }
-                                                                    }
-
-                                                                    return (
-                                                                        <div className="script-workflow">
-                                                                            {workflowItems.map((item, idx) => (
-                                                                                <React.Fragment key={idx}>
-                                                                                    <div className={`script-workflow-item ${item.type === 'pre' ? 'pre-script' : 'post-script'} ${item.status}`}>
-                                                                                        <div className="script-workflow-icon">
-                                                                                            {item.status === 'success' ? '✓' : item.status === 'failed' ? '✗' : '▶'}
-                                                                                        </div>
-                                                                                        <div className="script-workflow-content">
-                                                                                            <div className="script-workflow-name">{item.name}</div>
-                                                                                            <div className="script-workflow-status">
-                                                                                                {item.status === 'success' ? '执行成功' : item.status === 'failed' ? '执行失败' : '执行中...'}
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                    {idx < workflowItems.length - 1 && <div className="script-workflow-line"></div>}
-                                                                                </React.Fragment>
-                                                                            ))}
-                                                                        </div>
-                                                                    );
-                                                                })()}
-                                                                {response.script_logs && response.script_logs.length > 0 && (
-                                                                    <div className="script-logs-section" style={{ marginTop: 16 }}>
-                                                                        <div
-                                                                            className="section-header clickable"
-                                                                            onClick={() => setScriptLogsExpanded(!scriptLogsExpanded)}
-                                                                        >
-                                                                            <span className={`expand-icon ${scriptLogsExpanded ? 'expanded' : ''}`}>▶</span>
-                                                                            <span className="section-title">Console Logs</span>
-                                                                            <span className="section-count">{response.script_logs.length}</span>
-                                                                        </div>
-                                                                        {scriptLogsExpanded && (
-                                                                            <div className="script-logs-content">
-                                                                                {response.script_logs.map((log: string, index: number) => {
-                                                                                    let className = 'script-log-entry';
-                                                                                    if (log.includes('▶ START')) className += ' script-start';
-                                                                                    else if (log.includes('✓ SUCCESS')) className += ' script-success';
-                                                                                    else if (log.includes('✗ FAILED')) className += ' script-failed';
-                                                                                    return (
-                                                                                        <div key={index} className={className}>
-                                                                                            {log}
-                                                                                        </div>
-                                                                                    );
-                                                                                })}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                )}
-                                                                {response.tests && response.tests.length > 0 && (
-                                                                    <div className="test-results-section">
-                                                                        <div
-                                                                            className="section-header clickable"
-                                                                            onClick={() => setTestResultsExpanded(!testResultsExpanded)}
-                                                                        >
-                                                                            <span className={`expand-icon ${testResultsExpanded ? 'expanded' : ''}`}>▶</span>
-                                                                            <span className="section-title">Test Results</span>
-                                                                            <span className="test-summary">
-                                                                                ({response.tests.filter((t: any) => t.passed).length}/{response.tests.length} passed)
-                                                                            </span>
-                                                                        </div>
-                                                                        {testResultsExpanded && (
-                                                                            <div className="test-results-list">
-                                                                                {response.tests.map((test: any, index: number) => (
-                                                                                    <div key={index} className={`test-result-item ${test.passed ? 'passed' : 'failed'}`}>
-                                                                                        <span className="test-status-icon">{test.passed ? '✓' : '✗'}</span>
-                                                                                        <span className="test-name">{test.name}</span>
-                                                                                        {!test.passed && test.message && (
-                                                                                            <span className="test-message">{test.message}</span>
-                                                                                        )}
-                                                                                    </div>
-                                                                                ))}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                )}
-                                                            </div>
+                                                            <ScriptResultsPanel
+                                                                script_logs={response.script_logs}
+                                                                tests={response.tests}
+                                                                scriptResultsHeight={scriptResultsHeight}
+                                                                scriptLogsExpanded={scriptLogsExpanded}
+                                                                testResultsExpanded={testResultsExpanded}
+                                                                onScriptLogsExpand={() => setScriptLogsExpanded(!scriptLogsExpanded)}
+                                                                onTestResultsExpand={() => setTestResultsExpanded(!testResultsExpanded)}
+                                                            />
                                                         ),
                                                     }] : []),
                                                 ]}
