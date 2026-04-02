@@ -4913,55 +4913,14 @@ token=xyz789; Domain=api.example.com; Path=/api`}
                 open={historyModalVisible}
                 onCancel={() => { setHistoryModalVisible(false); setHistoryDetail(null); }}
                 footer={null}
-                width={historyDetail ? 1500 : 1000}
+                width={1000}
                 destroyOnClose
             >
-                {historyDetail ? (
-                    <div>
-                        <div style={{ marginBottom: 12 }}>
-                            <strong>{historyDetail.request_name || '未命名请求'}</strong>
-                            <span style={{ marginLeft: 12, color: getMethodColor(historyDetail.method) }}>{historyDetail.method}</span>
-                            <span style={{ marginLeft: 12 }}>{historyDetail.url}</span>
-                        </div>
-                        <Row gutter={12}>
-                            <Col span={12} style={{ textAlign: "left" }}>
-                                <h4>请求信息</h4>
-                                <div className="json-view-container" style={{ background: 'var(--bg-tertiary)', padding: 12, borderRadius: 4, maxHeight: 500, overflow: 'auto', minHeight: 250 }}>
-                                    <JsonView
-                                        data={historyDetail.spec || {}}
-                                        style={appTheme === 'dark' ? darkStyles : undefined}
-                                        shouldExpandNode={allExpanded}
-                                        clickToExpandNode
-                                    />
-                                </div>
-                            </Col>
-                            <Col span={12} style={{ textAlign: "left" }}>
-                                <div style={{ display: "flex" }}>
-                                    <h4>响应信息</h4>
-                                    <div style={{ marginLeft: 8, display: 'flex', gap: 12 }}>
-                                        <span style={{ color: getStatusColor(historyDetail.response?.status_code) }}>
-                                            Status: {historyDetail.response?.status_code || 'N/A'}
-                                        </span>
-                                        <span>Duration: {historyDetail.response?.duration || 0}ms</span>
-                                    </div>
-                                </div>
-                                <div className="json-view-container" style={{ background: 'var(--bg-tertiary)', padding: 12, borderRadius: 4, maxHeight: 470, overflow: 'auto', minHeight: 250 }}>
-                                    <JsonView
-                                        data={historyDetail.response || {}}
-                                        style={appTheme === 'dark' ? darkStyles : undefined}
-                                        shouldExpandNode={allExpanded}
-                                        clickToExpandNode
-                                    />
-                                </div>
-                            </Col>
-                        </Row>
-                    </div>
-                ) : (
-                    <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                            <Button size='small' danger onClick={async () => {
-                                Modal.confirm({
-                                    title: '确认清空',
+                <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <Button size='small' danger onClick={async () => {
+                            Modal.confirm({
+                                title: '确认清空',
                                     content: '确定要清空所有历史记录吗？',
                                     onOk: async () => {
                                         await ClearHistory();
@@ -5083,6 +5042,56 @@ token=xyz789; Domain=api.example.com; Path=/api`}
                                 { title: '耗时', dataIndex: 'duration', width: 70, render: (v) => v ? `${v}ms` : '-' },
                             ]}
                         />
+                    </div>
+                </Modal>
+
+            <Modal
+                title={historyDetail ? `${historyDetail.request_name || '请求详情'} - ${historyDetail.method}` : '请求详情'}
+                open={!!historyDetail}
+                onCancel={() => setHistoryDetail(null)}
+                footer={null}
+                width={1200}
+                destroyOnClose
+            >
+                {historyDetail && (
+                    <div>
+                        <div style={{ marginBottom: 12 }}>
+                            <strong>{historyDetail.request_name || '未命名请求'}</strong>
+                            <span style={{ marginLeft: 12, color: getMethodColor(historyDetail.method) }}>{historyDetail.method}</span>
+                            <span style={{ marginLeft: 12 }}>{historyDetail.url}</span>
+                        </div>
+                        <Row gutter={12}>
+                            <Col span={12} style={{ textAlign: "left" }}>
+                                <h4>请求信息</h4>
+                                <div className="json-view-container" style={{ background: 'var(--bg-tertiary)', padding: 12, borderRadius: 4, maxHeight: 500, overflow: 'auto', minHeight: 250 }}>
+                                    <JsonView
+                                        data={historyDetail.spec || {}}
+                                        style={appTheme === 'dark' ? darkStyles : undefined}
+                                        shouldExpandNode={allExpanded}
+                                        clickToExpandNode
+                                    />
+                                </div>
+                            </Col>
+                            <Col span={12} style={{ textAlign: "left" }}>
+                                <div style={{ display: "flex" }}>
+                                    <h4>响应信息</h4>
+                                    <div style={{ marginLeft: 8, display: 'flex', gap: 12 }}>
+                                        <span style={{ color: getStatusColor(historyDetail.response?.status_code) }}>
+                                            Status: {historyDetail.response?.status_code || 'N/A'}
+                                        </span>
+                                        <span>Duration: {historyDetail.response?.duration || 0}ms</span>
+                                    </div>
+                                </div>
+                                <div className="json-view-container" style={{ background: 'var(--bg-tertiary)', padding: 12, borderRadius: 4, maxHeight: 470, overflow: 'auto', minHeight: 250 }}>
+                                    <JsonView
+                                        data={historyDetail.response || {}}
+                                        style={appTheme === 'dark' ? darkStyles : undefined}
+                                        shouldExpandNode={allExpanded}
+                                        clickToExpandNode
+                                    />
+                                </div>
+                            </Col>
+                        </Row>
                     </div>
                 )}
             </Modal>
