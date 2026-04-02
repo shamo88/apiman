@@ -13,6 +13,10 @@ import './App.css';
 import { ScriptHelpWindow } from './components/ScriptHelpWindow';
 import { TitleBar } from './components/TitleBar';
 import { MCPSettingsModal } from './components/MCPSettingsModal';
+import { HistoryModal } from './components/HistoryModal';
+import { CookieModal } from './components/CookieModal';
+import { AddCaseModal, RenameCaseModal } from './components/CaseModal';
+import { CreateFolderModal, CreateRequestModal, RenameModal } from './components/CreateModal';
 
 interface Project {
     id: string;
@@ -886,7 +890,7 @@ function App() {
     const [searchVersion, setSearchVersion] = useState(0);
     const [projectWorkspaceStates, setProjectWorkspaceStates] = useState<Record<string, ProjectWorkspaceState>>({});
     const [animationEnabled, setListAnimationEnabled] = useState(false);
-    const [appTheme, setAppTheme] = useState(() => {
+    const [appTheme, setAppTheme] = useState<'light' | 'dark'>(() => {
         // 尝试从 localStorage 读取主题，避免闪烁
         const saved = localStorage.getItem('apiman-theme');
         return saved === 'dark' || saved === 'light' ? saved : 'light';
@@ -3317,7 +3321,7 @@ function App() {
                 onListAnimationChange={setListAnimationEnabled}
                 onThemeChange={(theme) => {
                     localStorage.setItem('apiman-theme', theme);
-                    setAppTheme(theme);
+                    setAppTheme(theme as 'light' | 'dark');
                 }}
                 theme={appTheme}
                 onSettingsSave={loadProjects}
@@ -4743,153 +4747,57 @@ function App() {
                 />
             </Modal>
 
-            <Modal
-                title="创建文件夹"
-                open={createFolderModal}
-                onOk={handleCreateFolder}
-                onCancel={() => { setCreateFolderModal(false); setNewFolderName(''); }}
-            >
-                <Input
-                    placeholder="输入文件夹名称"
-                    value={newFolderName}
-                    onChange={(e) => setNewFolderName(e.target.value)}
-                    onPressEnter={handleCreateFolder}
-                />
-            </Modal>
+            <CreateFolderModal
+                visible={createFolderModal}
+                onClose={() => { setCreateFolderModal(false); setNewFolderName(''); }}
+                onConfirm={handleCreateFolder}
+            />
 
-            <Modal
-                title="创建请求"
-                open={createRequestModal}
-                onOk={handleCreateRequest}
-                onCancel={() => { setCreateRequestModal(false); setNewRequestName(''); }}
-            >
-                <Input
-                    placeholder="输入请求名称"
-                    value={newRequestName}
-                    onChange={(e) => setNewRequestName(e.target.value)}
-                    onPressEnter={handleCreateRequest}
-                />
-            </Modal>
+            <CreateRequestModal
+                visible={createRequestModal}
+                onClose={() => { setCreateRequestModal(false); setNewRequestName(''); }}
+                onConfirm={handleCreateRequest}
+            />
 
-            <Modal
+            <RenameModal
+                visible={renameModal}
+                onClose={() => { setRenameModal(false); setRenamePath(''); setRenameValue(''); }}
+                onConfirm={handleRename}
                 title={renameType === 'request' ? '重命名请求' : '重命名文件夹'}
-                open={renameModal}
-                onOk={handleRename}
-                onCancel={() => { setRenameModal(false); setRenamePath(''); setRenameValue(''); }}
-            >
-                <Input
-                    ref={renameInputRef}
-                    placeholder="输入新名称"
-                    value={renameValue}
-                    onChange={(e) => setRenameValue(trimRightSpaces(e.target.value))}
-                    onPressEnter={handleRename}
-                />
-            </Modal>
+                initialValue={renameValue}
+            />
 
-            <Modal
-                title="新增用例"
-                open={addCaseModalOpen}
-                onOk={confirmAddCaseModal}
-                onCancel={() => {
+            <AddCaseModal
+                visible={addCaseModalOpen}
+                onClose={() => {
                     setAddCaseModalOpen(false);
                     setAddCaseTargetPath('');
                     setAddCaseNameInput('');
                 }}
-            >
-                <Input
-                    placeholder="输入用例名称"
-                    value={addCaseNameInput}
-                    onChange={(e) => setAddCaseNameInput(e.target.value)}
-                    onPressEnter={confirmAddCaseModal}
-                />
-            </Modal>
+                onConfirm={confirmAddCaseModal}
+                initialName={addCaseNameInput}
+            />
 
-            <Modal
-                title="重命名用例"
-                open={caseRenameModalOpen}
-                onOk={confirmCaseRenameFromTree}
-                onCancel={() => {
+            <RenameCaseModal
+                visible={caseRenameModalOpen}
+                onClose={() => {
                     setCaseRenameModalOpen(false);
                     setCaseRenameCasePath('');
                     setCaseRenameInput('');
                 }}
-            >
-                <Input
-                    placeholder="用例名称"
-                    value={caseRenameInput}
-                    onChange={(e) => setCaseRenameInput(e.target.value)}
-                    onPressEnter={confirmCaseRenameFromTree}
-                />
-            </Modal>
+                onConfirm={confirmCaseRenameFromTree}
+                initialName={caseRenameInput}
+            />
 
-            <Modal
-                title="设置全局Cookie"
-                open={cookieModalVisible}
-                onOk={handleSaveCookies}
-                onCancel={() => { setCookieModalVisible(false); setCookieInput(''); }}
-                className={`cookie-modal ${appTheme === 'dark' ? 'theme-dark' : ''}`}
-                width={700}
-                okText="保存"
-            >
-                <div style={{ marginBottom: 16 }}>
-                    <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                        输入 set-cookie 原始报文，每行一个。Cookie 将对所有项目的所有请求生效。
-                    </p>
-                    <Input.TextArea
-                        rows={6}
-                        placeholder={`例如:
-session=abc123; Domain=.example.com; Path=/; Expires=Wed, 09 Jun 2026 10:18:14 GMT; HttpOnly; Secure
-token=xyz789; Domain=api.example.com; Path=/api`}
-                        value={cookieInput}
-                        onChange={(e) => setCookieInput(e.target.value)}
-                        style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}
-                    />
-                </div>
-
-                {globalCookies.length > 0 && (
-                    <div>
-                        <Divider style={{ margin: '16px 0' }} />
-                        <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>已保存的 Cookies</p>
-                        <Table
-                            size="small"
-                            dataSource={globalCookies}
-                            rowKey="id"
-                            pagination={false}
-                            scroll={{ y: 200 }}
-                            columns={[
-                                { title: 'Name', dataIndex: 'name', key: 'name', width: 120, ellipsis: true },
-                                { title: 'Domain', dataIndex: 'domain', key: 'domain', width: 120, ellipsis: true },
-                                { title: 'Path', dataIndex: 'path', key: 'path', width: 80, ellipsis: true },
-                                {
-                                    title: 'Expires',
-                                    dataIndex: 'expires',
-                                    key: 'expires',
-                                    width: 150,
-                                    ellipsis: true,
-                                    render: (val: string) => val ? new Date(val).toLocaleString() : 'Session'
-                                },
-                                { title: 'SameSite', dataIndex: 'same_site', key: 'same_site', width: 80, ellipsis: true },
-                                { title: 'Priority', dataIndex: 'priority', key: 'priority', width: 80, ellipsis: true },
-                                {
-                                    title: 'Action',
-                                    key: 'action',
-                                    width: 80,
-                                    render: (_: any, record: any) => (
-                                        <Button
-                                            type="text"
-                                            danger
-                                            size="small"
-                                            onClick={() => handleDeleteCookie(record.id)}
-                                        >
-                                            删除
-                                        </Button>
-                                    )
-                                }
-                            ]}
-                        />
-                    </div>
-                )}
-            </Modal>
+            <CookieModal
+                visible={cookieModalVisible}
+                onClose={() => { setCookieModalVisible(false); setCookieInput(''); }}
+                appTheme={appTheme}
+                cookieInput={cookieInput}
+                setCookieInput={setCookieInput}
+                globalCookies={globalCookies}
+                onLoadCookies={loadGlobalCookies}
+            />
 
             <ScriptHelpWindow
                 visible={scriptHelpVisible}
@@ -4908,193 +4816,31 @@ token=xyz789; Domain=api.example.com; Path=/api`}
                 onLoadEnvironments={loadMCPEnvironments}
             />
 
-            <Modal
-                title="历史记录"
-                open={historyModalVisible}
-                onCancel={() => { setHistoryModalVisible(false); setHistoryDetail(null); }}
-                footer={null}
-                width={1000}
-                destroyOnClose
-            >
-                <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                        <Button size='small' danger onClick={async () => {
-                            Modal.confirm({
-                                title: '确认清空',
-                                    content: '确定要清空所有历史记录吗？',
-                                    onOk: async () => {
-                                        await ClearHistory();
-                                        setHistoryList([]);
-                                    }
-                                });
-                            }}>清空全部</Button>
-                        </div>
-                        <div>
-                            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                                <Input
-                                    size='small'
-                                    placeholder='项目'
-                                    value={historySearchProject}
-                                    onChange={(e) => setHistorySearchProject(e.target.value)}
-                                    onPressEnter={searchHistory}
-                                    style={{ width: 120 }}
-                                    allowClear
-                                    onClear={() => { setHistorySearchProject(''); }}
-                                />
-                                <Input
-                                    size='small'
-                                    placeholder='请求名称'
-                                    value={historySearchName}
-                                    onChange={(e) => setHistorySearchName(e.target.value)}
-                                    onPressEnter={searchHistory}
-                                    style={{ width: 120 }}
-                                    allowClear
-                                    onClear={() => { setHistorySearchName(''); }}
-                                />
-                                <Input
-                                    size='small'
-                                    placeholder='URL'
-                                    value={historySearchURL}
-                                    onChange={(e) => setHistorySearchURL(e.target.value)}
-                                    onPressEnter={searchHistory}
-                                    style={{ flex: 1 }}
-                                    allowClear
-                                    onClear={() => { setHistorySearchURL(''); }}
-                                />
-                            </div>
-                            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                                <Select
-                                    size='small'
-                                    placeholder='方法'
-                                    value={historySearchMethod || undefined}
-                                    onChange={(v) => setHistorySearchMethod(v || '')}
-                                    style={{ width: 100 }}
-                                    allowClear
-                                >
-                                    <Select.Option value="GET">GET</Select.Option>
-                                    <Select.Option value="POST">POST</Select.Option>
-                                    <Select.Option value="PUT">PUT</Select.Option>
-                                    <Select.Option value="DELETE">DELETE</Select.Option>
-                                    <Select.Option value="PATCH">PATCH</Select.Option>
-                                    <Select.Option value="OPTIONS">OPTIONS</Select.Option>
-                                    <Select.Option value="HEAD">HEAD</Select.Option>
-                                </Select>
-                                <Input
-                                    size='small'
-                                    placeholder='状态码'
-                                    value={historySearchStatus}
-                                    onChange={(e) => setHistorySearchStatus(e.target.value)}
-                                    onPressEnter={searchHistory}
-                                    style={{ width: 80 }}
-                                    allowClear
-                                    onClear={() => { setHistorySearchStatus(''); }}
-                                />
-                                <Select
-                                    size='small'
-                                    placeholder='来源'
-                                    value={historySearchSource || undefined}
-                                    onChange={(v) => setHistorySearchSource(v || '')}
-                                    style={{ width: 100 }}
-                                    allowClear
-                                >
-                                    <Select.Option value="GUI">GUI</Select.Option>
-                                    <Select.Option value="MCP">MCP</Select.Option>
-                                </Select>
-                                <Button size='small' type='primary' onClick={searchHistory} icon={<SearchOutlined />}>搜索</Button>
-                                <Button size='small' onClick={clearHistorySearch}>重置</Button>
-                            </div>
-                        </div>
-                        <Table
-                            dataSource={historyList}
-                            rowKey='id'
-                            size='small'
-                            loading={historyLoading}
-                            pagination={{ pageSize: 10, showTotal: (total: number) => `共 ${total} 条记录` }}
-                            onRow={(record) => ({
-                                onClick: async () => {
-                                    setHistoryLoading(true);
-                                    try {
-                                        const detail = await GetHistoryEntry(record.id);
-                                        setHistoryDetail(detail);
-                                    } catch (e) {
-                                        console.error('Failed to load history detail:', e);
-                                    } finally {
-                                        setHistoryLoading(false);
-                                    }
-                                },
-                                style: { cursor: 'pointer' }
-                            })}
-                            columns={[
-                                { title: '时间', dataIndex: 'created_at', width: 150, render: (v) => v ? new Date(v).toLocaleString() : '' },
-                                {
-                                    title: '来源', dataIndex: 'source', width: 70, render: (v, record) => {
-                                        if (v === 'MCP') {
-                                            return <span style={{ color: '#49cc90', fontSize: 11 }} title={record.source_tool}>{v}</span>;
-                                        }
-                                        return <span style={{ color: '#61affe', fontSize: 11 }}>{v}</span>;
-                                    }
-                                },
-                                { title: '项目', dataIndex: 'project_name', width: 100, ellipsis: true },
-                                { title: '请求', dataIndex: 'request_name', width: 120, ellipsis: true },
-                                { title: '方法', dataIndex: 'method', width: 60, render: (v) => <span style={{ color: getMethodColor(v) }}>{v}</span> },
-                                { title: 'URL', dataIndex: 'url', ellipsis: true },
-                                { title: '状态', dataIndex: 'status_code', width: 60, render: (v) => <span style={{ color: getStatusColor(v) }}>{v || '-'}</span> },
-                                { title: '耗时', dataIndex: 'duration', width: 70, render: (v) => v ? `${v}ms` : '-' },
-                            ]}
-                        />
-                    </div>
-                </Modal>
-
-            <Modal
-                title={historyDetail ? `${historyDetail.request_name || '请求详情'} - ${historyDetail.method}` : '请求详情'}
-                open={!!historyDetail}
-                onCancel={() => setHistoryDetail(null)}
-                footer={null}
-                width={1200}
-                destroyOnClose
-            >
-                {historyDetail && (
-                    <div>
-                        <div style={{ marginBottom: 12 }}>
-                            <strong>{historyDetail.request_name || '未命名请求'}</strong>
-                            <span style={{ marginLeft: 12, color: getMethodColor(historyDetail.method) }}>{historyDetail.method}</span>
-                            <span style={{ marginLeft: 12 }}>{historyDetail.url}</span>
-                        </div>
-                        <Row gutter={12}>
-                            <Col span={12} style={{ textAlign: "left" }}>
-                                <h4>请求信息</h4>
-                                <div className="json-view-container" style={{ background: 'var(--bg-tertiary)', padding: 12, borderRadius: 4, maxHeight: 500, overflow: 'auto', minHeight: 250 }}>
-                                    <JsonView
-                                        data={historyDetail.spec || {}}
-                                        style={appTheme === 'dark' ? darkStyles : undefined}
-                                        shouldExpandNode={allExpanded}
-                                        clickToExpandNode
-                                    />
-                                </div>
-                            </Col>
-                            <Col span={12} style={{ textAlign: "left" }}>
-                                <div style={{ display: "flex" }}>
-                                    <h4>响应信息</h4>
-                                    <div style={{ marginLeft: 8, display: 'flex', gap: 12 }}>
-                                        <span style={{ color: getStatusColor(historyDetail.response?.status_code) }}>
-                                            Status: {historyDetail.response?.status_code || 'N/A'}
-                                        </span>
-                                        <span>Duration: {historyDetail.response?.duration || 0}ms</span>
-                                    </div>
-                                </div>
-                                <div className="json-view-container" style={{ background: 'var(--bg-tertiary)', padding: 12, borderRadius: 4, maxHeight: 470, overflow: 'auto', minHeight: 250 }}>
-                                    <JsonView
-                                        data={historyDetail.response || {}}
-                                        style={appTheme === 'dark' ? darkStyles : undefined}
-                                        shouldExpandNode={allExpanded}
-                                        clickToExpandNode
-                                    />
-                                </div>
-                            </Col>
-                        </Row>
-                    </div>
-                )}
-            </Modal>
+            <HistoryModal
+                visible={historyModalVisible}
+                onClose={() => { setHistoryModalVisible(false); setHistoryDetail(null); }}
+                appTheme={appTheme}
+                historyList={historyList}
+                setHistoryList={setHistoryList}
+                historyDetail={historyDetail}
+                setHistoryDetail={setHistoryDetail}
+                historyLoading={historyLoading}
+                setHistoryLoading={setHistoryLoading}
+                historySearchProject={historySearchProject}
+                setHistorySearchProject={setHistorySearchProject}
+                historySearchName={historySearchName}
+                setHistorySearchName={setHistorySearchName}
+                historySearchURL={historySearchURL}
+                setHistorySearchURL={setHistorySearchURL}
+                historySearchMethod={historySearchMethod}
+                setHistorySearchMethod={setHistorySearchMethod}
+                historySearchStatus={historySearchStatus}
+                setHistorySearchStatus={setHistorySearchStatus}
+                historySearchSource={historySearchSource}
+                setHistorySearchSource={setHistorySearchSource}
+                onSearch={searchHistory}
+                onClearSearch={clearHistorySearch}
+            />
 
             <div className="app-footer">
                 <Button
