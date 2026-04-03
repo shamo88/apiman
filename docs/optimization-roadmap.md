@@ -80,18 +80,91 @@
 - ✅ Hooks：useProjects、useRequest、useEnvironment、useScript、useHistory、useMCP、useUI
 - ✅ 组件拆分：ApiTree（API树）、HomePage（主页）
 - ✅ 基础设施：utils/apiConfig、utils/curlUtils、utils/variableUtils、utils/treeUtils
+- ✅ 删除废弃的 `renderApiList` 函数（377行）
+- ✅ 删除废弃的 `convertTreeToDataNode` 函数（35行）
+- ✅ 删除废弃的 `getStatusColor` 函数（7行）
+- ✅ 清理未使用的图标导入（7个图标）
 
-**进行中**：
-- 组件拆分：RequestEditor、ResponseViewer、EnvironmentPanel、ScriptPanel
-- App.tsx 精简：从 4080 行精简到 500-800 行（当前 3907 行）
+**当前 App.tsx 大小**：
+- 原始：4080 行
+- 当前：3187 行（累计减少 893 行）
+- 目标：500-800 行
 
-**进度**：
-- ✅ HomePage 组件已集成（减少约 143 行）
-- ✅ ProjectSidebar 组件已集成
+**App.tsx 当前结构分析**：
+```
+App.tsx (3187 行)
+├── 类型定义 (17-145, ~130行) - Project, ProjectTree, CurlRequest 等
+├── 辅助函数 (147-575, ~430行)
+│   ├── apiConfig 相关 (~80行)
+│   ├── curl 相关 (~200行) - buildCurlCommand, parseCurlToApiConfig
+│   └── 变量相关 (~100行) - builtInGenerators, getVariableSuggestions
+├── 状态定义 (578-748, ~170行)
+├── 事件处理函数 (750-1270, ~520行)
+├── useEffects (1274-1400, ~130行)
+├── 更多事件处理 (1400-2737, ~1340行)
+└── 渲染逻辑 (2787-3187, ~400行) - 已大部分组件化
+```
 
-**待完成**：
-- 渐进式集成新组件到 App.tsx
-- 移除 App.tsx 中的重复状态和函数
+**待完成组件化计划**：
+
+| 优先级 | 模块 | 描述 | 预估减少 |
+|--------|------|------|----------|
+| P1 | **类型定义统一** | 将 `Project`, `ProjectTree`, `CurlRequest`, `ApiConfig` 等移动到 `types/index.ts` | ~130行 |
+| P1 | **curlUtils 扩展** | `buildCurlCommand`, `parseCurlToApiConfig` 移动到 `utils/curlUtils.ts` | ~200行 |
+| P1 | **变量工具体系** | `builtInGenerators`, `getVariableSuggestions` 等移动到 `utils/variableUtils.ts` | ~100行 |
+| P2 | **WorkspaceContext 完善** | 将 `ProjectWorkspaceState` 相关状态和函数提取到 `contexts/WorkspaceContext.tsx` | ~500行 |
+| P2 | **useScriptEditor Hook** | 脚本编辑器相关逻辑提取到 `hooks/useScriptEditor.ts` | ~200行 |
+| P2 | **useRequestEditor Hook** | 请求编辑器状态管理提取到 `hooks/useRequestEditor.ts` | ~300行 |
+| P3 | **通用工具函数** | `getMethodColor`, `formatSidebarMethodLabel` 移动到 `utils/misc.ts` | ~30行 |
+
+**组件目录结构**：
+```
+frontend/src/components/
+├── common/           # 通用组件
+│   ├── MethodTag.tsx ✅
+│   └── StatusTag.tsx ✅
+├── home/            # 主页相关组件
+│   ├── AppFooter.tsx ✅
+│   ├── EmptyState.tsx ✅
+│   ├── EnvironmentPanel.tsx ✅
+│   ├── EnvironmentVarRow.tsx ✅
+│   ├── HomePage.tsx ✅
+│   ├── ProjectSearchBar.tsx ✅
+│   ├── ProjectSidebar.tsx ✅
+│   └── ScriptPanel.tsx ✅
+├── layout/          # 布局组件
+│   ├── ScriptHelpWindow.tsx ✅
+│   └── TitleBar.tsx ✅
+├── modals/          # 模态框组件
+│   ├── CaseModal.tsx ✅
+│   ├── CookieModal.tsx ✅
+│   ├── CreateModal.tsx ✅
+│   ├── HistoryModal.tsx ✅
+│   ├── MCPSettingsModal.tsx ✅
+│   └── ProjectModal.tsx ✅
+├── request/         # 请求编辑相关组件
+│   ├── ApiRequestBar.tsx ✅
+│   ├── BodyTypeSelector.tsx ✅
+│   ├── KeyValueEditor.tsx ✅
+│   ├── MethodSelector.tsx ✅
+│   ├── RequestEditor.tsx ✅
+│   ├── ScriptBindingList.tsx ✅
+│   ├── ScriptEditor.tsx ✅
+│   └── VariableEditableInput.tsx ✅
+├── response/        # 响应查看相关组件
+│   ├── ResponseBodyViewer.tsx ✅
+│   ├── ResponseCookies.tsx ✅
+│   ├── ResponseHeaders.tsx ✅
+│   ├── ResponseStatus.tsx ✅
+│   ├── ResponseViewer.tsx ✅
+│   └── ScriptResultsPanel.tsx ✅
+└── sidebar/         # 侧边栏相关组件
+    ├── ApiListFilters.tsx ✅
+    ├── ApiTree.tsx ✅
+    ├── RequestTabsBar.tsx ✅
+    ├── SidebarList.tsx ✅
+    └── SidebarMenuHeader.tsx ✅
+```
 
 ---
 
