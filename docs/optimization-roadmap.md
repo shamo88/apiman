@@ -73,13 +73,25 @@
 
 ## 7. 前端架构优化
 
-**当前状态**：App.tsx 超过 5000 行，所有状态集中管理
+**当前状态**：进行中
 
-**优化方向**：
-- 拆分独立 hooks（useProject、useRequest、useEnvironment 等）
-- 引入 React Context 替代部分 prop drilling
-- 考虑引入状态管理库（zustand）
-- 组件拆分（历史记录详情、独立设置弹窗等）
+**已完成**：
+- ✅ Contexts：AppContext、ProjectContext、WorkspaceContext
+- ✅ Hooks：useProjects、useRequest、useEnvironment、useScript、useHistory、useMCP、useUI
+- ✅ 组件拆分：ApiTree（API树）、HomePage（主页）
+- ✅ 基础设施：utils/apiConfig、utils/curlUtils、utils/variableUtils、utils/treeUtils
+
+**进行中**：
+- 组件拆分：RequestEditor、ResponseViewer、EnvironmentPanel、ScriptPanel
+- App.tsx 精简：从 4080 行精简到 500-800 行（当前 3907 行）
+
+**进度**：
+- ✅ HomePage 组件已集成（减少约 143 行）
+- ✅ ProjectSidebar 组件已集成
+
+**待完成**：
+- 渐进式集成新组件到 App.tsx
+- 移除 App.tsx 中的重复状态和函数
 
 ---
 
@@ -147,4 +159,4 @@
 
 ---
 
-*最后更新：2026-04-02*
+*最后更新：2026-04-03*

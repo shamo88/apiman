@@ -10,7 +10,7 @@ import { models } from '../wailsjs/go/models';
 import './App.css';
 import { ScriptHelpWindow, TitleBar } from './components/layout';
 import { MCPSettingsModal, HistoryModal, CookieModal, AddCaseModal, RenameCaseModal, CreateFolderModal, CreateRequestModal, RenameModal, CreateProjectModal, CreateGroupModal, RenameProjectModal, RenameGroupModal } from './components/modals';
-import { AppFooter, EmptyState, EnvironmentVarEditor, EnvironmentPanel, ProjectSearchBar, ScriptPanel } from './components/home';
+import { AppFooter, EmptyState, EnvironmentVarEditor, EnvironmentPanel, HomePage, ProjectSearchBar, ProjectSidebar, ScriptPanel } from './components/home';
 import { SidebarMenuHeader, RequestTabsBar, ApiListFilters, SidebarList } from './components/sidebar';
 import { ResponseCookies, ResponseHeaders, ResponseStatus, ResponseBodyViewer, ScriptResultsPanel } from './components/response';
 import { MethodSelector, BodyTypeSelector, ScriptEditor, ScriptBindingList, KeyValueEditor, ApiRequestBar, VariableEditableInput } from './components/request';
@@ -3227,272 +3227,101 @@ function App() {
 
             <div className="app-content">
                 {activeTab === 'home' ? (
-                    <div className="home-page">
-                        <ProjectSearchBar
-                            searchKeyword={projectSearchKeyword}
-                            onSearchChange={setProjectSearchKeyword}
-                            onCreateGroup={() => setCreateGroupModal(true)}
-                            onCreateProject={() => setCreateProjectModal(true)}
-                            uploadProps={uploadProps}
-                            importing={importing}
-                            onImport={() => {}}
-                        />
-
-                        {loading && <Spin style={{ display: 'block', margin: '40px auto' }} />}
-
-                        {!loading && projects.length === 0 && (
-                            <EmptyState text='暂无项目，点击"新建项目"创建一个' />
-                        )}
-
-                        {!loading && projects.length > 0 && filteredProjects.length === 0 && (
-                            <EmptyState text="没有匹配的项目" />
-                        )}
-
-                        {!loading && groupedProjects.length > 0 && (
-                            <div className="project-group-list">
-                                {groupedProjects.map(group => (
-                                    <div
-                                        className={`project-group-section${projectDropTargetGroup === group.groupName ? ' drag-over' : ''}`}
-                                        key={group.groupName}
-                                        onDragOver={(e) => {
-                                            if (!draggingProjectId) return;
-                                            e.preventDefault();
-                                            e.dataTransfer.dropEffect = 'move';
-                                            setProjectDropTargetGroup(group.groupName);
-                                        }}
-                                        onDragLeave={() => {
-                                            if (projectDropTargetGroup === group.groupName) {
-                                                setProjectDropTargetGroup(null);
-                                            }
-                                        }}
-                                        onDrop={(e) => {
-                                            e.preventDefault();
-                                            if (!draggingProjectId) return;
-                                            handleAssignProjectGroup(draggingProjectId, group.groupName);
-                                            setDraggingProjectId(null);
-                                            setProjectDropTargetGroup(null);
-                                            message.success(`已移动到分组：${group.groupName}`);
-                                        }}
-                                    >
-                                        <div
-                                            className={`project-group-header${groupSortDropTarget === group.groupName ? ' sort-drop-target' : ''}`}
-                                            draggable={group.groupName !== DEFAULT_PROJECT_GROUP}
-                                            onDragStart={(e) => handleGroupDragStart(group.groupName, e)}
-                                            onDragOver={(e) => handleGroupDragOver(group.groupName, e)}
-                                            onDrop={(e) => handleGroupDrop(group.groupName, e)}
-                                            onDragEnd={() => {
-                                                setDraggingGroupName(null);
-                                                setGroupSortDropTarget(null);
-                                            }}
-                                            onClick={() => toggleProjectGroupCollapse(group.groupName)}
-                                        >
-                                            <div className="project-group-header-left">
-                                                <span className="project-group-toggle-icon">
-                                                    {collapsedProjectGroups.has(group.groupName) ? <RightOutlined /> : <DownOutlined />}
-                                                </span>
-                                                <span className="project-group-title">{group.groupName}</span>
-                                                <span className="project-group-count">{group.projects.length} 个</span>
-                                            </div>
-                                            {group.groupName !== DEFAULT_PROJECT_GROUP && (
-                                                <Dropdown
-                                                    trigger={['click']}
-                                                    menu={{
-                                                        items: [
-                                                            {
-                                                                key: 'rename',
-                                                                icon: <EditOutlined />,
-                                                                label: '重命名',
-                                                                onClick: () => openRenameProjectGroupModal(group.groupName),
-                                                            },
-                                                            {
-                                                                key: 'delete',
-                                                                icon: <CloseOutlined />,
-                                                                danger: true,
-                                                                label: '删除分组',
-                                                                onClick: () => handleDeleteProjectGroup(group.groupName),
-                                                            },
-                                                        ]
-                                                    }}
-                                                >
-                                                    <button
-                                                        className="project-group-action-btn"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    >
-                                                        <MoreOutlined />
-                                                    </button>
-                                                </Dropdown>
-                                            )}
-                                        </div>
-                                        {!collapsedProjectGroups.has(group.groupName) && group.projects.length > 0 && (
-                                            <Row gutter={[16, 16]} style={{ padding: '12px 20px 20px' }}>
-                                                {group.projects.map(project => (
-                                                    <Col xs={24} sm={12} md={8} lg={6} key={project.id}>
-                                                        <Card
-                                                            hoverable
-                                                            draggable
-                                                            className="project-card"
-                                                            onDragStart={(e) => {
-                                                                e.stopPropagation();
-                                                                setDraggingProjectId(project.id);
-                                                                e.dataTransfer.effectAllowed = 'move';
-                                                            }}
-                                                            onDragEnd={() => {
-                                                                setDraggingProjectId(null);
-                                                                setProjectDropTargetGroup(null);
-                                                            }}
-                                                            onClick={() => handleOpenProject(project)}
-                                                        >
-                                                            <Dropdown
-                                                                trigger={['click']}
-                                                                menu={{
-                                                                    items: [
-                                                                        {
-                                                                            key: 'rename',
-                                                                            icon: <EditOutlined />,
-                                                                            label: '重命名',
-                                                                            onClick: ({ domEvent }) => {
-                                                                                domEvent.stopPropagation();
-                                                                                openRenameProjectModal(project);
-                                                                            }
-                                                                        },
-                                                                        {
-                                                                            key: 'delete',
-                                                                            icon: <CloseOutlined />,
-                                                                            label: '删除',
-                                                                            danger: true,
-                                                                            onClick: ({ domEvent }) => {
-                                                                                domEvent.stopPropagation();
-                                                                                handleDeleteProject(project.id);
-                                                                            }
-                                                                        },
-                                                                    ]
-                                                                }}
-                                                            >
-                                                                <button className="project-card-menu-btn" onClick={(e) => e.stopPropagation()}>
-                                                                    <MoreOutlined />
-                                                                </button>
-                                                            </Dropdown>
-                                                            <Card.Meta
-                                                                avatar={<ProjectOutlined style={{ fontSize: 32, color: '#1890ff' }} />}
-                                                                title={project.name}
-                                                                description="点击打开项目"
-                                                            />
-                                                            <div className="project-group-select-row" onClick={(e) => e.stopPropagation()}>
-                                                                <span className="project-group-select-label">分组</span>
-                                                                <Select
-                                                                    size="small"
-                                                                    value={projectGroupAssignments[project.id] || DEFAULT_PROJECT_GROUP}
-                                                                    onChange={(value) => handleAssignProjectGroup(project.id, value)}
-                                                                    options={[
-                                                                        { label: DEFAULT_PROJECT_GROUP, value: DEFAULT_PROJECT_GROUP },
-                                                                        ...projectGroups.map(groupName => ({ label: groupName, value: groupName })),
-                                                                    ]}
-                                                                    style={{ width: 140 }}
-                                                                />
-                                                            </div>
-                                                        </Card>
-                                                    </Col>
-                                                ))}
-                                            </Row>
-                                        )}
-                                        {!collapsedProjectGroups.has(group.groupName) && group.projects.length === 0 && (
-                                            <div className="project-group-empty-drop-zone">
-                                                暂无项目，可将项目卡片拖拽到此分组
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                    <HomePage
+                        projects={projects as any}
+                        loading={loading}
+                        searchKeyword={projectSearchKeyword}
+                        projectGroups={projectGroups}
+                        projectGroupAssignments={projectGroupAssignments}
+                        collapsedProjectGroups={collapsedProjectGroups}
+                        draggingProjectId={draggingProjectId}
+                        projectDropTargetGroup={projectDropTargetGroup}
+                        groupSortDropTarget={groupSortDropTarget}
+                        draggingGroupName={draggingGroupName}
+                        createGroupModal={createGroupModal}
+                        createProjectModal={createProjectModal}
+                        uploadProps={uploadProps}
+                        importing={importing}
+                        DEFAULT_PROJECT_GROUP={DEFAULT_PROJECT_GROUP}
+                        onSearchChange={setProjectSearchKeyword}
+                        onCreateGroup={() => setCreateGroupModal(true)}
+                        onCreateProject={() => setCreateProjectModal(true)}
+                        onAssignProjectGroup={handleAssignProjectGroup}
+                        onToggleGroupCollapse={toggleProjectGroupCollapse}
+                        onGroupDragStart={handleGroupDragStart}
+                        onGroupDragOver={handleGroupDragOver}
+                        onGroupDrop={handleGroupDrop}
+                        onDragEnd={() => {
+                            setDraggingGroupName(null);
+                            setGroupSortDropTarget(null);
+                        }}
+                        onOpenProject={handleOpenProject}
+                        onDeleteProject={handleDeleteProject}
+                        onRenameProject={(project) => openRenameProjectModal(project)}
+                        onCreateGroupWithName={createGroupWithName}
+                        onDeleteGroup={handleDeleteProjectGroup}
+                        onOpenRenameGroupModal={openRenameProjectGroupModal}
+                        onSetDraggingProjectId={setDraggingProjectId}
+                        onSetProjectDropTargetGroup={setProjectDropTargetGroup}
+                    />
                 ) : (
                     <div className="project-workspace">
-                        <div className="project-sidebar">
-                            <SidebarMenuHeader
-                                activeMenu={sidebarMenu}
-                                onMenuChange={setSidebarMenu}
-                                onCreateFolder={() => setCreateFolderModal(true)}
-                                onCreateRequest={() => setCreateRequestModal(true)}
-                                onCreateEnvironment={handleCreateEnvironmentClick}
-                                onCreateScript={handleCreateScript}
-                                scriptSaving={scriptSaving}
-                            />
-
-                            {sidebarMenu === 'apis' ? (
-                                <>
-                                    <ApiListFilters
-                                        searchKeyword={searchKeyword}
-                                        filterMethod={filterMethod}
-                                        onSearchChange={(v) => { setSearchKeyword(v); setSearchVersion(p => p + 1); }}
-                                        onMethodChange={setFilterMethod}
-                                    />
-
-                                    <div
-                                        className={`sidebar-content${(animationEnabled || forceListAnimation) ? ' animations-enabled' : ''}${dropTargetFolderPath === currentTree?.path ? ' root-drop-target' : ''}`}
-                                        onDragOver={(e) => {
-                                            if (!draggingNode || !currentTree?.path) return;
-                                            const check = checkDropAppendIntoFolder(draggingNode, currentTree.path);
-                                            if (!check.ok) {
-                                                e.dataTransfer.dropEffect = 'none';
-                                                setDropTargetFolderPath(null);
-                                                setInvalidDropHint({
-                                                    message: getDropHintMessage(check.reason),
-                                                    x: e.clientX + 14,
-                                                    y: e.clientY + 14,
-                                                });
-                                                return;
-                                            }
-                                            e.preventDefault();
-                                            e.dataTransfer.dropEffect = 'move';
-                                            setDropTargetFolderPath(currentTree.path);
-                                            setInvalidDropHint(null);
-                                        }}
-                                        onDrop={async (e) => {
-                                            e.preventDefault();
-                                            if (!draggingNode || !currentTree?.path) return;
-                                            const check = checkDropAppendIntoFolder(draggingNode, currentTree.path);
-                                            if (!check.ok) {
-                                                clearDragState();
-                                                return;
-                                            }
-                                            if (draggingNode.type === 'request') {
-                                                await moveRequestNode(draggingNode.path, currentTree.path, '');
-                                            } else {
-                                                await moveFolderNode(draggingNode.path, currentTree.path, '');
-                                            }
-                                            clearDragState();
-                                        }}
-                                    >
-                                        {loading && <Spin style={{ display: 'block', margin: '20px auto' }} />}
-                                        {!loading && !currentTree && (
-                                            <div className="empty-sidebar">
-                                                <ApiOutlined style={{ fontSize: 32, color: '#d0d0db', marginBottom: 12 }} />
-                                                <div>暂无接口</div>
-                                            </div>
-                                        )}
-                                        {!loading && currentTree && renderApiList()}
-                                    </div>
-                                </>
-                            ) : sidebarMenu === 'environments' ? (
-                                <SidebarList
-                                    items={environments}
-                                    activeId={editingEnvironmentId}
-                                    type="environment"
-                                    loading={envLoading}
-                                    onSelect={openEnvironmentEditor}
-                                    emptyText={'暂无环境，点击右上角"新建"创建'}
-                                />
-                            ) : (
-                                <SidebarList
-                                    items={projectScripts}
-                                    activeId={editingScriptId}
-                                    type="script"
-                                    loading={scriptsLoading}
-                                    onSelect={handleSelectScriptEditor}
-                                    emptyText={'暂无脚本，点击右上角"新建"创建'}
-                                />
-                            )}
-                        </div>
+                        <ProjectSidebar
+                            sidebarMenu={sidebarMenu}
+                            currentTree={currentTree as any}
+                            treeLoading={loading}
+                            expandedKeys={expandedKeys}
+                            collapsedFolders={collapsedFolders}
+                            expandedRequestPaths={expandedRequestPaths}
+                            sidebarHighlightedCasePath={sidebarHighlightedCasePath}
+                            searchKeyword={searchKeyword}
+                            filterMethod={filterMethod}
+                            environments={environments}
+                            projectScripts={projectScripts}
+                            editingEnvironmentId={editingEnvironmentId}
+                            editingScriptId={editingScriptId}
+                            envLoading={envLoading}
+                            scriptsLoading={scriptsLoading}
+                            scriptSaving={scriptSaving}
+                            draggingNode={draggingNode}
+                            dropTargetFolderPath={dropTargetFolderPath}
+                            movedHighlightPath={movedHighlightPath}
+                            animationEnabled={animationEnabled}
+                            forceListAnimation={forceListAnimation}
+                            currentRequestPath={currentRequest?.path}
+                            onSidebarMenuChange={setSidebarMenu}
+                            onCreateFolder={() => setCreateFolderModal(true)}
+                            onCreateRequest={() => setCreateRequestModal(true)}
+                            onCreateEnvironment={handleCreateEnvironmentClick}
+                            onCreateScript={handleCreateScript}
+                            onSearchChange={(v) => { setSearchKeyword(v); setSearchVersion(p => p + 1); }}
+                            onMethodChange={setFilterMethod}
+                            onToggleExpand={(key) => { setExpandedKeys(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]); }}
+                            onFolderCollapse={toggleFolderCollapse}
+                            onItemClick={(key, node) => handleTreeItemClick(node)}
+                            onAddRequest={(folderPath) => { setSelectedFolder(folderPath || currentTree?.path || ''); setCreateRequestModal(true); }}
+                            onAddFolder={(folderPath) => { setSelectedFolder(folderPath || currentTree?.path || ''); setCreateFolderModal(true); }}
+                            onRename={openRenameModal}
+                            onDelete={(type, path) => { if (type === 'folder') { handleDeleteFolder(path); } else { handleDeleteRequest(path); } }}
+                            onCopy={(path) => handleCopyRequest(path)}
+                            onCaseClick={(casePath) => { const node = getNodeByPath(casePath); if (node) handleCaseTreeClick(node); }}
+                            onToggleCasesExpanded={toggleRequestCasesExpanded}
+                            onAddCase={openAddCaseModal}
+                            onDeleteCase={(casePath) => handleDeleteCaseFromTree(casePath)}
+                            onDuplicateCase={(casePath) => { const node = getNodeByPath(casePath); if (node) handleDuplicateCaseFromTree(node.path!); }}
+                            onRenameCase={(casePath, currentName) => openCaseRenameFromTree(casePath, currentName)}
+                            onClearDragState={clearDragState}
+                            onSetDraggingNode={setDraggingNode}
+                            onSetDropTargetFolderPath={setDropTargetFolderPath}
+                            onSetInvalidDropHint={setInvalidDropHint}
+                            onCheckDropAppendIntoFolder={checkDropAppendIntoFolder}
+                            onCheckDropOrdered={checkDropOrdered}
+                            onGetDropHintMessage={getDropHintMessage}
+                            onMoveRequestNode={moveRequestNode}
+                            onMoveFolderNode={moveFolderNode}
+                            onGetParentFolderPath={getParentFolderPath}
+                            onGetChildrenByFolderPath={getChildrenByFolderPath as any}
+                        />
 
                         <div className="project-main">
                             {sidebarMenu === 'apis' && requestTabs.length > 0 && (

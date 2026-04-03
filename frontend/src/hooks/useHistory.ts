@@ -1,28 +1,29 @@
 import { useState, useCallback } from 'react';
 import { ListHistory, GetHistoryEntry, DeleteHistory, ClearHistory, SearchHistory } from '../../wailsjs/go/main/App';
 
-interface UseHistorySearch {
-    project: string;
-    name: string;
-    url: string;
-    method: string;
-    status: string;
-    source: string;
-}
-
 interface UseHistoryReturn {
     historyList: any[];
     historyDetail: any | null;
     historyLoading: boolean;
-    historySearch: UseHistorySearch;
+    historySearchProject: string;
+    historySearchName: string;
+    historySearchURL: string;
+    historySearchMethod: string;
+    historySearchStatus: string;
+    historySearchSource: string;
     setHistoryList: React.Dispatch<React.SetStateAction<any[]>>;
     setHistoryDetail: (detail: any | null) => void;
     setHistoryLoading: React.Dispatch<React.SetStateAction<boolean>>;
-    setHistorySearch: (search: UseHistorySearch) => void;
+    setHistorySearchProject: (value: string) => void;
+    setHistorySearchName: (value: string) => void;
+    setHistorySearchURL: (value: string) => void;
+    setHistorySearchMethod: (value: string) => void;
+    setHistorySearchStatus: (value: string) => void;
+    setHistorySearchSource: (value: string) => void;
     loadHistoryList: () => Promise<void>;
     loadHistoryDetail: (id: string) => Promise<void>;
-    handleSearch: () => Promise<void>;
-    handleClearSearch: () => void;
+    searchHistory: () => Promise<void>;
+    clearHistorySearch: () => void;
     handleClearHistory: () => Promise<void>;
 }
 
@@ -30,14 +31,12 @@ export const useHistory = (): UseHistoryReturn => {
     const [historyList, setHistoryList] = useState<any[]>([]);
     const [historyDetail, setHistoryDetail] = useState<any | null>(null);
     const [historyLoading, setHistoryLoading] = useState(false);
-    const [historySearch, setHistorySearch] = useState<UseHistorySearch>({
-        project: '',
-        name: '',
-        url: '',
-        method: '',
-        status: '',
-        source: '',
-    });
+    const [historySearchProject, setHistorySearchProject] = useState('');
+    const [historySearchName, setHistorySearchName] = useState('');
+    const [historySearchURL, setHistorySearchURL] = useState('');
+    const [historySearchMethod, setHistorySearchMethod] = useState('');
+    const [historySearchStatus, setHistorySearchStatus] = useState('');
+    const [historySearchSource, setHistorySearchSource] = useState('');
 
     const loadHistoryList = useCallback(async () => {
         setHistoryLoading(true);
@@ -64,16 +63,16 @@ export const useHistory = (): UseHistoryReturn => {
         }
     }, []);
 
-    const handleSearch = useCallback(async () => {
+    const searchHistory = useCallback(async () => {
         setHistoryLoading(true);
         try {
             const params: any = {};
-            if (historySearch.project) params.project = historySearch.project;
-            if (historySearch.name) params.name = historySearch.name;
-            if (historySearch.url) params.url = historySearch.url;
-            if (historySearch.method) params.method = historySearch.method.toUpperCase();
-            if (historySearch.status) params.status = parseInt(historySearch.status, 10) || 0;
-            if (historySearch.source) params.source = historySearch.source.toUpperCase();
+            if (historySearchProject) params.project = historySearchProject;
+            if (historySearchName) params.name = historySearchName;
+            if (historySearchURL) params.url = historySearchURL;
+            if (historySearchMethod) params.method = historySearchMethod.toUpperCase();
+            if (historySearchStatus) params.status = parseInt(historySearchStatus, 10) || 0;
+            if (historySearchSource) params.source = historySearchSource.toUpperCase();
             const result = await SearchHistory(params, 100);
             setHistoryList(result || []);
         } catch (e) {
@@ -81,17 +80,15 @@ export const useHistory = (): UseHistoryReturn => {
         } finally {
             setHistoryLoading(false);
         }
-    }, [historySearch]);
+    }, [historySearchProject, historySearchName, historySearchURL, historySearchMethod, historySearchStatus, historySearchSource]);
 
-    const handleClearSearch = useCallback(() => {
-        setHistorySearch({
-            project: '',
-            name: '',
-            url: '',
-            method: '',
-            status: '',
-            source: '',
-        });
+    const clearHistorySearch = useCallback(() => {
+        setHistorySearchProject('');
+        setHistorySearchName('');
+        setHistorySearchURL('');
+        setHistorySearchMethod('');
+        setHistorySearchStatus('');
+        setHistorySearchSource('');
         loadHistoryList();
     }, [loadHistoryList]);
 
@@ -108,15 +105,25 @@ export const useHistory = (): UseHistoryReturn => {
         historyList,
         historyDetail,
         historyLoading,
-        historySearch,
+        historySearchProject,
+        historySearchName,
+        historySearchURL,
+        historySearchMethod,
+        historySearchStatus,
+        historySearchSource,
         setHistoryList,
         setHistoryDetail,
         setHistoryLoading,
-        setHistorySearch,
+        setHistorySearchProject,
+        setHistorySearchName,
+        setHistorySearchURL,
+        setHistorySearchMethod,
+        setHistorySearchStatus,
+        setHistorySearchSource,
         loadHistoryList,
         loadHistoryDetail,
-        handleSearch,
-        handleClearSearch,
+        searchHistory,
+        clearHistorySearch,
         handleClearHistory,
     };
 };
