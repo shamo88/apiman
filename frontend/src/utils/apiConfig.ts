@@ -1,4 +1,5 @@
 import { models } from '../../wailsjs/go/models';
+import type { CurlRequest } from '../types';
 
 /** ApiConfig body type */
 export type BodyType = 'none' | 'form-data' | 'x-www-form-urlencoded' | 'json' | 'xml' | 'raw' | 'binary';
@@ -85,4 +86,48 @@ export const apiConfigFromHttpSpec = (spec: models.HttpRequestSpec, requestName:
 /** 检查文本是否包含 {{}} 变量占位符 */
 export const containsVariablePlaceholder = (text: string): boolean => {
     return /\{\{[^}]+\}\}/.test(text);
+};
+
+/** 将 CurlRequest（Go模型）转换为 ApiConfig（前端结构） */
+export const apiConfigFromRequest = (r: CurlRequest, fallbackName: string): ApiConfig => {
+    const bt = (r.body_type || 'none') as BodyType;
+    const allowed: BodyType[] = ['none', 'form-data', 'x-www-form-urlencoded', 'json', 'xml', 'raw', 'binary'];
+    const bodyType = allowed.includes(bt) ? bt : 'none';
+    return {
+        name: r.name || fallbackName,
+        method: (r.method || 'GET').toUpperCase(),
+        url: r.http_url || '',
+        headers: Array.isArray(r.headers)
+            ? r.headers.map((h) => ({
+                  key: h.key || '',
+                  value: h.value || '',
+                  enabled: h.enabled !== false,
+              }))
+            : [],
+        params: Array.isArray(r.params)
+            ? r.params.map((p) => ({
+                  key: p.key || '',
+                  value: p.value || '',
+                  enabled: p.enabled !== false,
+              }))
+            : [],
+        body: r.body || '',
+        bodyType,
+        formData: Array.isArray(r.form_data)
+            ? r.form_data.map((f) => ({
+                  key: f.key || '',
+                  value: f.value || '',
+                  enabled: f.enabled !== false,
+              }))
+            : [],
+        urlencoded: Array.isArray(r.url_encoded)
+            ? r.url_encoded.map((u) => ({
+                  key: u.key || '',
+                  value: u.value || '',
+                  enabled: u.enabled !== false,
+              }))
+            : [],
+        preScripts: r.pre_scripts || [],
+        postScripts: r.post_scripts || [],
+    };
 };

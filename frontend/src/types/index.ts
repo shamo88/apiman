@@ -35,20 +35,20 @@ export interface CurlRequest {
     body_type?: string;
     form_data?: { key: string; value: string; enabled?: boolean }[];
     url_encoded?: { key: string; value: string; enabled?: boolean }[];
-    cases?: HttpRequestCase[];
+    cases?: any[];
     active_case_id?: string;
-    interface_spec?: HttpRequestSpec;
+    interface_spec?: any;
 }
 
 export interface HttpRequestSpec {
     method: string;
     http_url: string;
-    headers: RequestKeyVal[];
-    params: RequestKeyVal[];
+    headers: any[];
+    params: any[];
     body: string;
     body_type: string;
-    form_data: RequestPair[];
-    url_encoded: RequestPair[];
+    form_data: any[];
+    url_encoded: any[];
 }
 
 export interface HttpRequestCase {
