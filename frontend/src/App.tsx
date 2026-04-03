@@ -13,7 +13,7 @@ import { MCPSettingsModal, HistoryModal, CookieModal, AddCaseModal, RenameCaseMo
 import { AppFooter, EmptyState, EnvironmentVarEditor, EnvironmentPanel, HomePage, ProjectSearchBar, ProjectSidebar, ScriptPanel } from './components/home';
 import { SidebarMenuHeader, RequestTabsBar, ApiListFilters, SidebarList } from './components/sidebar';
 import { ResponseCookies, ResponseHeaders, ResponseStatus, ResponseBodyViewer, ResponseViewer, ScriptResultsPanel } from './components/response';
-import { MethodSelector, BodyTypeSelector, ScriptEditor, ScriptBindingList, KeyValueEditor, ApiRequestBar, VariableEditableInput } from './components/request';
+import { MethodSelector, BodyTypeSelector, ScriptEditor, ScriptBindingList, KeyValueEditor, ApiRequestBar, VariableEditableInput, RequestEditor } from './components/request';
 
 interface Project {
     id: string;
@@ -3294,6 +3294,8 @@ function App() {
                             onCreateRequest={() => setCreateRequestModal(true)}
                             onCreateEnvironment={handleCreateEnvironmentClick}
                             onCreateScript={handleCreateScript}
+                            onEnvironmentSelect={(env) => openEnvironmentEditor(env)}
+                            onScriptSelect={(script) => handleSelectScriptEditor(script)}
                             onSearchChange={(v) => { setSearchKeyword(v); setSearchVersion(p => p + 1); }}
                             onMethodChange={setFilterMethod}
                             onToggleExpand={(key) => { setExpandedKeys(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]); }}
@@ -3403,281 +3405,27 @@ function App() {
                                     )}
                                 </div>
                             ) : currentRequest ? (
-                                <div className="request-panel">
-                                    {requestCases.length > 0 && (
-                                        <div className="request-active-case-hint">
-                                            {requestEditorSurface === 'interface'
-                                                ? ''
-                                                : `当前用例：${requestCases.find((c) => c.id === activeCaseId)?.name ?? '—'}`}
-                                        </div>
-                                    )}
-                                    <ApiRequestBar
-                                        method={apiConfig.method}
-                                        url={apiConfig.url}
+                                <>
+                                    <RequestEditor
+                                        apiConfig={apiConfig}
                                         executing={executing}
+                                        requestCases={requestCases}
+                                        activeCaseId={activeCaseId}
+                                        requestEditorSurface={requestEditorSurface}
+                                        curlPreview={curlPreview}
                                         environmentVariables={currentEnvironmentVariables}
+                                        projectScripts={projectScripts}
+                                        animationEnabled={animationEnabled}
+                                        forceListAnimation={forceListAnimation}
                                         onMethodChange={(value) => setApiConfig({ ...apiConfig, method: value })}
                                         onUrlChange={(value) => setApiConfig({ ...apiConfig, url: value })}
                                         onSend={handleExecuteCurl}
                                         onSave={handleSaveRequest}
+                                        onConfigChange={setApiConfig}
+                                        onCurlPreviewChange={setCurlPreview}
+                                        renderVariableAwareInput={renderVariableAwareInput}
+                                        parseCurlToApiConfig={parseCurlToApiConfig}
                                     />
-                                    <div className="api-config-section">
-                                        <Tabs
-                                            defaultActiveKey="params"
-                                            items={[
-                                                {
-                                                    key: 'params',
-                                                    label: 'Params',
-                                                    children: (
-                                                        <KeyValueEditor
-                                                            items={apiConfig.params}
-                                                            onAdd={() => setApiConfig({ ...apiConfig, params: [...apiConfig.params, { key: '', value: '', enabled: true }] })}
-                                                            onRemove={(index) => setApiConfig({ ...apiConfig, params: apiConfig.params.filter((_, i) => i !== index) })}
-                                                            onUpdate={(index, field, value) => {
-                                                                const newParams = [...apiConfig.params];
-                                                                if (field === 'enabled') {
-                                                                    newParams[index].enabled = value as boolean;
-                                                                } else {
-                                                                    (newParams[index] as any)[field] = value;
-                                                                }
-                                                                setApiConfig({ ...apiConfig, params: newParams });
-                                                            }}
-                                                            renderValueInput={(index, value, onChange) => renderVariableAwareInput(value, onChange, 'Value', { flex: 1 })}
-                                                            addButtonText="添加参数"
-                                                        />
-                                                    ),
-                                                },
-                                                {
-                                                    key: 'headers',
-                                                    label: 'Headers',
-                                                    children: (
-                                                        <KeyValueEditor
-                                                            items={apiConfig.headers}
-                                                            onAdd={() => setApiConfig({ ...apiConfig, headers: [...apiConfig.headers, { key: '', value: '', enabled: true }] })}
-                                                            onRemove={(index) => setApiConfig({ ...apiConfig, headers: apiConfig.headers.filter((_, i) => i !== index) })}
-                                                            onUpdate={(index, field, value) => {
-                                                                const newHeaders = [...apiConfig.headers];
-                                                                if (field === 'enabled') {
-                                                                    newHeaders[index].enabled = value as boolean;
-                                                                } else {
-                                                                    (newHeaders[index] as any)[field] = value;
-                                                                }
-                                                                setApiConfig({ ...apiConfig, headers: newHeaders });
-                                                            }}
-                                                            renderValueInput={(index, value, onChange) => renderVariableAwareInput(value, onChange, 'Value', { flex: 1 })}
-                                                            addButtonText="添加请求头"
-                                                        />
-                                                    ),
-                                                },
-                                                {
-                                                    key: 'body',
-                                                    label: 'Body',
-                                                    children: (
-                                                        <div className="body-editor">
-                                                            <div className="body-type-selector">
-                                                                <BodyTypeSelector
-                                                                    value={apiConfig.bodyType || 'none'}
-                                                                    onChange={(type) => setApiConfig({ ...apiConfig, bodyType: type })}
-                                                                />
-                                                            </div>
-                                                            {apiConfig.bodyType === 'none' && (
-                                                                <div className="body-empty">This request does not have a body</div>
-                                                            )}
-                                                            {(apiConfig.bodyType === 'form-data' || apiConfig.bodyType === 'x-www-form-urlencoded') && (
-                                                                <KeyValueEditor
-                                                                    items={apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded}
-                                                                    onAdd={() => {
-                                                                        const newData = [...(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded), { key: '', value: '', enabled: true }];
-                                                                        setApiConfig(apiConfig.bodyType === 'form-data'
-                                                                            ? { ...apiConfig, formData: newData }
-                                                                            : { ...apiConfig, urlencoded: newData });
-                                                                    }}
-                                                                    onRemove={(index) => {
-                                                                        const newData = (apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded).filter((_, i) => i !== index);
-                                                                        setApiConfig(apiConfig.bodyType === 'form-data'
-                                                                            ? { ...apiConfig, formData: newData }
-                                                                            : { ...apiConfig, urlencoded: newData });
-                                                                    }}
-                                                                    onUpdate={(index, field, value) => {
-                                                                        const newData = [...(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded)];
-                                                                        if (field === 'enabled') {
-                                                                            newData[index].enabled = value as boolean;
-                                                                        } else {
-                                                                            (newData[index] as any)[field] = value;
-                                                                        }
-                                                                        setApiConfig(apiConfig.bodyType === 'form-data'
-                                                                            ? { ...apiConfig, formData: newData }
-                                                                            : { ...apiConfig, urlencoded: newData });
-                                                                    }}
-                                                                    renderKeyInput={(index, value, onChange) => renderVariableAwareInput(value, onChange, 'Key', { flex: 1 })}
-                                                                    renderValueInput={(index, value, onChange) => renderVariableAwareInput(value, onChange, 'Value', { flex: 1 })}
-                                                                    addButtonText="添加字段"
-                                                                />
-                                                            )}
-                                                            {(apiConfig.bodyType === 'json' || apiConfig.bodyType === 'xml' || apiConfig.bodyType === 'raw') && (
-                                                                <>
-                                                                    {renderVariableAwareInput(
-                                                                        apiConfig.body,
-                                                                        (value) => setApiConfig({ ...apiConfig, body: value }),
-                                                                        apiConfig.bodyType === 'json'
-                                                                            ? '{\n  "key": "value"\n}'
-                                                                            : apiConfig.bodyType === 'xml'
-                                                                                ? '<root>\n  <key>value</key>\n</root>'
-                                                                                : 'Raw body content',
-                                                                        {
-                                                                            fontFamily: 'monospace',
-                                                                            minHeight: 150,
-                                                                            marginTop: 12
-                                                                        },
-                                                                        true
-                                                                    )}
-                                                                </>
-                                                            )}
-                                                            {apiConfig.bodyType === 'binary' && (
-                                                                <div className="body-binary">
-                                                                    <Input type="file" />
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    ),
-                                                },
-                                                {
-                                                    key: 'pre-script',
-                                                    label: '前置脚本',
-                                                    children: (
-                                                        <div className="script-binding-panel">
-                                                            <ScriptBindingList
-                                                                scripts={apiConfig.preScripts}
-                                                                projectScripts={projectScripts}
-                                                                onAdd={(scriptId) => setApiConfig({ ...apiConfig, preScripts: [...apiConfig.preScripts, scriptId] })}
-                                                                onRemove={(scriptId) => setApiConfig({ ...apiConfig, preScripts: apiConfig.preScripts.filter(id => id !== scriptId) })}
-                                                                onMoveUp={(index) => {
-                                                                    if (index > 0) {
-                                                                        const newScripts = [...apiConfig.preScripts];
-                                                                        [newScripts[index - 1], newScripts[index]] = [newScripts[index], newScripts[index - 1]];
-                                                                        setApiConfig({ ...apiConfig, preScripts: newScripts });
-                                                                    }
-                                                                }}
-                                                                onMoveDown={(index) => {
-                                                                    if (index < apiConfig.preScripts.length - 1) {
-                                                                        const newScripts = [...apiConfig.preScripts];
-                                                                        [newScripts[index], newScripts[index + 1]] = [newScripts[index + 1], newScripts[index]];
-                                                                        setApiConfig({ ...apiConfig, preScripts: newScripts });
-                                                                    }
-                                                                }}
-                                                                emptyText="暂无前置脚本"
-                                                            />
-                                                        </div>
-                                                    ),
-                                                },
-                                                {
-                                                    key: 'post-script',
-                                                    label: '后置脚本',
-                                                    children: (
-                                                        <div className="script-binding-panel">
-                                                            <ScriptBindingList
-                                                                scripts={apiConfig.postScripts}
-                                                                projectScripts={projectScripts}
-                                                                onAdd={(scriptId) => setApiConfig({ ...apiConfig, postScripts: [...apiConfig.postScripts, scriptId] })}
-                                                                onRemove={(scriptId) => setApiConfig({ ...apiConfig, postScripts: apiConfig.postScripts.filter(id => id !== scriptId) })}
-                                                                onMoveUp={(index) => {
-                                                                    if (index > 0) {
-                                                                        const newScripts = [...apiConfig.postScripts];
-                                                                        [newScripts[index - 1], newScripts[index]] = [newScripts[index], newScripts[index - 1]];
-                                                                        setApiConfig({ ...apiConfig, postScripts: newScripts });
-                                                                    }
-                                                                }}
-                                                                onMoveDown={(index) => {
-                                                                    if (index < apiConfig.postScripts.length - 1) {
-                                                                        const newScripts = [...apiConfig.postScripts];
-                                                                        [newScripts[index], newScripts[index + 1]] = [newScripts[index + 1], newScripts[index]];
-                                                                        setApiConfig({ ...apiConfig, postScripts: newScripts });
-                                                                    }
-                                                                }}
-                                                                emptyText="暂无后置脚本"
-                                                            />
-                                                        </div>
-                                                    ),
-                                                },
-                                                {
-                                                    key: 'curl',
-                                                    label: 'Curl',
-                                                    children: (
-                                                        <div style={{ padding: '12px 0' }}>
-                                                            {renderVariableAwareInput(
-                                                                curlPreview,
-                                                                (value) => setCurlPreview(value),
-                                                                'curl 命令将显示在这里...',
-                                                                {
-                                                                    fontFamily: 'monospace',
-                                                                    fontSize: 12,
-                                                                    minHeight: 200,
-                                                                    marginTop: 0
-                                                                },
-                                                                true
-                                                            )}
-                                                            <Button
-                                                                type="primary"
-                                                                onClick={() => {
-                                                                    const parsed = parseCurlToApiConfig(curlPreview);
-                                                                    // 合并headers：保留disabled的，更新parsed中有值的
-                                                                    const mergedHeaders = [...apiConfig.headers];
-                                                                    if (parsed.headers && parsed.headers.length > 0) {
-                                                                        for (const parsedHeader of parsed.headers) {
-                                                                            const idx = mergedHeaders.findIndex(h => h.key.toLowerCase() === parsedHeader.key.toLowerCase());
-                                                                            if (idx >= 0) {
-                                                                                // 保留原有的enabled状态，只更新key和value
-                                                                                mergedHeaders[idx] = {
-                                                                                    ...mergedHeaders[idx],
-                                                                                    key: parsedHeader.key,
-                                                                                    value: parsedHeader.value,
-                                                                                };
-                                                                            } else {
-                                                                                mergedHeaders.push(parsedHeader);
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                    // 合并params：保留disabled的，更新parsed中有值的
-                                                                    const mergedParams = [...apiConfig.params];
-                                                                    if (parsed.params && parsed.params.length > 0) {
-                                                                        for (const parsedParam of parsed.params) {
-                                                                            const idx = mergedParams.findIndex(p => p.key.toLowerCase() === parsedParam.key.toLowerCase());
-                                                                            if (idx >= 0) {
-                                                                                // 保留原有的enabled状态，只更新key和value
-                                                                                mergedParams[idx] = {
-                                                                                    ...mergedParams[idx],
-                                                                                    key: parsedParam.key,
-                                                                                    value: parsedParam.value,
-                                                                                };
-                                                                            } else {
-                                                                                mergedParams.push(parsedParam);
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                    setApiConfig({
-                                                                        ...apiConfig,
-                                                                        method: parsed.method || apiConfig.method,
-                                                                        url: parsed.url || apiConfig.url,
-                                                                        headers: mergedHeaders,
-                                                                        params: mergedParams,
-                                                                        body: parsed.body !== undefined ? parsed.body : apiConfig.body,
-                                                                        bodyType: parsed.bodyType || apiConfig.bodyType,
-                                                                        formData: parsed.formData || apiConfig.formData,
-                                                                        urlencoded: parsed.urlencoded || apiConfig.urlencoded,
-                                                                    });
-                                                                    message.success('保存成功');
-                                                                }}
-                                                                style={{ marginTop: 12 }}
-                                                            >
-                                                                保存Curl
-                                                            </Button>
-                                                        </div>
-                                                    ),
-                                                },
-                                            ]}
-                                            animated={(animationEnabled || forceListAnimation)}
-                                        />
-                                    </div>
 
                                     {response && (
                                         <ResponseViewer
@@ -3694,7 +3442,7 @@ function App() {
                                             onTestResultsExpand={() => setTestResultsExpanded(!testResultsExpanded)}
                                         />
                                     )}
-                                </div>
+                                </>
                             ) : (
                                 <EmptyState text="选择一个请求开始测试" />
                             )}

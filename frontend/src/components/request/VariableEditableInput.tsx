@@ -25,7 +25,10 @@ export const VariableEditableInput: React.FC<VariableEditableInputProps> = ({
     const [forceSuggestAll, setForceSuggestAll] = useState(false);
     const [suggestionPos, setSuggestionPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
     const suggestions = getVariableSuggestions(value, caretIndex, environmentVariables);
-    const suggestionItems = forceSuggestAll ? Object.keys(environmentVariables) : suggestions.items;
+    const allBuiltInNames = builtInGenerators.map(g => g.name);
+    const envVarNames = Object.keys(environmentVariables);
+    const uniqueEnvVars = envVarNames.filter(name => !allBuiltInNames.includes(name));
+    const suggestionItems = forceSuggestAll ? [...allBuiltInNames, ...uniqueEnvVars] : suggestions.items;
 
     const updateCaretPosition = () => {
         const editor = editorRef.current;
@@ -114,6 +117,7 @@ export const VariableEditableInput: React.FC<VariableEditableInputProps> = ({
                 onDoubleClick={(e) => {
                     setCaretIndex(getCaretOffset(e.currentTarget));
                     setForceSuggestAll(true);
+                    setFocused(true);
                     updateCaretPosition();
                 }}
                 onInput={(e) => {

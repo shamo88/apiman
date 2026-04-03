@@ -37,6 +37,8 @@ interface ProjectSidebarProps {
     onCreateRequest: () => void;
     onCreateEnvironment: () => void;
     onCreateScript: () => void;
+    onEnvironmentSelect: (env: Environment) => void;
+    onScriptSelect: (script: ProjectScript) => void;
 
     // Callbacks - Filters
     onSearchChange: (keyword: string) => void;
@@ -98,6 +100,8 @@ export const ProjectSidebar: React.FC<ProjectSidebarProps> = ({
     onCreateRequest,
     onCreateEnvironment,
     onCreateScript,
+    onEnvironmentSelect,
+    onScriptSelect,
     onSearchChange,
     onMethodChange,
     onToggleExpand,
@@ -198,7 +202,7 @@ export const ProjectSidebar: React.FC<ProjectSidebarProps> = ({
                     activeId={editingEnvironmentId}
                     type="environment"
                     loading={envLoading}
-                    onSelect={() => {}}
+                    onSelect={onEnvironmentSelect}
                     emptyText={'暂无环境，点击右上角"新建"创建'}
                 />
             ) : (
@@ -207,7 +211,7 @@ export const ProjectSidebar: React.FC<ProjectSidebarProps> = ({
                     activeId={editingScriptId}
                     type="script"
                     loading={scriptsLoading}
-                    onSelect={() => {}}
+                    onSelect={onScriptSelect}
                     emptyText={'暂无脚本，点击右上角"新建"创建'}
                 />
             )}
