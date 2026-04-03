@@ -1,8 +1,6 @@
 import { CloseOutlined, CopyOutlined, DownOutlined, EditOutlined, FileOutlined, FolderOutlined, HomeOutlined, ImportOutlined, MoreOutlined, PlusOutlined, ProjectOutlined, RightOutlined, SearchOutlined } from '@ant-design/icons';
-import { javascript } from '@codemirror/lang-javascript';
-import CodeMirror from '@uiw/react-codemirror';
 import type { UploadProps } from 'antd';
-import { Button, Card, Checkbox, Col, Divider, Dropdown, Empty, Input, InputRef, message, Modal, Radio, Row, Select, Space, Spin, Table, Tabs, Tooltip, Upload } from 'antd';
+import { Button, Col, Divider, Dropdown, Empty, Input, InputRef, message, Modal, Row, Select, Tabs, Tooltip, Upload } from 'antd';
 import React, { useEffect, useState } from 'react';
 import { AddGlobalCookies, AddRequestCase, CopyRequest, CreateEnvironment, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteEnvironment, DeleteFolder, DeleteGlobalCookie, DeleteProject, DeleteProjectScript, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts, ExecuteHTTPRequestWithProject, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, ListProjectScripts, LoadAppConfig, LoadEnvironments, LoadGlobalCookies, MoveFolder, MoveRequest, PullGitRepo, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, SaveAppConfig, SaveGlobalCookies, UpdateEnvironment, UpdateProjectScript, UpdateRequest, UpdateRequestScripts, LoadMCPConfig, SaveMCPConfig, StartMCP, StopMCP, GetMCPStatus, ListHistory, GetHistoryEntry, DeleteHistory, ClearHistory, SearchHistory } from '../wailsjs/go/main/App';
 import { models } from '../wailsjs/go/models';
@@ -17,6 +15,7 @@ import { buildCurlCommand, parseCurlToApiConfig } from './utils/curlUtils';
 import { escapeHtml, getCaretOffset, setCaretOffset, renderHighlightedVariableHtml, isBuiltInGenerator, builtInGenerators, getVariableSuggestions } from './utils/variableUtils';
 import { ApiConfig, createDefaultApiConfig, cloneApiConfig, apiConfigFromHttpSpec, toWailsHttpSpec, apiConfigToSpec, containsVariablePlaceholder, apiConfigFromRequest } from './utils/apiConfig';
 import { createEmptyWorkspaceState, CurlRequest } from './types';
+import { getMethodColor, formatSidebarMethodLabel, trimRightSpaces, getPrimaryName } from './utils/misc';
 
 interface Project {
     id: string;
@@ -303,9 +302,6 @@ function App() {
         if (!root) return;
         root.classList.toggle('theme-dark', appTheme === 'dark');
     }, [appTheme]);
-
-    const trimRightSpaces = (value: string) => value.replace(/\s+$/g, '');
-    const getPrimaryName = (value: string) => value.replace(/-副本\d*$/u, '');
 
     const collectFolderKeys = (tree: ProjectTree | null): string[] => {
         if (!tree) return [];
@@ -738,27 +734,6 @@ function App() {
         applyWorkspaceState(targetState);
     };
 
-    const getMethodColor = (method: string) => {
-        const colors: Record<string, string> = {
-            GET: '#61affe',
-            POST: '#49cc90',
-            PUT: '#fca130',
-            DELETE: '#f93e3e',
-            PATCH: '#50e3c2',
-            OPTIONS: '#0d5aa7',
-            HEAD: '#9012fe'
-        };
-        return colors[method.toUpperCase()] || '#999';
-    };
-
-    /** 侧栏方法标签文案（DELETE→DEL、PATCH→PAT，其余最长 7 字符） */
-    const formatSidebarMethodLabel = (method: string): string => {
-        const m = (method || 'GET').toUpperCase();
-        if (m === 'DELETE') return 'DEL';
-        if (m === 'PATCH') return 'PAT';
-        if (m === 'OPTIONS') return 'OPT';
-        return m.substring(0, 7);
-    };
 
     const filterTreeNodes = (tree: ProjectTree | null, keyword: string, method: string): ProjectTree | null => {
         if (!tree) return null;
