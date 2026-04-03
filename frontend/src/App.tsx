@@ -14,14 +14,29 @@ import { VariableEditableInput, RequestEditor } from './components/request';
 import { buildCurlCommand, parseCurlToApiConfig } from './utils/curlUtils';
 import { escapeHtml, getCaretOffset, setCaretOffset, renderHighlightedVariableHtml, isBuiltInGenerator, builtInGenerators, getVariableSuggestions } from './utils/variableUtils';
 import { ApiConfig, createDefaultApiConfig, cloneApiConfig, apiConfigFromHttpSpec, toWailsHttpSpec, apiConfigToSpec, containsVariablePlaceholder, apiConfigFromRequest } from './utils/apiConfig';
-import { createEmptyWorkspaceState, CurlRequest } from './types';
-import { getMethodColor, formatSidebarMethodLabel, trimRightSpaces, getPrimaryName } from './utils/misc';
+import {
+    Project,
+    ProjectTab,
+    RequestTab,
+    Environment,
+    EnvironmentVariableRow,
+    EnvironmentEditorTab,
+    ProjectScript,
+    ProjectWorkspaceState,
+    ProjectGroupStore,
+    RequestCaseState,
+    RequestEditorSurface,
+    CurlRequest,
+    createEmptyWorkspaceState,
+    createEnvironmentVariableRow,
+    DEFAULT_PROJECT_GROUP,
+    parseRequestCaseRef,
+    requestRefFromIds,
+} from './types';
+import { useHistory } from './hooks/useHistory';
+import { trimRightSpaces, getPrimaryName } from './utils/misc';
 
-interface Project {
-    id: string;
-    name: string;
-}
-
+// ProjectTree interface - uses string type to match Wails generated model
 interface ProjectTree {
     id: string;
     name: string;
@@ -31,98 +46,6 @@ interface ProjectTree {
     children?: ProjectTree[];
     path?: string;
 }
-
-const parseRequestCaseRef = (path: string): { projectId: string; requestId: string; caseId: string } | null => {
-    if (!path.startsWith('requestCase|')) return null;
-    const parts = path.slice('requestCase|'.length).split('|');
-    if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return null;
-    return { projectId: parts[0], requestId: parts[1], caseId: parts[2] };
-};
-
-const requestRefFromIds = (projectId: string, requestId: string) => `request|${projectId}|${requestId}`;
-
-/** plain：无子用例；interface：编辑集合根请求；case：编辑某一用例 */
-type RequestEditorSurface = 'plain' | 'interface' | 'case';
-
-interface RequestCaseState {
-    id: string;
-    name: string;
-    config: ApiConfig;
-}
-
-interface ProjectTab {
-    id: string;
-    title: string;
-    project: Project;
-}
-
-interface RequestTab {
-    id: string;
-    title: string;
-    path: string;
-}
-
-interface Environment {
-    id: string;
-    name: string;
-    variables: Record<string, string>;
-    created_at: string;
-    updated_at: string;
-}
-
-interface EnvironmentVariableRow {
-    id: string;
-    key: string;
-    value: string;
-}
-
-interface EnvironmentEditorTab {
-    key: string;
-    title: string;
-    environmentId?: string;
-    isNew?: boolean;
-}
-
-interface ProjectScript {
-    id: string;
-    project_id: string;
-    name: string;
-    description: string;
-    path: string;
-    content: string;
-}
-
-
-interface ProjectWorkspaceState {
-    requestTabs: RequestTab[];
-    activeRequestTab: string;
-    currentRequest: CurlRequest | null;
-    response: any;
-    selectedKeys: string[];
-    apiConfig: ApiConfig;
-    selectedEnvironmentId: string;
-    requestCases: RequestCaseState[];
-    activeCaseId: string;
-    interfaceApiConfig: ApiConfig;
-    requestEditorSurface: RequestEditorSurface;
-    /** 侧栏用例高亮：仅用户点击用例行时设置；点击接口行或切换请求标签时清空 */
-    sidebarHighlightedCasePath: string;
-}
-
-interface ProjectGroupStore {
-    groups: string[];
-    assignments: Record<string, string>;
-    collapsedGroups?: string[];
-}
-
-
-const createEnvironmentVariableRow = (key: string = '', value: string = ''): EnvironmentVariableRow => ({
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    key,
-    value
-});
-
-const DEFAULT_PROJECT_GROUP = '未分组';
 
 function App() {
     const [status, setStatus] = useState('初始化中...');
@@ -135,65 +58,31 @@ function App() {
     const [globalCookies, setGlobalCookies] = useState<any[]>([]);
     const [mcpModalVisible, setMCpModalVisible] = useState(false);
     const [historyModalVisible, setHistoryModalVisible] = useState(false);
-    const [historyList, setHistoryList] = useState<any[]>([]);
-    const [historyDetail, setHistoryDetail] = useState<any | null>(null);
-    const [historyLoading, setHistoryLoading] = useState(false);
-    const [historySearchProject, setHistorySearchProject] = useState('');
-    const [historySearchName, setHistorySearchName] = useState('');
-    const [historySearchURL, setHistorySearchURL] = useState('');
-    const [historySearchMethod, setHistorySearchMethod] = useState('');
-    const [historySearchStatus, setHistorySearchStatus] = useState('');
-    const [historySearchSource, setHistorySearchSource] = useState('');
 
-    // Build search params from individual fields
-    const buildHistorySearchParams = (): any => {
-        const params: any = {};
-        if (historySearchProject) params.project = historySearchProject;
-        if (historySearchName) params.name = historySearchName;
-        if (historySearchURL) params.url = historySearchURL;
-        if (historySearchMethod) params.method = historySearchMethod.toUpperCase();
-        if (historySearchStatus) params.status = parseInt(historySearchStatus, 10) || 0;
-        if (historySearchSource) params.source = historySearchSource.toUpperCase();
-        return params;
-    };
-
-    // Search history with current filters
-    const searchHistory = async () => {
-        setHistoryLoading(true);
-        try {
-            const params = buildHistorySearchParams();
-            const list = await SearchHistory(params, 100);
-            setHistoryList(list || []);
-        } catch (e) {
-            console.error('Failed to search history:', e);
-        } finally {
-            setHistoryLoading(false);
-        }
-    };
-
-    // Load history list
-    const loadHistoryList = async () => {
-        setHistoryLoading(true);
-        try {
-            const list = await ListHistory(100);
-            setHistoryList(list || []);
-        } catch (e) {
-            console.error('Failed to load history:', e);
-        } finally {
-            setHistoryLoading(false);
-        }
-    };
-
-    // Clear all search fields
-    const clearHistorySearch = () => {
-        setHistorySearchProject('');
-        setHistorySearchName('');
-        setHistorySearchURL('');
-        setHistorySearchMethod('');
-        setHistorySearchStatus('');
-        setHistorySearchSource('');
-        loadHistoryList();
-    };
+    // Use history hook to replace duplicate state
+    const {
+        historyList,
+        historyDetail,
+        historyLoading,
+        historySearchProject,
+        historySearchName,
+        historySearchURL,
+        historySearchMethod,
+        historySearchStatus,
+        historySearchSource,
+        setHistoryList,
+        setHistoryDetail,
+        setHistoryLoading,
+        setHistorySearchProject,
+        setHistorySearchName,
+        setHistorySearchURL,
+        setHistorySearchMethod,
+        setHistorySearchStatus,
+        setHistorySearchSource,
+        loadHistoryList,
+        searchHistory,
+        clearHistorySearch,
+    } = useHistory();
 
     const [mcpConfig, setMCPConfig] = useState<any>({ enabled: false, port: 3847, project_id: '', environment_id: '', api_key: '' });
     const [mcpStatus, setMCPStatus] = useState<'stopped' | 'running' | 'error'>('stopped');
@@ -1012,7 +901,7 @@ function App() {
         setLoading(true);
         try {
             const projectList = await ListProjects();
-            setProjects(projectList || []);
+            setProjects((projectList || []) as unknown as Project[]);
             setStatus(`已加载 ${(projectList || []).length} 个项目`);
         } catch (error: any) {
             console.error('Failed to load projects:', error);
