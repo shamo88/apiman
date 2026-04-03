@@ -12,7 +12,7 @@ import { ScriptHelpWindow, TitleBar } from './components/layout';
 import { MCPSettingsModal, HistoryModal, CookieModal, AddCaseModal, RenameCaseModal, CreateFolderModal, CreateRequestModal, RenameModal, CreateProjectModal, CreateGroupModal, RenameProjectModal, RenameGroupModal } from './components/modals';
 import { AppFooter, EmptyState, EnvironmentVarEditor, EnvironmentPanel, HomePage, ProjectSearchBar, ProjectSidebar, ScriptPanel } from './components/home';
 import { SidebarMenuHeader, RequestTabsBar, ApiListFilters, SidebarList } from './components/sidebar';
-import { ResponseCookies, ResponseHeaders, ResponseStatus, ResponseBodyViewer, ScriptResultsPanel } from './components/response';
+import { ResponseCookies, ResponseHeaders, ResponseStatus, ResponseBodyViewer, ResponseViewer, ScriptResultsPanel } from './components/response';
 import { MethodSelector, BodyTypeSelector, ScriptEditor, ScriptBindingList, KeyValueEditor, ApiRequestBar, VariableEditableInput } from './components/request';
 
 interface Project {
@@ -3680,70 +3680,19 @@ function App() {
                                     </div>
 
                                     {response && (
-                                        <div className="response-panel">
-                                            <ResponseStatus statusCode={response.status_code} duration={response.duration} />
-                                            <Tabs
-                                                defaultActiveKey="body"
-                                                items={[
-                                                    {
-                                                        key: 'body',
-                                                        label: 'Body',
-                                                        children: (
-                                                            <ResponseBodyViewer
-                                                                body={response.body}
-                                                                error={response.error}
-                                                                height={responseBodyHeight}
-                                                                appTheme={appTheme}
-                                                                viewMode="body"
-                                                            />
-                                                        ),
-                                                    },
-                                                    {
-                                                        key: 'headers',
-                                                        label: 'Header',
-                                                        children: (
-                                                            <ResponseHeaders headers={response.headers} height={responseBodyHeight} />
-                                                        ),
-                                                    },
-                                                    {
-                                                        key: 'formatted',
-                                                        label: 'JsonView',
-                                                        children: (
-                                                            <ResponseBodyViewer
-                                                                body={response.body}
-                                                                formattedResponse={formattedResponse}
-                                                                height={responseBodyHeight}
-                                                                appTheme={appTheme}
-                                                                viewMode="json"
-                                                            />
-                                                        ),
-                                                    },
-                                                    {
-                                                        key: 'cookies',
-                                                        label: 'Cookie',
-                                                        children: (
-                                                            <ResponseCookies cookies={response.cookies || []} height={responseBodyHeight} />
-                                                        ),
-                                                    },
-                                                    ...(response.script_logs?.length || response.tests?.length ? [{
-                                                        key: 'scripts',
-                                                        label: '脚本结果',
-                                                        children: (
-                                                            <ScriptResultsPanel
-                                                                script_logs={response.script_logs}
-                                                                tests={response.tests}
-                                                                scriptResultsHeight={scriptResultsHeight}
-                                                                scriptLogsExpanded={scriptLogsExpanded}
-                                                                testResultsExpanded={testResultsExpanded}
-                                                                onScriptLogsExpand={() => setScriptLogsExpanded(!scriptLogsExpanded)}
-                                                                onTestResultsExpand={() => setTestResultsExpanded(!testResultsExpanded)}
-                                                            />
-                                                        ),
-                                                    }] : []),
-                                                ]}
-                                                animated={(animationEnabled || forceListAnimation)}
-                                            />
-                                        </div>
+                                        <ResponseViewer
+                                            response={response}
+                                            formattedResponse={formattedResponse}
+                                            responseBodyHeight={responseBodyHeight}
+                                            scriptResultsHeight={scriptResultsHeight}
+                                            scriptLogsExpanded={scriptLogsExpanded}
+                                            testResultsExpanded={testResultsExpanded}
+                                            animationEnabled={animationEnabled}
+                                            forceListAnimation={forceListAnimation}
+                                            appTheme={appTheme}
+                                            onScriptLogsExpand={() => setScriptLogsExpanded(!scriptLogsExpanded)}
+                                            onTestResultsExpand={() => setTestResultsExpanded(!testResultsExpanded)}
+                                        />
                                     )}
                                 </div>
                             ) : (
