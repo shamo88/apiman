@@ -1,8 +1,8 @@
-import { CloseOutlined, CopyOutlined, DownOutlined, EditOutlined, FolderOutlined, HomeOutlined, ImportOutlined, MoreOutlined, PlusOutlined, RightOutlined, SearchOutlined } from '@ant-design/icons';
+import { HomeOutlined } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
-import { Button, Dropdown, Empty, Input, InputRef, message, Modal, Row, Tabs, Tooltip, Upload } from 'antd';
+import { Empty, InputRef, message, Modal, Tabs } from 'antd';
 import React, { useEffect, useState } from 'react';
-import { AddGlobalCookies, AddRequestCase, CopyRequest, CreateEnvironment, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteEnvironment, DeleteFolder, DeleteGlobalCookie, DeleteProject, DeleteProjectScript, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequestWithScripts, ExecuteHTTPRequestWithProject, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, ListProjectScripts, LoadAppConfig, LoadEnvironments, LoadGlobalCookies, MoveFolder, MoveRequest, PullGitRepo, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, SaveAppConfig, SaveGlobalCookies, UpdateEnvironment, UpdateProjectScript, UpdateRequest, UpdateRequestScripts, LoadMCPConfig, SaveMCPConfig, StartMCP, StopMCP, GetMCPStatus, ListHistory, GetHistoryEntry, DeleteHistory, ClearHistory, SearchHistory } from '../wailsjs/go/main/App';
+import { AddRequestCase, CopyRequest, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteFolder, DeleteProject, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequestWithScripts, ExecuteHTTPRequestWithProject, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, LoadAppConfig, LoadGlobalCookies, PullGitRepo, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, UpdateRequest, UpdateRequestScripts } from '../wailsjs/go/main/App';
 import { models } from '../wailsjs/go/models';
 import './App.css';
 import { ScriptHelpWindow, TitleBar } from './components/layout';
@@ -12,23 +12,16 @@ import { RequestTabsBar } from './components/sidebar';
 import { ResponseViewer } from './components/response';
 import { VariableEditableInput, RequestEditor } from './components/request';
 import { buildCurlCommand, parseCurlToApiConfig } from './utils/curlUtils';
-import { escapeHtml, getCaretOffset, setCaretOffset, renderHighlightedVariableHtml, isBuiltInGenerator, builtInGenerators, getVariableSuggestions } from './utils/variableUtils';
-import { ApiConfig, createDefaultApiConfig, cloneApiConfig, apiConfigFromHttpSpec, toWailsHttpSpec, apiConfigToSpec, containsVariablePlaceholder, apiConfigFromRequest } from './utils/apiConfig';
+import { ApiConfig, createDefaultApiConfig, cloneApiConfig, apiConfigFromHttpSpec, toWailsHttpSpec, apiConfigToSpec, apiConfigFromRequest } from './utils/apiConfig';
 import {
     Project,
     ProjectTab,
     RequestTab,
-    Environment,
-    EnvironmentVariableRow,
-    EnvironmentEditorTab,
-    ProjectScript,
     ProjectWorkspaceState,
     ProjectGroupStore,
     RequestCaseState,
-    RequestEditorSurface,
     CurlRequest,
     createEmptyWorkspaceState,
-    createEnvironmentVariableRow,
     DEFAULT_PROJECT_GROUP,
     parseRequestCaseRef,
     requestRefFromIds,
@@ -55,7 +48,6 @@ function App() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(false);
     const [createProjectModal, setCreateProjectModal] = useState(false);
-    const [newProjectName, setNewProjectName] = useState('');
     const [cookieModalVisible, setCookieModalVisible] = useState(false);
     const [cookieInput, setCookieInput] = useState('');
     const [globalCookies, setGlobalCookies] = useState<any[]>([]);
@@ -65,9 +57,6 @@ function App() {
     const {
         projectScripts,
         editingScriptId,
-        scriptFormName,
-        scriptFormDescription,
-        scriptFormContent,
         scriptsLoading,
         scriptSaving,
         scriptHelpVisible,
@@ -76,18 +65,10 @@ function App() {
         setScriptFormName,
         setScriptFormDescription,
         setScriptFormContent,
-        setScriptsLoading,
         setScriptSaving,
         setScriptHelpVisible,
         loadProjectScriptsData,
-        createScript,
         selectScript,
-        updateScriptName,
-        updateScriptDescription,
-        updateScriptContent,
-        saveScript,
-        deleteScript,
-        toggleScriptHelp,
     } = useScriptContext();
 
     // Use environment hook to replace duplicate local state
@@ -95,25 +76,14 @@ function App() {
     const {
         environments,
         selectedEnvironmentId,
-        environmentsInitiallyLoaded,
         editingEnvironmentId,
-        environmentFormName,
-        environmentFormVariables,
         envLoading,
-        envSaving,
         environmentTabs,
         activeEnvironmentTab,
         loadEnvironmentsData,
         openEnvironmentEditor,
         openCreateEnvironmentTab,
         closeEnvironmentTab,
-        resetEnvironmentEditor,
-        updateEnvironmentName,
-        addVariable,
-        removeVariable,
-        updateVariable,
-        saveEnvironment,
-        deleteEnvironment,
         setSelectedEnvironmentId,
         setActiveEnvironmentTab,
     } = useEnv;
@@ -122,12 +92,10 @@ function App() {
         mcpConfig,
         mcpStatus,
         mcpEnvironments,
-        mcpLoading,
         loadMCPConfig,
         saveAndApplyMCPConfig,
         loadMCPEnvironments,
         checkMCPStatus,
-        stopMCP,
     } = useMCP();
 
     const useReq = useRequest();
@@ -178,7 +146,6 @@ function App() {
         movedHighlightPath,
         expandedKeys,
         importing,
-        searchVersion,
         forceListAnimation,
         // Setters
         setRequestTabs,
@@ -242,7 +209,6 @@ function App() {
     const [projectGroups, setProjectGroups] = useState<string[]>([]);
     const [projectGroupAssignments, setProjectGroupAssignments] = useState<Record<string, string>>({});
     const [createGroupModal, setCreateGroupModal] = useState(false);
-    const [newGroupName, setNewGroupName] = useState('');
     const [renameProjectModal, setRenameProjectModal] = useState(false);
     const [renameProjectId, setRenameProjectId] = useState('');
     const [renameProjectValue, setRenameProjectValue] = useState('');
@@ -258,7 +224,6 @@ function App() {
     const [sidebarMenu, setSidebarMenu] = useState<'apis' | 'environments' | 'scripts'>('apis');
     const forceAnimationTimerRef = React.useRef<number | null>(null);
     const movedHighlightTimerRef = React.useRef<number | null>(null);
-    const searchInputRef = React.useRef<InputRef>(null);
     const renameInputRef = React.useRef<InputRef>(null);
     const renameSelectionEndRef = React.useRef<number>(0);
 
@@ -286,6 +251,9 @@ function App() {
         walk(tree);
         return keys;
     };
+
+    // Derived value: current active project
+    const activeProject = projectTabs.find(t => t.id === activeTab)?.project;
 
     const toggleFolderCollapse = (folderPath: string) => {
         setCollapsedFolders(prev => {
@@ -509,13 +477,13 @@ function App() {
     };
 
     const handleCreateScript = async () => {
-        if (!currentProject?.id) return;
+        if (!activeProject?.id) return;
         const scriptName = `脚本${projectScripts.length + 1}`;
         setScriptSaving(true);
         try {
-            const created = await CreateProjectScript(currentProject.id, scriptName, '', '// 在这里编写 JavaScript 脚本\n');
+            const created = await CreateProjectScript(activeProject.id, scriptName, '', '// 在这里编写 JavaScript 脚本\n');
             message.success('脚本已创建');
-            await loadProjectScriptsData(currentProject.id);
+            await loadProjectScriptsData(activeProject.id);
             setEditingScriptId(created.id);
             setScriptFormName(created.name);
             setScriptFormDescription(created.description || '');
@@ -526,52 +494,6 @@ function App() {
         } finally {
             setScriptSaving(false);
         }
-    };
-
-    const handleSaveScript = async () => {
-        if (!currentProject?.id || !editingScriptId) return;
-        const name = scriptFormName.trim();
-        if (!name) {
-            message.warning('请输入脚本名称');
-            return;
-        }
-        setScriptSaving(true);
-        try {
-            await UpdateProjectScript(currentProject.id, editingScriptId, name, scriptFormDescription, scriptFormContent);
-            message.success('脚本已保存');
-            await loadProjectScriptsData(currentProject.id);
-        } catch (error: any) {
-            message.error(`保存脚本失败: ${error?.message || error}`);
-        } finally {
-            setScriptSaving(false);
-        }
-    };
-
-    const handleDeleteScriptCurrent = async () => {
-        if (!currentProject?.id || !editingScriptId) return;
-        Modal.confirm({
-            title: '删除脚本',
-            content: '确定删除当前脚本吗？接口中已绑定该脚本的配置会被清空。',
-            onOk: async () => {
-                try {
-                    await DeleteProjectScript(currentProject.id, editingScriptId);
-                    message.success('脚本已删除');
-                    await loadProjectScriptsData(currentProject.id);
-                    setApiConfig((prev) => ({
-                        ...prev,
-                        preScripts: prev.preScripts.filter((id: string) => id !== editingScriptId),
-                        postScripts: prev.postScripts.filter((id: string) => id !== editingScriptId),
-                    }));
-                    setInterfaceApiConfig((prev) => ({
-                        ...prev,
-                        preScripts: prev.preScripts.filter((id: string) => id !== editingScriptId),
-                        postScripts: prev.postScripts.filter((id: string) => id !== editingScriptId),
-                    }));
-                } catch (error: any) {
-                    message.error(`删除脚本失败: ${error?.message || error}`);
-                }
-            }
-        });
     };
 
     const switchProjectTab = (targetTab: string, skipSaveCurrent: boolean = false) => {
@@ -674,7 +596,6 @@ function App() {
     }, []);
 
     useEffect(() => {
-        const activeProject = projectTabs.find(t => t.id === activeTab)?.project;
         if (!activeProject?.id) {
             setProjectScripts([]);
             setEditingScriptId('');
@@ -685,7 +606,7 @@ function App() {
         }
         loadProjectScriptsData(activeProject.id);
         loadEnvironmentsData(activeProject.id);
-    }, [activeTab, projectTabs]);
+    }, [activeTab, projectTabs, activeProject]);
 
     useEffect(() => {
         const projectIds = new Set(projects.map(p => p.id));
@@ -850,24 +771,6 @@ function App() {
         },
     };
 
-    const handleCreateProject = async () => {
-        if (!newProjectName.trim()) {
-            message.warning('请输入项目名称');
-            return;
-        }
-
-        try {
-            await CreateProject(newProjectName);
-            message.success('项目创建成功');
-            setCreateProjectModal(false);
-            setNewProjectName('');
-            loadProjects();
-        } catch (error: any) {
-            console.error('Failed to create project:', error);
-            message.error(`创建失败: ${error?.message || error}`);
-        }
-    };
-
     const createProjectWithName = async (name: string) => {
         try {
             await CreateProject(name);
@@ -902,35 +805,6 @@ function App() {
         setRenameProjectId(project.id);
         setRenameProjectValue(project.name);
         setRenameProjectModal(true);
-    };
-
-    const handleRenameProject = async () => {
-        const newName = renameProjectValue.trim();
-        if (!renameProjectId) return;
-        if (!newName) {
-            message.warning('请输入项目名称');
-            return;
-        }
-        try {
-            const renamed = await RenameProject(renameProjectId, newName);
-            setProjectTabs(prev => prev.map(tab => (
-                tab.project.id === renameProjectId
-                    ? { ...tab, title: renamed.name, project: { ...tab.project, name: renamed.name } }
-                    : tab
-            )));
-            setRenameProjectModal(false);
-            setRenameProjectId('');
-            setRenameProjectValue('');
-            message.success('项目重命名成功');
-            await loadProjects();
-        } catch (error: any) {
-            const msg = String(error?.message || error || '');
-            if (msg.includes('同名') || msg.includes('已存在')) {
-                message.warning('重命名失败：已存在同名项目');
-            } else {
-                message.error(`重命名失败: ${msg}`);
-            }
-        }
     };
 
     const renameProjectWithName = async (name: string) => {
@@ -1000,37 +874,6 @@ function App() {
         message.success('分组重命名成功');
     };
 
-    const handleCreateProjectGroup = () => {
-        const groupName = newGroupName.trim();
-        if (!groupName) {
-            message.warning('请输入分组名称');
-            return;
-        }
-        if (groupName === DEFAULT_PROJECT_GROUP) {
-            message.warning('该名称为系统默认分组，请使用其他名称');
-            return;
-        }
-        if (projectGroups.includes(groupName)) {
-            message.warning('分组名称已存在');
-            return;
-        }
-        setProjectGroups(prev => [...prev, groupName]);
-        setCreateGroupModal(false);
-        setNewGroupName('');
-        message.success('分组创建成功');
-    };
-
-    const handleStopMCP = async () => {
-        try {
-            await stopMCP();
-            const config = { ...mcpConfig, enabled: false };
-            await saveAndApplyMCPConfig(config);
-        } catch (err) {
-            console.error('Failed to stop MCP:', err);
-            message.error('停止 MCP 失败');
-        }
-    };
-
     const loadGlobalCookies = async () => {
         try {
             const data = await LoadGlobalCookies();
@@ -1042,32 +885,6 @@ function App() {
         } catch (err) {
             console.error('Failed to load cookies:', err);
             setGlobalCookies([]);
-        }
-    };
-
-    const handleSaveCookies = async () => {
-        if (!cookieInput.trim()) {
-            message.warning('请输入 set-cookie 内容');
-            return;
-        }
-        try {
-            await AddGlobalCookies(cookieInput);
-            message.success('Cookie 保存成功');
-            setCookieInput('');
-            loadGlobalCookies();
-        } catch (err) {
-            message.error(`保存失败: ${err}`);
-        }
-    };
-
-    const handleDeleteCookie = async (id: string) => {
-        try {
-            await DeleteGlobalCookie(id);
-            message.success('Cookie 已删除');
-            loadGlobalCookies();
-        } catch (err: any) {
-            console.error('Delete error:', err);
-            message.error(`删除失败: ${err?.message || err}`);
         }
     };
 
@@ -1103,46 +920,6 @@ function App() {
         setEditingGroupName(groupName);
         setRenameGroupValue(groupName);
         setRenameGroupModal(true);
-    };
-
-    const handleRenameProjectGroup = () => {
-        const nextName = renameGroupValue.trim();
-        if (!editingGroupName) return;
-        if (!nextName) {
-            message.warning('请输入分组名称');
-            return;
-        }
-        if (nextName === DEFAULT_PROJECT_GROUP) {
-            message.warning('该名称为系统默认分组，请使用其他名称');
-            return;
-        }
-        if (nextName !== editingGroupName && projectGroups.includes(nextName)) {
-            message.warning('分组名称已存在');
-            return;
-        }
-
-        setProjectGroups(prev => prev.map(name => (name === editingGroupName ? nextName : name)));
-        setProjectGroupAssignments(prev => {
-            const next = { ...prev };
-            Object.keys(next).forEach(projectId => {
-                if (next[projectId] === editingGroupName) {
-                    next[projectId] = nextName;
-                }
-            });
-            return next;
-        });
-        setCollapsedProjectGroups(prev => {
-            const next = new Set(prev);
-            if (next.delete(editingGroupName)) {
-                next.add(nextName);
-            }
-            return next;
-        });
-
-        setRenameGroupModal(false);
-        setEditingGroupName('');
-        setRenameGroupValue('');
-        message.success('分组重命名成功');
     };
 
     const handleDeleteProjectGroup = (groupName: string) => {
@@ -1269,20 +1046,19 @@ function App() {
     };
 
     const handleCreateFolder = async () => {
-        const currentProject = projectTabs.find(t => t.id === activeTab)?.project;
-        if (!newFolderName.trim() || !currentProject) {
+        if (!newFolderName.trim() || !activeProject) {
             message.warning('请先选择一个项目');
             return;
         }
 
         const parentPath = selectedFolder || "";
         try {
-            await CreateFolder(currentProject.id, parentPath, newFolderName);
+            await CreateFolder(activeProject.id, parentPath, newFolderName);
             message.success('文件夹创建成功');
             setCreateFolderModal(false);
             setNewFolderName('');
-            const tree = await GetProjectTree(currentProject.id);
-            setProjectTrees(prev => ({ ...prev, [currentProject.id]: tree }));
+            const tree = await GetProjectTree(activeProject.id);
+            setProjectTrees(prev => ({ ...prev, [activeProject.id]: tree }));
 
             // 清除折叠状态以显示新创建的文件夹
             if (!selectedFolder) {
@@ -1314,11 +1090,10 @@ function App() {
     };
 
     const moveRequestNode = async (requestPath: string, targetFolderPath: string, beforeID: string = '') => {
-        const currentProject = projectTabs.find(t => t.id === activeTab)?.project;
-        if (!currentProject) return;
+        if (!activeProject) return;
 
         try {
-            await useReq.moveRequestNode(requestPath, targetFolderPath, beforeID ?? '', currentProject.id);
+            await useReq.moveRequestNode(requestPath, targetFolderPath, beforeID ?? '', activeProject.id);
 
             useReq.setRequestTabs(prev => prev.map(tab =>
                 tab.path === requestPath ? { ...tab, path: requestPath } : tab
@@ -1327,8 +1102,8 @@ function App() {
                 useReq.setCurrentRequest({ ...useReq.currentRequest, path: requestPath });
             }
 
-            const tree = await GetProjectTree(currentProject.id);
-            setProjectTrees(prev => ({ ...prev, [currentProject.id]: tree }));
+            const tree = await GetProjectTree(activeProject.id);
+            setProjectTrees(prev => ({ ...prev, [activeProject.id]: tree }));
             useReq.setCollapsedFolders(prev => {
                 const next = new Set(prev);
                 next.delete(targetFolderPath);
@@ -1342,11 +1117,10 @@ function App() {
     };
 
     const moveFolderNode = async (folderPath: string, targetFolderPath: string, beforeID: string = '') => {
-        const currentProject = projectTabs.find(t => t.id === activeTab)?.project;
-        if (!currentProject) return;
+        if (!activeProject) return;
 
         try {
-            await useReq.moveFolderNode(folderPath, targetFolderPath, beforeID ?? '', currentProject.id);
+            await useReq.moveFolderNode(folderPath, targetFolderPath, beforeID ?? '', activeProject.id);
 
             useReq.setRequestTabs(prev => prev.map(tab => ({
                 ...tab,
@@ -1360,8 +1134,8 @@ function App() {
                 }
             }
 
-            const tree = await GetProjectTree(currentProject.id);
-            setProjectTrees(prev => ({ ...prev, [currentProject.id]: tree }));
+            const tree = await GetProjectTree(activeProject.id);
+            setProjectTrees(prev => ({ ...prev, [activeProject.id]: tree }));
             useReq.setCollapsedFolders(prev => {
                 const next = new Set(prev);
                 next.delete(targetFolderPath);
@@ -1375,20 +1149,19 @@ function App() {
     };
 
     const handleCreateRequest = async () => {
-        const currentProject = projectTabs.find(t => t.id === activeTab)?.project;
-        if (!newRequestName.trim() || !currentProject) {
+        if (!newRequestName.trim() || !activeProject) {
             message.warning('请先选择一个项目');
             return;
         }
 
         const parentPath = selectedFolder || "";
         try {
-            await CreateRequest(currentProject.id, parentPath, newRequestName, toWailsHttpSpec(createDefaultApiConfig()));
+            await CreateRequest(activeProject.id, parentPath, newRequestName, toWailsHttpSpec(createDefaultApiConfig()));
             message.success('请求创建成功');
             setCreateRequestModal(false);
             setNewRequestName('');
-            const tree = await GetProjectTree(currentProject.id);
-            setProjectTrees(prev => ({ ...prev, [currentProject.id]: tree }));
+            const tree = await GetProjectTree(activeProject.id);
+            setProjectTrees(prev => ({ ...prev, [activeProject.id]: tree }));
 
             // 清除折叠状态以显示新创建的请求
             if (!selectedFolder) {
@@ -1725,8 +1498,8 @@ function App() {
             return;
         }
 
-        const projectId = currentProject?.id || '';
-        const projectName = currentProject?.name || '';
+        const projectId = activeProject?.id || '';
+        const projectName = activeProject?.name || '';
         const requestName = currentRequest?.name || '';
         const requestPath = currentRequest?.path || '';
 
@@ -1776,20 +1549,6 @@ function App() {
     };
 
     // Environment action wrappers - convert () => void interface for EnvironmentPanel
-    const handleEnvironmentSave = () => {
-        const projectId = projectTabs.find(t => t.id === activeTab)?.project?.id;
-        if (projectId) {
-            saveEnvironment(projectId);
-        }
-    };
-
-    const handleEnvironmentDelete = () => {
-        const projectId = projectTabs.find(t => t.id === activeTab)?.project?.id;
-        if (projectId) {
-            deleteEnvironment(projectId);
-        }
-    };
-
     const handleCreateEnvironment = () => {
         openCreateEnvironmentTab(projectTabs, activeTab);
     };
@@ -1838,10 +1597,9 @@ function App() {
             setStatus('请求已保存');
 
             // 刷新项目树以更新接口列表中的方法显示
-            const currentProject = projectTabs.find(t => t.id === activeTab)?.project;
-            if (currentProject) {
-                const tree = await GetProjectTree(currentProject.id);
-                setProjectTrees(prev => ({ ...prev, [currentProject.id]: tree }));
+            if (activeProject) {
+                const tree = await GetProjectTree(activeProject.id);
+                setProjectTrees(prev => ({ ...prev, [activeProject.id]: tree }));
             }
         } catch (error: any) {
             message.error(`保存失败: ${error?.message || error}`);
@@ -1857,10 +1615,9 @@ function App() {
                     await DeleteRequest(path);
                     message.success('请求已删除');
                     handleCloseRequestTab(requestTabs.find(t => t.path === path)?.id || '');
-                    const currentProject = projectTabs.find(t => t.id === activeTab)?.project;
-                    if (currentProject) {
-                        const tree = await GetProjectTree(currentProject.id);
-                        setProjectTrees(prev => ({ ...prev, [currentProject.id]: tree }));
+                    if (activeProject) {
+                        const tree = await GetProjectTree(activeProject.id);
+                        setProjectTrees(prev => ({ ...prev, [activeProject.id]: tree }));
                     }
                 } catch (error: any) {
                     message.error(`删除失败: ${error?.message || error}`);
@@ -1873,10 +1630,9 @@ function App() {
         try {
             await CopyRequest(path);
             message.success('请求复制成功');
-            const currentProject = projectTabs.find(t => t.id === activeTab)?.project;
-            if (currentProject) {
-                const tree = await GetProjectTree(currentProject.id);
-                setProjectTrees(prev => ({ ...prev, [currentProject.id]: tree }));
+            if (activeProject) {
+                const tree = await GetProjectTree(activeProject.id);
+                setProjectTrees(prev => ({ ...prev, [activeProject.id]: tree }));
             }
         } catch (error: any) {
             message.error(`复制失败: ${error?.message || error}`);
@@ -1923,10 +1679,9 @@ function App() {
             message.success('重命名成功');
             setRenameModal(false);
 
-            const currentProject = projectTabs.find(t => t.id === activeTab)?.project;
-            if (currentProject) {
-                const tree = await GetProjectTree(currentProject.id);
-                setProjectTrees(prev => ({ ...prev, [currentProject.id]: tree }));
+            if (activeProject) {
+                const tree = await GetProjectTree(activeProject.id);
+                setProjectTrees(prev => ({ ...prev, [activeProject.id]: tree }));
             }
         } catch (error: any) {
             const msg = String(error?.message || error || '');
@@ -1957,10 +1712,9 @@ function App() {
                 try {
                     await DeleteFolder(path);
                     message.success('文件夹已删除');
-                    const currentProject = projectTabs.find(t => t.id === activeTab)?.project;
-                    if (currentProject) {
-                        const tree = await GetProjectTree(currentProject.id);
-                        setProjectTrees(prev => ({ ...prev, [currentProject.id]: tree }));
+                    if (activeProject) {
+                        const tree = await GetProjectTree(activeProject.id);
+                        setProjectTrees(prev => ({ ...prev, [activeProject.id]: tree }));
                     }
                 } catch (error: any) {
                     message.error(`删除失败: ${error?.message || error}`);
@@ -1970,36 +1724,7 @@ function App() {
     };
 
 
-    const currentProject = projectTabs.find(t => t.id === activeTab)?.project;
-    const currentTree = currentProject ? projectTrees[currentProject.id] : null;
-    const normalizedProjectKeyword = projectSearchKeyword.trim().toLowerCase();
-    const filteredProjects = projects.filter(project => {
-        if (!normalizedProjectKeyword) return true;
-        return (project.name || '').toLowerCase().includes(normalizedProjectKeyword);
-    });
-    const groupedProjects = React.useMemo(() => {
-        const bucket: Record<string, Project[]> = {};
-        const orderedGroups = [...projectGroups, DEFAULT_PROJECT_GROUP];
-
-        filteredProjects.forEach(project => {
-            const assigned = projectGroupAssignments[project.id];
-            const groupName = assigned && projectGroups.includes(assigned) ? assigned : DEFAULT_PROJECT_GROUP;
-            if (!bucket[groupName]) bucket[groupName] = [];
-            bucket[groupName].push(project);
-        });
-
-        return orderedGroups
-            .map(groupName => ({
-                groupName,
-                projects: bucket[groupName] || [],
-            }));
-    }, [filteredProjects, projectGroupAssignments, projectGroups]);
-
-    const filteredTree = React.useMemo(() => {
-        if (!currentTree) return null;
-        return filterTreeNodes(currentTree, searchKeyword, filterMethod);
-    }, [currentTree, searchKeyword, filterMethod, searchVersion]);
-
+    const currentTree = activeProject ? projectTrees[activeProject.id] : null;
     const tabItems = [
         {
             key: 'home',
@@ -2177,7 +1902,7 @@ function App() {
                                                 animated={(animationEnabled || forceListAnimation)}
                                             />
                                             <EnvironmentPanel
-                                                projectId={projectTabs.find(t => t.id === activeTab)?.project?.id || ''}
+                                                projectId={activeProject?.id || ''}
                                             />
                                         </>
                                     ) : (
@@ -2188,7 +1913,7 @@ function App() {
                                 <div className="request-panel">
                                     {editingScriptId ? (
                                         <ScriptPanel
-                                            projectId={projectTabs.find(t => t.id === activeTab)?.project?.id || ''}
+                                            projectId={activeProject?.id || ''}
                                         />
                                     ) : (
                                         <Empty description="请先在左侧选择脚本，或点击新建" />
@@ -2255,14 +1980,14 @@ function App() {
 
             <CreateProjectModal
                 visible={createProjectModal}
-                onClose={() => { setCreateProjectModal(false); setNewProjectName(''); }}
+                onClose={() => setCreateProjectModal(false)}
                 onConfirm={createProjectWithName}
                 appTheme={appTheme}
             />
 
             <CreateGroupModal
                 visible={createGroupModal}
-                onClose={() => { setCreateGroupModal(false); setNewGroupName(''); }}
+                onClose={() => setCreateGroupModal(false)}
                 onConfirm={createGroupWithName}
             />
 

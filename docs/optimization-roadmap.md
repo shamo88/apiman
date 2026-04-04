@@ -109,8 +109,21 @@
 
 **当前 App.tsx 大小**：
 - 原始：4080 行
-- 当前：2378 行（累计减少 ~144 行）
+- 当前：2101 行（累计减少 ~263 行）
 - 目标：500-800 行
+
+**本次优化**：
+- ✅ 添加 `activeProject` 派生值，移除 14 处重复的 `projectTabs.find(t => t.id === activeTab)?.project` 调用
+- ✅ 清理未使用的 antd 导入：Button, Dropdown, Row, Tooltip, Upload, Input
+- ✅ 清理未使用的 @ant-design/icons 导入（仅保留 HomeOutlined）
+- ✅ 清理未使用的类型导入：EnvironmentEditorTab
+- ✅ 清理未使用的 variableUtils 函数导入
+- ✅ 清理未使用的 wailsjs 导入：CreateEnvironment, DeleteEnvironment, ListProjectScripts, LoadEnvironments, MoveFolder, MoveRequest, SaveAppConfig, SaveGlobalCookies, UpdateEnvironment, LoadMCPConfig, SaveMCPConfig, StartMCP, StopMCP, GetMCPStatus, ListHistory, GetHistoryEntry, DeleteHistory, ClearHistory, SearchHistory, AddGlobalCookies, DeleteGlobalCookie, DeleteProjectScript, UpdateProjectScript
+- ✅ 清理未使用的 hook 返回值：useScriptContext (setScriptsLoading, createScript, updateScriptName 等), useEnvironment (environmentsInitiallyLoaded, environmentFormName 等), useMCP (mcpLoading)
+- ✅ 清理未使用的函数：handleSaveScript, handleDeleteScriptCurrent, handleCreateProject, handleRenameProject, handleCreateProjectGroup, handleStopMCP, handleSaveCookies, handleDeleteCookie, handleRenameProjectGroup, handleEnvironmentSave, handleEnvironmentDelete
+- ✅ 清理未使用的状态变量：newProjectName, newGroupName
+- ✅ 清理未使用的计算变量：groupedProjects, filteredTree, normalizedProjectKeyword, filteredProjects, searchInputRef
+- ✅ 清理未使用的 hook 返回项：searchVersion
 
 **Hooks 状态**：
 
@@ -147,7 +160,7 @@
 | P1 | ~~EnvironmentPanel 重构~~ | ✅ 直接用 hook，只传 projectId | - |
 | P2 | ~~useMCP + App.tsx 重构~~ | ✅ useMCP Hook 重构，App.tsx 使用 hook 替代本地状态 | ~48行 |
 | P2 | ~~useScript + ScriptPanel~~ | ✅ useScript Hook 重构，ScriptContext 共享状态，ScriptPanel 直接用 context | ~8行 |
-| P3 | useProjects 重构 | 暴露 action 函数替代 raw setters | ~200行 |
+| P3 | useProjects 重构 | ⚠️ 需要架构调整：useProjects 不暴露 group 相关的 raw setters，需先改造 App.tsx 的 group 函数或扩展 useProjects | ~200行 |
 | P3 | useRequest 重构 | 暴露 action 函数替代 raw setters | ~500行 |
 
 **组件目录结构**：
