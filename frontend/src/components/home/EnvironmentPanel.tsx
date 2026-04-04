@@ -2,42 +2,43 @@ import React from 'react';
 import { Button, Input, Space } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { EnvironmentVarEditor } from './EnvironmentVarRow';
+import { useEnvironment } from '../../hooks/useEnvironment';
 
 interface EnvironmentPanelProps {
-    environmentFormName: string;
-    environmentFormVariables: { id: string; key: string; value: string }[];
-    envSaving: boolean;
-    editingEnvironmentId: string | null;
-    onNameChange: (value: string) => void;
-    onVariablesUpdate: (id: string, field: 'key' | 'value', value: string) => void;
-    onVariablesRemove: (id: string) => void;
-    onVariablesAdd: () => void;
-    onReset: () => void;
-    onDelete: () => void;
-    onSave: () => void;
-    createEnvironmentVariableRow: () => { id: string; key: string; value: string };
+    projectId: string;
 }
 
 export const EnvironmentPanel: React.FC<EnvironmentPanelProps> = ({
-    environmentFormName,
-    environmentFormVariables,
-    envSaving,
-    editingEnvironmentId,
-    onNameChange,
-    onVariablesUpdate,
-    onVariablesRemove,
-    onVariablesAdd,
-    onReset,
-    onDelete,
-    onSave,
-    createEnvironmentVariableRow,
+    projectId,
 }) => {
+    const {
+        environmentFormName,
+        environmentFormVariables,
+        envSaving,
+        editingEnvironmentId,
+        updateEnvironmentName,
+        addVariable,
+        removeVariable,
+        updateVariable,
+        resetEnvironmentEditor,
+        saveEnvironment,
+        deleteEnvironment,
+    } = useEnvironment();
+
+    const handleSave = () => {
+        saveEnvironment(projectId);
+    };
+
+    const handleDelete = () => {
+        deleteEnvironment(projectId);
+    };
+
     return (
         <div className="environment-panel">
             <Input
                 placeholder="环境名称"
                 value={environmentFormName}
-                onChange={(e) => onNameChange(e.target.value)}
+                onChange={(e) => updateEnvironmentName(e.target.value)}
                 style={{ marginBottom: 10 }}
             />
             <div className="environment-vars-header">
@@ -46,24 +47,24 @@ export const EnvironmentPanel: React.FC<EnvironmentPanelProps> = ({
                     size="small"
                     type="link"
                     icon={<PlusOutlined />}
-                    onClick={onVariablesAdd}
+                    onClick={addVariable}
                 >
                     添加
                 </Button>
             </div>
             <EnvironmentVarEditor
                 variables={environmentFormVariables}
-                onUpdate={onVariablesUpdate}
-                onRemove={onVariablesRemove}
-                onAdd={onVariablesAdd}
+                onUpdate={updateVariable}
+                onRemove={removeVariable}
+                onAdd={addVariable}
             />
             <Space style={{ width: '100%', justifyContent: 'space-between', marginTop: 12 }}>
-                <Button onClick={onReset}>清空</Button>
+                <Button onClick={resetEnvironmentEditor}>清空</Button>
                 <Space>
                     {editingEnvironmentId && (
-                        <Button danger onClick={onDelete}>删除</Button>
+                        <Button danger onClick={handleDelete}>删除</Button>
                     )}
-                    <Button type="primary" loading={envSaving} onClick={onSave}>保存</Button>
+                    <Button type="primary" loading={envSaving} onClick={handleSave}>保存</Button>
                 </Space>
             </Space>
         </div>

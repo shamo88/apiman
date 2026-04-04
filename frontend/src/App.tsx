@@ -78,11 +78,15 @@ function App() {
         setScriptsLoading,
         setScriptSaving,
         setScriptHelpVisible,
-        loadProjectScriptsData: loadProjectScriptsDataFromHook,
-        handleCreateScript: handleCreateScriptBase,
-        handleSelectScriptEditor,
-        handleSaveScript: handleSaveScriptBase,
-        handleDeleteScriptCurrent: handleDeleteScriptCurrentBase,
+        loadProjectScriptsData,
+        createScript,
+        selectScript,
+        updateScriptName,
+        updateScriptDescription,
+        updateScriptContent,
+        saveScript,
+        deleteScript,
+        toggleScriptHelp,
     } = useScript();
 
     // Use environment hook to replace duplicate local state
@@ -103,15 +107,13 @@ function App() {
         openCreateEnvironmentTab,
         closeEnvironmentTab,
         resetEnvironmentEditor,
-        environmentToRows,
-        rowsToEnvironmentVariables,
-        handleCreateEnvironmentClick,
-        handleSaveEnvironment,
-        handleDeleteEnvironmentCurrent,
+        updateEnvironmentName,
+        addVariable,
+        removeVariable,
+        updateVariable,
+        saveEnvironment,
+        deleteEnvironment,
         setSelectedEnvironmentId,
-        setEnvironmentFormName,
-        setEnvironmentFormVariables,
-        setEnvironmentTabs,
         setActiveEnvironmentTab,
     } = useEnv;
 
@@ -494,31 +496,6 @@ function App() {
         setInterfaceApiConfig(state.interfaceApiConfig || createDefaultApiConfig());
         setRequestEditorSurface(state.requestEditorSurface || 'plain');
         setSidebarHighlightedCasePath(state.sidebarHighlightedCasePath || '');
-    };
-
-    const loadProjectScriptsData = async (projectID: string) => {
-        setScriptsLoading(true);
-        try {
-            const scripts = await ListProjectScripts(projectID);
-            setProjectScripts(scripts || []);
-            if (scripts && scripts.length > 0) {
-                const target = scripts.find(item => item.id === editingScriptId) || scripts[0];
-                setEditingScriptId(target.id);
-                setScriptFormName(target.name);
-                setScriptFormDescription(target.description || '');
-                setScriptFormContent(target.content || '');
-            } else {
-                setEditingScriptId('');
-                setScriptFormName('');
-                setScriptFormDescription('');
-                setScriptFormContent('// 在这里编写 JavaScript 脚本\n');
-            }
-        } catch (error: any) {
-            console.error('Failed to load scripts:', error);
-            message.error(`加载脚本失败: ${error?.message || error}`);
-        } finally {
-            setScriptsLoading(false);
-        }
     };
 
     const handleCreateScript = async () => {
@@ -1850,14 +1827,14 @@ function App() {
     const handleEnvironmentSave = () => {
         const projectId = projectTabs.find(t => t.id === activeTab)?.project?.id;
         if (projectId) {
-            handleSaveEnvironment(projectId);
+            saveEnvironment(projectId);
         }
     };
 
     const handleEnvironmentDelete = () => {
         const projectId = projectTabs.find(t => t.id === activeTab)?.project?.id;
         if (projectId) {
-            handleDeleteEnvironmentCurrent(projectId);
+            deleteEnvironment(projectId);
         }
     };
 
@@ -2180,7 +2157,7 @@ function App() {
                             onCreateEnvironment={handleCreateEnvironment}
                             onCreateScript={handleCreateScript}
                             onEnvironmentSelect={(env) => openEnvironmentEditor(env)}
-                            onScriptSelect={(script) => handleSelectScriptEditor(script)}
+                            onScriptSelect={(script) => selectScript(script)}
                             onSearchChange={(v) => { setSearchKeyword(v); setSearchVersion(p => p + 1); }}
                             onMethodChange={setFilterMethod}
                             onToggleExpand={(key) => { setExpandedKeys(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]); }}
@@ -2248,21 +2225,7 @@ function App() {
                                                 animated={(animationEnabled || forceListAnimation)}
                                             />
                                             <EnvironmentPanel
-                                                environmentFormName={environmentFormName}
-                                                environmentFormVariables={environmentFormVariables}
-                                                envSaving={envSaving}
-                                                editingEnvironmentId={editingEnvironmentId}
-                                                onNameChange={setEnvironmentFormName}
-                                                onVariablesUpdate={(id, field, value) => setEnvironmentFormVariables(prev => prev.map((row) => row.id === id ? { ...row, [field]: value } : row))}
-                                                onVariablesRemove={(id) => setEnvironmentFormVariables(prev => {
-                                                    const next = prev.filter((row) => row.id !== id);
-                                                    return next.length > 0 ? next : [createEnvironmentVariableRow()];
-                                                })}
-                                                onVariablesAdd={() => setEnvironmentFormVariables(prev => [...prev, createEnvironmentVariableRow()])}
-                                                onReset={resetEnvironmentEditor}
-                                                onDelete={handleEnvironmentDelete}
-                                                onSave={handleEnvironmentSave}
-                                                createEnvironmentVariableRow={createEnvironmentVariableRow}
+                                                projectId={projectTabs.find(t => t.id === activeTab)?.project?.id || ''}
                                             />
                                         </>
                                     ) : (

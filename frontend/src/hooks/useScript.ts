@@ -3,6 +3,7 @@ import { ListProjectScripts, CreateProjectScript, UpdateProjectScript, DeletePro
 import { ProjectScript } from '../types';
 
 interface UseScriptReturn {
+    // State
     projectScripts: ProjectScript[];
     editingScriptId: string;
     scriptFormName: string;
@@ -11,6 +12,7 @@ interface UseScriptReturn {
     scriptsLoading: boolean;
     scriptSaving: boolean;
     scriptHelpVisible: boolean;
+    // Raw setters (for backward compatibility)
     setProjectScripts: React.Dispatch<React.SetStateAction<ProjectScript[]>>;
     setEditingScriptId: React.Dispatch<React.SetStateAction<string>>;
     setScriptFormName: React.Dispatch<React.SetStateAction<string>>;
@@ -19,11 +21,16 @@ interface UseScriptReturn {
     setScriptsLoading: React.Dispatch<React.SetStateAction<boolean>>;
     setScriptSaving: React.Dispatch<React.SetStateAction<boolean>>;
     setScriptHelpVisible: React.Dispatch<React.SetStateAction<boolean>>;
+    // Actions
     loadProjectScriptsData: (projectId: string) => Promise<void>;
-    handleCreateScript: (projectId: string) => Promise<void>;
-    handleSelectScriptEditor: (script: ProjectScript) => void;
-    handleSaveScript: (projectId: string) => Promise<void>;
-    handleDeleteScriptCurrent: (projectId: string, preScripts: string[], postScripts: string[], setApiConfig: (config: any) => void) => Promise<void>;
+    createScript: (projectId: string) => Promise<void>;
+    selectScript: (script: ProjectScript) => void;
+    updateScriptName: (name: string) => void;
+    updateScriptDescription: (description: string) => void;
+    updateScriptContent: (content: string) => void;
+    saveScript: (projectId: string) => Promise<void>;
+    deleteScript: (projectId: string, preScripts: string[], postScripts: string[], setApiConfig: (config: any) => void) => Promise<void>;
+    toggleScriptHelp: () => void;
 }
 
 export const useScript = (): UseScriptReturn => {
@@ -60,7 +67,7 @@ export const useScript = (): UseScriptReturn => {
         }
     }, [editingScriptId]);
 
-    const handleCreateScript = useCallback(async (projectId: string) => {
+    const createScript = useCallback(async (projectId: string) => {
         const scriptName = `脚本${projectScripts.length + 1}`;
         setScriptSaving(true);
         try {
@@ -77,14 +84,30 @@ export const useScript = (): UseScriptReturn => {
         }
     }, [projectScripts.length, loadProjectScriptsData]);
 
-    const handleSelectScriptEditor = useCallback((script: ProjectScript) => {
+    const selectScript = useCallback((script: ProjectScript) => {
         setEditingScriptId(script.id);
         setScriptFormName(script.name);
         setScriptFormDescription(script.description || '');
         setScriptFormContent(script.content || '');
     }, []);
 
-    const handleSaveScript = useCallback(async (projectId: string) => {
+    const updateScriptName = useCallback((name: string) => {
+        setScriptFormName(name);
+    }, []);
+
+    const updateScriptDescription = useCallback((description: string) => {
+        setScriptFormDescription(description);
+    }, []);
+
+    const updateScriptContent = useCallback((content: string) => {
+        setScriptFormContent(content);
+    }, []);
+
+    const toggleScriptHelp = useCallback(() => {
+        setScriptHelpVisible(prev => !prev);
+    }, []);
+
+    const saveScript = useCallback(async (projectId: string) => {
         if (!projectId || !editingScriptId) return;
         const name = scriptFormName.trim();
         if (!name) return;
@@ -99,7 +122,7 @@ export const useScript = (): UseScriptReturn => {
         }
     }, [editingScriptId, scriptFormName, scriptFormDescription, scriptFormContent, loadProjectScriptsData]);
 
-    const handleDeleteScriptCurrent = useCallback(async (
+    const deleteScript = useCallback(async (
         projectId: string,
         preScripts: string[],
         postScripts: string[],
@@ -140,9 +163,13 @@ export const useScript = (): UseScriptReturn => {
         setScriptSaving,
         setScriptHelpVisible,
         loadProjectScriptsData,
-        handleCreateScript,
-        handleSelectScriptEditor,
-        handleSaveScript,
-        handleDeleteScriptCurrent,
+        createScript,
+        selectScript,
+        updateScriptName,
+        updateScriptDescription,
+        updateScriptContent,
+        saveScript,
+        deleteScript,
+        toggleScriptHelp,
     };
 };

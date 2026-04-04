@@ -17,21 +17,23 @@ export interface UseEnvironmentState {
 }
 
 export interface UseEnvironmentActions {
+    // Data loading
     loadEnvironmentsData: (projectId: string) => Promise<void>;
+    // Tab management
     openEnvironmentEditor: (env: Environment) => void;
     openCreateEnvironmentTab: (projectTabs: ProjectTab[], activeTab: string) => void;
     closeEnvironmentTab: (tabKey: string) => void;
+    setActiveEnvironmentTab: (tabKey: string) => void;
+    setSelectedEnvironmentId: (id: string) => void;
+    // Editor state
     resetEnvironmentEditor: () => void;
-    environmentToRows: (variables: Record<string, string>) => EnvironmentVariableRow[];
-    rowsToEnvironmentVariables: (rows: EnvironmentVariableRow[]) => Record<string, string>;
-    handleCreateEnvironmentClick: () => void;
-    handleSaveEnvironment: (projectId: string) => Promise<void>;
-    handleDeleteEnvironmentCurrent: (projectId: string) => Promise<void>;
-    setSelectedEnvironmentId: React.Dispatch<React.SetStateAction<string>>;
-    setEnvironmentFormName: React.Dispatch<React.SetStateAction<string>>;
-    setEnvironmentFormVariables: React.Dispatch<React.SetStateAction<EnvironmentVariableRow[]>>;
-    setEnvironmentTabs: React.Dispatch<React.SetStateAction<EnvironmentEditorTab[]>>;
-    setActiveEnvironmentTab: React.Dispatch<React.SetStateAction<string>>;
+    updateEnvironmentName: (name: string) => void;
+    addVariable: () => void;
+    removeVariable: (id: string) => void;
+    updateVariable: (id: string, field: 'key' | 'value', value: string) => void;
+    // CRUD operations
+    saveEnvironment: (projectId: string) => Promise<void>;
+    deleteEnvironment: (projectId: string) => Promise<void>;
 }
 
 export type UseEnvironment = UseEnvironmentState & UseEnvironmentActions;
@@ -122,12 +124,29 @@ export function useEnvironment(): UseEnvironment {
         });
     }, [activeEnvironmentTab, resetEnvironmentEditor]);
 
-    const handleCreateEnvironmentClick = useCallback(() => {
-        // This is handled by the component passing projectTabs and activeTab
-        // The actual openCreateEnvironmentTab should be called with those parameters
+    // Editor state actions
+    const updateEnvironmentName = useCallback((name: string) => {
+        setEnvironmentFormName(name);
     }, []);
 
-    const handleSaveEnvironment = useCallback(async (projectId: string) => {
+    const addVariable = useCallback(() => {
+        setEnvironmentFormVariables(prev => [...prev, createEnvironmentVariableRow()]);
+    }, []);
+
+    const removeVariable = useCallback((id: string) => {
+        setEnvironmentFormVariables(prev => {
+            const next = prev.filter(row => row.id !== id);
+            return next.length > 0 ? next : [createEnvironmentVariableRow()];
+        });
+    }, []);
+
+    const updateVariable = useCallback((id: string, field: 'key' | 'value', value: string) => {
+        setEnvironmentFormVariables(prev => prev.map(row =>
+            row.id === id ? { ...row, [field]: value } : row
+        ));
+    }, []);
+
+    const saveEnvironment = useCallback(async (projectId: string) => {
         if (!projectId) {
             message.warning('请先打开项目');
             return;
@@ -162,7 +181,7 @@ export function useEnvironment(): UseEnvironment {
         }
     }, [environmentFormName, environmentFormVariables, editingEnvironmentId, activeEnvironmentTab, rowsToEnvironmentVariables, loadEnvironmentsData]);
 
-    const handleDeleteEnvironmentCurrent = useCallback(async (projectId: string) => {
+    const deleteEnvironment = useCallback(async (projectId: string) => {
         if (!projectId || !editingEnvironmentId) return;
         Modal.confirm({
             title: '删除环境',
@@ -255,15 +274,13 @@ export function useEnvironment(): UseEnvironment {
         openCreateEnvironmentTab,
         closeEnvironmentTab,
         resetEnvironmentEditor,
-        environmentToRows,
-        rowsToEnvironmentVariables,
-        handleCreateEnvironmentClick,
-        handleSaveEnvironment,
-        handleDeleteEnvironmentCurrent,
-        setSelectedEnvironmentId,
-        setEnvironmentFormName,
-        setEnvironmentFormVariables,
-        setEnvironmentTabs,
+        updateEnvironmentName,
+        addVariable,
+        removeVariable,
+        updateVariable,
+        saveEnvironment,
+        deleteEnvironment,
         setActiveEnvironmentTab,
+        setSelectedEnvironmentId,
     };
 }
