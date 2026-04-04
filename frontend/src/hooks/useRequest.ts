@@ -246,7 +246,7 @@ export interface UseRequestActions {
     toggleRequestCasesExpanded: (requestPath: string) => void;
     handleCaseTreeClick: (caseNode: ProjectTree) => Promise<void>;
     openAddCaseModal: (targetPath: string) => void;
-    confirmAddCaseModal: () => Promise<void>;
+    confirmAddCaseModal: (name?: string) => Promise<void>;
     handleDuplicateCaseFromTree: (casePath: string, projectId: string) => Promise<void>;
     handleDeleteCaseFromTree: (casePath: string, projectId: string) => Promise<void>;
     openCaseRenameFromTree: (casePath: string, currentName: string) => void;
@@ -904,8 +904,8 @@ export function useRequest(options?: {
         setAddCaseModalOpen(true);
     }, []);
 
-    const confirmAddCaseModal = useCallback(async () => {
-        const trimmedName = addCaseNameInput.trim();
+    const confirmAddCaseModal = useCallback(async (name?: string) => {
+        const trimmedName = (name !== undefined ? name : addCaseNameInput).trim();
         if (!trimmedName) {
             message.warning('请输入用例名称');
             return;

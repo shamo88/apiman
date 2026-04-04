@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { message, Modal } from 'antd';
 import { Environment, EnvironmentVariableRow, EnvironmentEditorTab, createEnvironmentVariableRow, ProjectTab } from '../types';
 import { LoadEnvironments, CreateEnvironment, UpdateEnvironment, DeleteEnvironment } from '../../wailsjs/go/main/App';
@@ -14,6 +14,7 @@ export interface UseEnvironmentState {
     envSaving: boolean;
     environmentTabs: EnvironmentEditorTab[];
     activeEnvironmentTab: string;
+    currentEnvironmentVariables: Record<string, string>;
 }
 
 export interface UseEnvironmentActions {
@@ -256,6 +257,11 @@ export function useEnvironment(): UseEnvironment {
         }
     }, [environments, selectedEnvironmentId, editingEnvironmentId, environmentsInitiallyLoaded, resetEnvironmentEditor]);
 
+    const currentEnvironmentVariables = useMemo(() => {
+        const env = environments.find(item => item.id === selectedEnvironmentId);
+        return env?.variables || {};
+    }, [environments, selectedEnvironmentId]);
+
     return {
         // State
         environments,
@@ -268,6 +274,7 @@ export function useEnvironment(): UseEnvironment {
         envSaving,
         environmentTabs,
         activeEnvironmentTab,
+        currentEnvironmentVariables,
         // Actions
         loadEnvironmentsData,
         openEnvironmentEditor,

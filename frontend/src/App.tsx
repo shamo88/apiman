@@ -1,8 +1,8 @@
 import { HomeOutlined } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
-import { Empty, InputRef, message, Modal, Tabs } from 'antd';
+import { Empty, InputRef, message, Tabs } from 'antd';
 import React, { useEffect, useState } from 'react';
-import { AddRequestCase, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequestWithScripts, ExecuteHTTPRequestWithProject, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, LoadAppConfig, LoadGlobalCookies, RenameFolder, RenameProject, RenameRequest, RenameRequestCase } from '../wailsjs/go/main/App';
+import { CreateProject, InitProjectsDir, LoadAppConfig, LoadGlobalCookies, RenameProject } from '../wailsjs/go/main/App';
 import './App.css';
 import { ScriptHelpWindow, TitleBar } from './components/layout';
 import { MCPSettingsModal, HistoryModal, CookieModal, AddCaseModal, RenameCaseModal, CreateFolderModal, CreateRequestModal, RenameModal, CreateProjectModal, CreateGroupModal, RenameProjectModal, RenameGroupModal } from './components/modals';
@@ -11,26 +11,18 @@ import { RequestTabsBar } from './components/sidebar';
 import { ResponseViewer } from './components/response';
 import { VariableEditableInput, RequestEditor } from './components/request';
 import { buildCurlCommand, parseCurlToApiConfig } from './utils/curlUtils';
-import { ApiConfig, createDefaultApiConfig, cloneApiConfig, apiConfigFromHttpSpec, toWailsHttpSpec, apiConfigToSpec, apiConfigFromRequest } from './utils/apiConfig';
 import {
     Project,
-    ProjectTab,
-    RequestTab,
     ProjectWorkspaceState,
     ProjectGroupStore,
-    RequestCaseState,
-    CurlRequest,
     createEmptyWorkspaceState,
     DEFAULT_PROJECT_GROUP,
-    parseRequestCaseRef,
-    requestRefFromIds,
 } from './types';
 import { useScriptContext } from './contexts/ScriptContext';
 import { useEnvironment } from './hooks/useEnvironment';
 import { useMCP } from './hooks/useMCP';
 import { useProjects } from './hooks/useProjects';
 import { useRequest } from './hooks/useRequest';
-import { trimRightSpaces, getPrimaryName } from './utils/misc';
 
 // ProjectTree interface - uses string type to match Wails generated model
 interface ProjectTree {
@@ -287,28 +279,11 @@ function App() {
         root.classList.toggle('theme-dark', appTheme === 'dark');
     }, [appTheme]);
 
-    const collectFolderKeys = (tree: ProjectTree | null): string[] => {
-        if (!tree) return [];
-        const keys: string[] = [];
-
-        const walk = (node: ProjectTree) => {
-            if (node.type === 'folder') {
-                keys.push(node.path || node.id);
-            }
-            if (node.children) {
-                node.children.forEach(walk);
-            }
-        };
-
-        walk(tree);
-        return keys;
-    };
-
     // Derived value: current active project
     const activeProject = projectTabs.find(t => t.id === activeTab)?.project;
 
     const toggleFolderCollapse = (folderPath: string) => {
-        setCollapsedFolders(prev => {
+        useReq.setCollapsedFolders(prev => {
             const newSet = new Set(prev);
             if (newSet.has(folderPath)) {
                 newSet.delete(folderPath);
@@ -320,213 +295,26 @@ function App() {
     };
 
     const clearDragState = () => {
-        setDraggingNode(null);
-        setDropTargetFolderPath(null);
-        setInvalidDropHint(null);
-    };
-
-    const replacePathPrefix = (path: string, fromPrefix: string, toPrefix: string) => {
-        if (path === fromPrefix) return toPrefix;
-        const normalizedFrom = fromPrefix.endsWith('/') || fromPrefix.endsWith('\\') ? fromPrefix : fromPrefix + '/';
-        if (path.startsWith(normalizedFrom)) {
-            return toPrefix + path.slice(fromPrefix.length);
-        }
-        return path;
-    };
-
-    const getChildrenByFolderPath = (folderPath: string): ProjectTree[] => {
-        if (!currentTree || !currentTree?.path) return [];
-        if (folderPath === currentTree.path) {
-            return currentTree.children || [];
-        }
-        const node = findTreeNode(currentTree, folderPath);
-        if (!node || node.type !== 'folder') return [];
-        return node.children || [];
-    };
-
-    const getNodeByPath = (path: string): ProjectTree | null => {
-        if (!currentTree) return null;
-        return findTreeNode(currentTree, path);
-    };
-
-    const getParentFolderPath = (path: string): string | null => {
-        if (!currentTree || !currentTree?.path) return null;
-
-        let foundParent: string | null = null;
-        const walk = (node: ProjectTree, parentPath: string) => {
-            const nodePath = node.path || node.id;
-            if (nodePath === path) {
-                foundParent = parentPath;
-                return;
-            }
-            if (!node.children || foundParent) return;
-
-            const nextParent = node.type === 'folder' ? nodePath : parentPath;
-            for (const child of node.children) {
-                walk(child, nextParent);
-                if (foundParent) return;
-            }
-        };
-
-        walk(currentTree, currentTree.path);
-        return foundParent;
-    };
-
-    /** 拖入某文件夹（或根）末尾 */
-    const checkDropAppendIntoFolder = (dragNode: { type: 'request' | 'folder'; path: string }, targetFolderPath: string): { ok: boolean; reason?: string } => {
-        if (!currentTree?.path) return { ok: false, reason: 'invalid-target' };
-        if (dragNode.path === targetFolderPath) return { ok: false, reason: 'self' };
-
-        if (dragNode.type === 'folder') {
-            let p: string | null = targetFolderPath;
-            const seen = new Set<string>();
-            while (p) {
-                if (p === dragNode.path) {
-                    return { ok: false, reason: 'child' };
-                }
-                if (seen.has(p)) break;
-                seen.add(p);
-                p = getParentFolderPath(p);
-            }
-        }
-
-        const draggingTreeNode = getNodeByPath(dragNode.path);
-        if (!draggingTreeNode) return { ok: false, reason: 'missing-source' };
-
-        const targetChildren = getChildrenByFolderPath(targetFolderPath);
-        if (dragNode.type === 'request') {
-            const conflict = targetChildren.some(
-                (child) => child.type === 'request' && child.name === draggingTreeNode.name && child.path !== dragNode.path
-            );
-            if (conflict) return { ok: false, reason: 'duplicate-request-name' };
-        } else {
-            const conflict = targetChildren.some(
-                (child) => child.type === 'folder' && child.name === draggingTreeNode.name && child.path !== dragNode.path
-            );
-            if (conflict) return { ok: false, reason: 'duplicate-folder-name' };
-        }
-
-        return { ok: true };
-    };
-
-    const subtreeContainsId = (folderRefPath: string, needleId: string): boolean => {
-        const node = findTreeNode(currentTree, folderRefPath);
-        if (!node) return false;
-        const walk = (n: ProjectTree): boolean => {
-            if (n.id === needleId) return true;
-            return (n.children || []).some(walk);
-        };
-        return walk(node);
-    };
-
-    /** 插入到 parentContainerPath 的子列表中，位于 beforeID 之前；beforeID 为空表示末尾 */
-    const checkDropOrdered = (
-        dragNode: { type: 'request' | 'folder'; path: string },
-        parentContainerPath: string,
-        beforeID: string
-    ): { ok: boolean; reason?: string } => {
-        if (!currentTree?.path) return { ok: false, reason: 'invalid-target' };
-
-        const dragParent = getParentFolderPath(dragNode.path);
-        if (dragParent === null) return { ok: false, reason: 'missing-source' };
-
-        if (dragNode.type === 'folder' && beforeID) {
-            if (subtreeContainsId(dragNode.path, beforeID)) {
-                return { ok: false, reason: 'child' };
-            }
-        }
-
-        const draggingTreeNode = getNodeByPath(dragNode.path);
-        if (!draggingTreeNode) return { ok: false, reason: 'missing-source' };
-
-        if (dragParent !== parentContainerPath) {
-            const targetChildren = getChildrenByFolderPath(parentContainerPath);
-            if (dragNode.type === 'request') {
-                const conflict = targetChildren.some((c) => c.type === 'request' && c.name === draggingTreeNode.name);
-                if (conflict) return { ok: false, reason: 'duplicate-request-name' };
-            } else {
-                const conflict = targetChildren.some(
-                    (c) => c.type === 'folder' && c.name === draggingTreeNode.name && c.path !== dragNode.path
-                );
-                if (conflict) return { ok: false, reason: 'duplicate-folder-name' };
-            }
-        }
-
-        return { ok: true };
-    };
-
-    const getDropHintMessage = (reason?: string) => {
-        const map: Record<string, string> = {
-            'self': '不能拖到自己',
-            'same-parent': '已在该目录',
-            'child': '不能移动到子目录',
-            'duplicate-request-name': '同名接口冲突',
-            'duplicate-folder-name': '同名文件夹冲突',
-            'invalid-target': '目标无效',
-            'missing-source': '源节点不存在',
-        };
-        if (!reason) return '不可放置';
-        return map[reason] || '不可放置';
+        useReq.setDraggingNode(null);
+        useReq.setDropTargetFolderPath(null);
+        useReq.setInvalidDropHint(null);
     };
 
     const markMovedNode = (path: string) => {
         if (movedHighlightTimerRef.current) {
             window.clearTimeout(movedHighlightTimerRef.current);
         }
-        setMovedHighlightPath(path);
+        useReq.setMovedHighlightPath(path);
         movedHighlightTimerRef.current = window.setTimeout(() => {
-            setMovedHighlightPath(null);
+            useReq.setMovedHighlightPath(null);
             movedHighlightTimerRef.current = null;
         }, 2000);
     };
 
-    const resetWorkspaceState = () => {
-        const emptyState = createEmptyWorkspaceState();
-        setRequestTabs(emptyState.requestTabs);
-        setActiveRequestTab(emptyState.activeRequestTab);
-        setCurrentRequest(emptyState.currentRequest);
-        setResponse(emptyState.response);
-        setFormattedResponse('');
-        setSelectedKeys(emptyState.selectedKeys);
-        setApiConfig(emptyState.apiConfig);
-        setSelectedEnvironmentId(emptyState.selectedEnvironmentId);
-        setRequestCases(emptyState.requestCases);
-        setActiveCaseId(emptyState.activeCaseId);
-        setInterfaceApiConfig(emptyState.interfaceApiConfig);
-        setRequestEditorSurface(emptyState.requestEditorSurface);
-        setSidebarHighlightedCasePath(emptyState.sidebarHighlightedCasePath);
-        setExpandedRequestPaths(new Set());
-    };
-
-    const captureCurrentWorkspaceState = (): ProjectWorkspaceState => ({
-        requestTabs,
-        activeRequestTab,
-        currentRequest,
-        response,
-        selectedKeys,
-        apiConfig,
-        selectedEnvironmentId,
-        requestCases,
-        activeCaseId,
-        interfaceApiConfig,
-        requestEditorSurface,
-        sidebarHighlightedCasePath
-    });
-
-    const applyWorkspaceState = (state: ProjectWorkspaceState) => {
-        setRequestTabs(state.requestTabs);
-        setActiveRequestTab(state.activeRequestTab);
-        setCurrentRequest(state.currentRequest);
-        setResponse(state.response);
-        setSelectedKeys(state.selectedKeys);
-        setApiConfig(state.apiConfig);
-        setSelectedEnvironmentId(state.selectedEnvironmentId || '');
-        setRequestCases(state.requestCases || []);
-        setActiveCaseId(state.activeCaseId || '');
-        setInterfaceApiConfig(state.interfaceApiConfig || createDefaultApiConfig());
-        setRequestEditorSurface(state.requestEditorSurface || 'plain');
-        setSidebarHighlightedCasePath(state.sidebarHighlightedCasePath || '');
-    };
+    // Re-export workspace state functions from useRequest
+    const resetWorkspaceState = useReq.resetWorkspaceState;
+    const captureCurrentWorkspaceState = useReq.captureCurrentWorkspaceState;
+    const applyWorkspaceState = useReq.applyWorkspaceState;
 
     const handleCreateScript = async () => {
         if (activeProject) {
@@ -769,28 +557,13 @@ function App() {
         }, 400);
     };
 
-    const handleImportPostman = async (file: File) => {
-        setImporting(true);
-        try {
-            const text = await file.text();
-            const project = await ImportPostmanCollection(text);
-            message.success(`成功导入项目: ${project.name}`);
-            loadProjects();
-        } catch (error: any) {
-            console.error('Failed to import Postman collection:', error);
-            message.error(`导入失败: ${error?.message || error}`);
-        } finally {
-            setImporting(false);
-        }
-    };
-
     const uploadProps: UploadProps = {
         name: 'file',
         multiple: false,
         accept: '.json',
         showUploadList: false,
         beforeUpload: (file) => {
-            handleImportPostman(file);
+            useProjs.handleImportPostman(file);
             return false;
         },
     };
@@ -862,28 +635,156 @@ function App() {
         return null;
     };
 
+    const replacePathPrefix = (path: string, fromPrefix: string, toPrefix: string) => {
+        if (path === fromPrefix) return toPrefix;
+        const normalizedFrom = fromPrefix.endsWith('/') || fromPrefix.endsWith('\\') ? fromPrefix : fromPrefix + '/';
+        if (path.startsWith(normalizedFrom)) {
+            return toPrefix + path.slice(fromPrefix.length);
+        }
+        return path;
+    };
+
+    const getChildrenByFolderPath = (folderPath: string): ProjectTree[] => {
+        if (!currentTree || !currentTree?.path) return [];
+        if (folderPath === currentTree.path) {
+            return currentTree.children || [];
+        }
+        const node = findTreeNode(currentTree, folderPath);
+        if (!node || node.type !== 'folder') return [];
+        return node.children || [];
+    };
+
+    const getNodeByPath = (path: string): ProjectTree | null => {
+        if (!currentTree) return null;
+        return findTreeNode(currentTree, path);
+    };
+
+    const getParentFolderPath = (path: string): string | null => {
+        if (!currentTree || !currentTree?.path) return null;
+
+        let foundParent: string | null = null;
+        const walk = (node: ProjectTree, parentPath: string) => {
+            const nodePath = node.path || node.id;
+            if (nodePath === path) {
+                foundParent = parentPath;
+                return;
+            }
+            if (!node.children || foundParent) return;
+
+            const nextParent = node.type === 'folder' ? nodePath : parentPath;
+            for (const child of node.children) {
+                walk(child, nextParent);
+                if (foundParent) return;
+            }
+        };
+
+        walk(currentTree, currentTree.path);
+        return foundParent;
+    };
+
+    /** 拖入某文件夹（或根）末尾 */
+    const checkDropAppendIntoFolder = (dragNode: { type: 'request' | 'folder'; path: string }, targetFolderPath: string): { ok: boolean; reason?: string } => {
+        if (!currentTree?.path) return { ok: false, reason: 'invalid-target' };
+        if (dragNode.path === targetFolderPath) return { ok: false, reason: 'self' };
+
+        if (dragNode.type === 'folder') {
+            let p: string | null = targetFolderPath;
+            const seen = new Set<string>();
+            while (p) {
+                if (p === dragNode.path) {
+                    return { ok: false, reason: 'child' };
+                }
+                if (seen.has(p)) break;
+                seen.add(p);
+                p = getParentFolderPath(p);
+            }
+        }
+
+        const draggingTreeNode = getNodeByPath(dragNode.path);
+        if (!draggingTreeNode) return { ok: false, reason: 'missing-source' };
+
+        const targetChildren = getChildrenByFolderPath(targetFolderPath);
+        if (dragNode.type === 'request') {
+            const conflict = targetChildren.some(
+                (child) => child.type === 'request' && child.name === draggingTreeNode.name && child.path !== dragNode.path
+            );
+            if (conflict) return { ok: false, reason: 'duplicate-request-name' };
+        } else {
+            const conflict = targetChildren.some(
+                (child) => child.type === 'folder' && child.name === draggingTreeNode.name && child.path !== dragNode.path
+            );
+            if (conflict) return { ok: false, reason: 'duplicate-folder-name' };
+        }
+
+        return { ok: true };
+    };
+
+    const subtreeContainsId = (folderRefPath: string, needleId: string): boolean => {
+        const node = findTreeNode(currentTree, folderRefPath);
+        if (!node) return false;
+        const walk = (n: ProjectTree): boolean => {
+            if (n.id === needleId) return true;
+            return (n.children || []).some(walk);
+        };
+        return walk(node);
+    };
+
+    /** 插入到 parentContainerPath 的子列表中，位于 beforeID 之前；beforeID 为空表示末尾 */
+    const checkDropOrdered = (
+        dragNode: { type: 'request' | 'folder'; path: string },
+        parentContainerPath: string,
+        beforeID: string
+    ): { ok: boolean; reason?: string } => {
+        if (!currentTree?.path) return { ok: false, reason: 'invalid-target' };
+
+        const dragParent = getParentFolderPath(dragNode.path);
+        if (dragParent === null) return { ok: false, reason: 'missing-source' };
+
+        if (dragNode.type === 'folder' && beforeID) {
+            if (subtreeContainsId(dragNode.path, beforeID)) {
+                return { ok: false, reason: 'child' };
+            }
+        }
+
+        const draggingTreeNode = getNodeByPath(dragNode.path);
+        if (!draggingTreeNode) return { ok: false, reason: 'missing-source' };
+
+        if (dragParent !== parentContainerPath) {
+            const targetChildren = getChildrenByFolderPath(parentContainerPath);
+            if (dragNode.type === 'request') {
+                const conflict = targetChildren.some((c) => c.type === 'request' && c.name === draggingTreeNode.name);
+                if (conflict) return { ok: false, reason: 'duplicate-request-name' };
+            } else {
+                const conflict = targetChildren.some(
+                    (c) => c.type === 'folder' && c.name === draggingTreeNode.name && c.path !== dragNode.path
+                );
+                if (conflict) return { ok: false, reason: 'duplicate-folder-name' };
+            }
+        }
+
+        return { ok: true };
+    };
+
+    const getDropHintMessage = (reason?: string) => {
+        const map: Record<string, string> = {
+            'self': '不能拖到自己',
+            'same-parent': '已在该目录',
+            'child': '不能移动到子目录',
+            'duplicate-request-name': '同名接口冲突',
+            'duplicate-folder-name': '同名文件夹冲突',
+            'invalid-target': '目标无效',
+            'missing-source': '源节点不存在',
+        };
+        if (!reason) return '不可放置';
+        return map[reason] || '不可放置';
+    };
+
     const moveRequestNode = async (requestPath: string, targetFolderPath: string, beforeID: string = '') => {
         if (!activeProject) return;
 
         try {
             await useReq.moveRequestNode(requestPath, targetFolderPath, beforeID ?? '', activeProject.id);
-
-            useReq.setRequestTabs(prev => prev.map(tab =>
-                tab.path === requestPath ? { ...tab, path: requestPath } : tab
-            ));
-            if (useReq.currentRequest?.path === requestPath) {
-                useReq.setCurrentRequest({ ...useReq.currentRequest, path: requestPath });
-            }
-
-            const tree = await GetProjectTree(activeProject.id);
-            setProjectTrees(prev => ({ ...prev, [activeProject.id]: tree }));
-            useReq.setCollapsedFolders(prev => {
-                const next = new Set(prev);
-                next.delete(targetFolderPath);
-                return next;
-            });
             markMovedNode(requestPath);
-            message.success('接口移动成功');
         } catch (error: any) {
             message.error(`移动失败: ${error?.message || error}`);
         }
@@ -894,375 +795,15 @@ function App() {
 
         try {
             await useReq.moveFolderNode(folderPath, targetFolderPath, beforeID ?? '', activeProject.id);
-
-            useReq.setRequestTabs(prev => prev.map(tab => ({
-                ...tab,
-                path: replacePathPrefix(tab.path, folderPath, folderPath)
-            })));
-
-            if (useReq.currentRequest?.path) {
-                const nextPath = replacePathPrefix(useReq.currentRequest.path, folderPath, folderPath);
-                if (nextPath !== useReq.currentRequest.path) {
-                    useReq.setCurrentRequest({ ...useReq.currentRequest, path: nextPath });
-                }
-            }
-
-            const tree = await GetProjectTree(activeProject.id);
-            setProjectTrees(prev => ({ ...prev, [activeProject.id]: tree }));
-            useReq.setCollapsedFolders(prev => {
-                const next = new Set(prev);
-                next.delete(targetFolderPath);
-                return next;
-            });
             markMovedNode(folderPath);
-            message.success('文件夹移动成功');
         } catch (error: any) {
             message.error(`移动失败: ${error?.message || error}`);
         }
     };
 
-    const applyEnvironmentVariables = (input: string, variables: Record<string, string>): string => {
-        if (!input) return input;
-        return input.replace(/\{\{(\w+)\}\}/g, (raw, varName: string) => {
-            return Object.prototype.hasOwnProperty.call(variables, varName) ? variables[varName] : raw;
-        });
-    };
-
-    const currentEnvironmentVariables = React.useMemo(() => {
-        const env = environments.find(item => item.id === selectedEnvironmentId);
-        return env?.variables || {};
-    }, [environments, selectedEnvironmentId]);
-
-    const renderVariableAwareInput = (
-        value: string,
-        onChange: (next: string) => void,
-        placeholder: string,
-        style?: React.CSSProperties,
-        multiline: boolean = false
-    ) => <VariableEditableInput value={value} onChange={onChange} placeholder={placeholder} style={style} environmentVariables={currentEnvironmentVariables} multiline={multiline} />;
-
-    const hydrateRequestEditor = (request: any, preferredCaseId?: string) => {
-        useReq.hydrateRequestEditor(request, preferredCaseId);
-
-        // Also update App-level state that RequestEditor reads from
-        const name = request.name || '';
-        const preScripts = request.pre_scripts || [];
-        const postScripts = request.post_scripts || [];
-        const reqCases = request.cases as any[];
-        const attachScripts = (cfg: ApiConfig): ApiConfig => ({
-            ...cfg,
-            preScripts: [...preScripts],
-            postScripts: [...postScripts],
-        });
-        if (reqCases && reqCases.length > 0) {
-            const rows: RequestCaseState[] = reqCases.map((c) => ({
-                id: c.id,
-                name: (c.name || '').trim() || '未命名',
-                config: attachScripts({
-                    ...apiConfigFromHttpSpec(c.spec, name),
-                }),
-            }));
-            const cr = request as CurlRequest;
-            const ifaceSpec = cr.interface_spec;
-            const ifaceCfg: ApiConfig = ifaceSpec
-                ? attachScripts({ ...apiConfigFromHttpSpec(ifaceSpec as any, name) })
-                : attachScripts(apiConfigFromRequest(cr, name));
-            setInterfaceApiConfig(ifaceCfg);
-            setRequestCases(rows);
-            const want = typeof preferredCaseId === 'string' ? preferredCaseId.trim() : '';
-            const openAsCase = want !== '' && rows.some((r) => r.id === want);
-            if (openAsCase) {
-                setActiveCaseId(want);
-                const activeRow = rows.find((r) => r.id === want)!;
-                setApiConfig({ ...cloneApiConfig(activeRow.config), name });
-                setRequestEditorSurface('case');
-            } else {
-                const resolvedActive = (request.active_case_id as string) || rows[0].id;
-                setActiveCaseId(resolvedActive);
-                setApiConfig({ ...cloneApiConfig(ifaceCfg), name });
-                setRequestEditorSurface('interface');
-            }
-        } else {
-            const cfg = attachScripts(apiConfigFromRequest(request as CurlRequest, name));
-            setInterfaceApiConfig(createDefaultApiConfig());
-            setRequestCases([]);
-            setActiveCaseId('');
-            setApiConfig(cfg);
-            setRequestEditorSurface('plain');
-        }
-        setResponse(null);
-    };
-
-    const commitActiveCaseIntoList = (): RequestCaseState[] => {
-        if (!currentRequest) return requestCases;
-        return requestCases.map((c) =>
-            c.id === activeCaseId ? { ...c, config: cloneApiConfig({ ...apiConfig, name: currentRequest.name }) } : c
-        );
-    };
-
-    const refreshProjectTree = async () => {
-        const cp = projectTabs.find((t) => t.id === activeTab)?.project;
-        if (!cp) return;
-        const tree = await GetProjectTree(cp.id);
-        setProjectTrees((prev) => ({ ...prev, [cp.id]: tree }));
-    };
-
-    const toggleRequestCasesExpanded = (requestPath: string) => {
-        setExpandedRequestPaths((prev) => {
-            const next = new Set(prev);
-            if (next.has(requestPath)) next.delete(requestPath);
-            else next.add(requestPath);
-            return next;
-        });
-    };
-
-    const openAddCaseModal = (requestPath: string) => {
-        setAddCaseTargetPath(requestPath);
-        setAddCaseNameInput('');
-        setAddCaseModalOpen(true);
-    };
-
-    const confirmAddCaseModal = async (name: string) => {
-        const trimmedName = name.trim();
-        if (!trimmedName) {
-            message.warning('请输入用例名称');
-            return Promise.reject();
-        }
-        const targetPath = addCaseTargetPath;
-        try {
-            await AddRequestCase(targetPath, trimmedName);
-            message.success('已新增用例');
-            setAddCaseModalOpen(false);
-            setAddCaseTargetPath('');
-            setAddCaseNameInput('');
-            setExpandedRequestPaths((prev) => new Set(prev).add(targetPath));
-            await refreshProjectTree();
-            if (currentRequest?.path === targetPath) {
-                const r = await GetRequest(targetPath);
-                const aid = (r as CurlRequest).active_case_id;
-                hydrateRequestEditor(r, typeof aid === 'string' ? aid : undefined);
-            }
-        } catch (error: any) {
-            message.error(`新增用例失败: ${error?.message || error}`);
-            return Promise.reject();
-        }
-    };
-
-    const openCaseRenameFromTree = (casePath: string, currentName: string) => {
-        setCaseRenameCasePath(casePath);
-        setCaseRenameInput(currentName);
-        setCaseRenameModalOpen(true);
-    };
-
-    const confirmCaseRenameFromTree = async (name: string) => {
-        const p = parseRequestCaseRef(caseRenameCasePath);
-        if (!p) {
-            setCaseRenameModalOpen(false);
-            return Promise.reject();
-        }
-        const reqPath = requestRefFromIds(p.projectId, p.requestId);
-        const trimmedName = name.trim() || '未命名';
-        try {
-            await RenameRequestCase(reqPath, p.caseId, trimmedName);
-            message.success('用例已重命名');
-            setCaseRenameModalOpen(false);
-            await refreshProjectTree();
-            if (currentRequest?.path === reqPath) {
-                setRequestCases((prev) => prev.map((c) => (c.id === p.caseId ? { ...c, name: trimmedName } : c)));
-            }
-        } catch (error: any) {
-            message.error(`重命名失败: ${error?.message || error}`);
-        }
-    };
-
-    const handleExecuteCurl = async () => {
-        const selectedEnvironment = environments.find(env => env.id === selectedEnvironmentId);
-        const variables = selectedEnvironment?.variables || {};
-        const resolvedConfig: ApiConfig = {
-            ...apiConfig,
-            url: applyEnvironmentVariables(apiConfig.url, variables),
-            headers: apiConfig.headers.map(header => ({
-                ...header,
-                key: applyEnvironmentVariables(header.key, variables),
-                value: applyEnvironmentVariables(header.value, variables),
-            })),
-            params: apiConfig.params.map(param => ({
-                ...param,
-                key: applyEnvironmentVariables(param.key, variables),
-                value: applyEnvironmentVariables(param.value, variables),
-            })),
-            body: applyEnvironmentVariables(apiConfig.body, variables),
-            formData: apiConfig.formData.map(item => ({
-                ...item,
-                key: applyEnvironmentVariables(item.key, variables),
-                value: applyEnvironmentVariables(item.value, variables),
-            })),
-            urlencoded: apiConfig.urlencoded.map(item => ({
-                ...item,
-                key: applyEnvironmentVariables(item.key, variables),
-                value: applyEnvironmentVariables(item.value, variables),
-            })),
-        };
-
-        if (!apiConfig.url?.trim()) {
-            message.warning('请输入 URL');
-            return;
-        }
-
-        const projectId = activeProject?.id || '';
-        const projectName = activeProject?.name || '';
-        const requestName = currentRequest?.name || '';
-        const requestPath = currentRequest?.path || '';
-
-        setExecuting(true);
-        setResponse(null);
-        try {
-            let result;
-            if (projectId && (apiConfig.preScripts.length > 0 || apiConfig.postScripts.length > 0)) {
-                result = await ExecuteHTTPRequestWithScripts(
-                    projectId,
-                    projectName,
-                    requestName,
-                    requestPath,
-                    selectedEnvironmentId,
-                    toWailsHttpSpec(resolvedConfig),
-                    apiConfig.preScripts,
-                    apiConfig.postScripts
-                );
-            } else {
-                result = await ExecuteHTTPRequestWithProject(
-                    projectId,
-                    projectName,
-                    requestName,
-                    requestPath,
-                    toWailsHttpSpec(resolvedConfig)
-                );
-            }
-            setResponse(result);
-            // 格式化响应体
-            try {
-                if (result.body) {
-                    const parsed = JSON.parse(result.body);
-                    setFormattedResponse(JSON.stringify(parsed, null, 2));
-                } else {
-                    setFormattedResponse('');
-                }
-            } catch {
-                setFormattedResponse(result.body || '');
-            }
-            setStatus(`请求完成 - ${result.status_code}`);
-        } catch (error: any) {
-            console.error('Failed to execute request:', error);
-            message.error(`执行失败: ${error?.message || error}`);
-        } finally {
-            setExecuting(false);
-        }
-    };
-
     // Environment action wrappers - convert () => void interface for EnvironmentPanel
     const handleCreateEnvironment = () => {
-        openCreateEnvironmentTab(projectTabs, activeTab);
-    };
-
-    // Wrapper functions to call useRequest handlers with activeProject.id
-    const saveRequest = () => {
-        if (activeProject) {
-            useReq.handleSaveRequest(activeProject.id);
-        }
-    };
-
-    const deleteRequest = (path: string) => {
-        if (activeProject) {
-            const tabId = requestTabs.find(t => t.path === path)?.id;
-            useReq.handleDeleteRequest(path, activeProject.id, tabId);
-        }
-    };
-
-    const copyRequest = (path: string) => {
-        if (activeProject) {
-            useReq.handleCopyRequest(path, activeProject.id);
-        }
-    };
-
-    const createFolder = () => {
-        if (activeProject) {
-            return useReq.handleCreateFolder(activeProject.id);
-        }
-        return Promise.resolve();
-    };
-
-    const createRequest = () => {
-        if (activeProject) {
-            return useReq.handleCreateRequest(activeProject.id);
-        }
-        return Promise.resolve();
-    };
-
-    const duplicateCase = (casePath: string) => {
-        if (activeProject) {
-            return useReq.handleDuplicateCaseFromTree(casePath, activeProject.id);
-        }
-        return Promise.resolve();
-    };
-
-    const deleteCase = (casePath: string) => {
-        if (activeProject) {
-            useReq.handleDeleteCaseFromTree(casePath, activeProject.id);
-        }
-    };
-
-    const openRenameModal = (type: 'request' | 'folder', path: string, currentName: string) => {
-        const normalizedName = trimRightSpaces(currentName);
-        const primaryName = getPrimaryName(normalizedName);
-        setRenameType(type);
-        setRenamePath(path);
-        setRenameValue(normalizedName);
-        renameSelectionEndRef.current = primaryName.length;
-        setRenameModal(true);
-    };
-
-    const handleRename = async () => {
-        const newName = renameValue.trim();
-        if (!newName) {
-            message.warning('请输入名称');
-            return;
-        }
-
-        try {
-            if (renameType === 'request') {
-                const renamed = await RenameRequest(renamePath, newName);
-
-                setRequestTabs(prev => prev.map(tab => tab.path === renamePath
-                    ? { ...tab, path: renamed.path, title: renamed.name }
-                    : tab));
-
-                if (currentRequest?.path === renamePath) {
-                    setCurrentRequest({ ...currentRequest, path: renamed.path, name: renamed.name });
-                    setApiConfig({ ...apiConfig, name: renamed.name });
-                    setInterfaceApiConfig((prev) => ({ ...prev, name: renamed.name }));
-                    setRequestCases((prev) =>
-                        prev.map((c) => ({ ...c, config: { ...c.config, name: renamed.name } }))
-                    );
-                }
-            } else {
-                await RenameFolder(renamePath, newName);
-            }
-
-            message.success('重命名成功');
-            setRenameModal(false);
-
-            if (activeProject) {
-                const tree = await GetProjectTree(activeProject.id);
-                setProjectTrees(prev => ({ ...prev, [activeProject.id]: tree }));
-            }
-        } catch (error: any) {
-            const msg = String(error?.message || error || '');
-            if (msg.includes('同名') || msg.includes('已存在')) {
-                message.warning(renameType === 'request' ? '重命名失败：同级目录下已存在同名接口' : '重命名失败：同级目录下已存在同名文件夹');
-            } else {
-                message.error(`重命名失败: ${msg}`);
-            }
-        }
+        useEnv.openCreateEnvironmentTab(projectTabs, activeTab);
     };
 
     useEffect(() => {
@@ -1275,12 +816,6 @@ function App() {
             input.setSelectionRange(0, end);
         }, 0);
     }, [renameModal]);
-
-    const deleteFolder = (path: string) => {
-        if (activeProject) {
-            useReq.handleDeleteFolder(path, activeProject.id);
-        }
-    };
 
 
     const currentTree = activeProject ? projectTrees[activeProject.id] : null;
@@ -1391,7 +926,7 @@ function App() {
                             onCreateFolder={() => setCreateFolderModal(true)}
                             onCreateRequest={() => setCreateRequestModal(true)}
                             onCreateEnvironment={handleCreateEnvironment}
-                            onCreateScript={handleCreateScript}
+                            onCreateScript={() => { if (activeProject) { createScript(activeProject.id); setSidebarMenu('scripts'); } }}
                             onEnvironmentSelect={(env) => openEnvironmentEditor(env)}
                             onScriptSelect={(script) => selectScript(script)}
                             onSearchChange={(v) => { setSearchKeyword(v); setSearchVersion(p => p + 1); }}
@@ -1401,15 +936,15 @@ function App() {
                             onItemClick={(key, node) => useReq.handleTreeItemClick(node)}
                             onAddRequest={(folderPath) => { setSelectedFolder(folderPath || currentTree?.path || ''); setCreateRequestModal(true); }}
                             onAddFolder={(folderPath) => { setSelectedFolder(folderPath || currentTree?.path || ''); setCreateFolderModal(true); }}
-                            onRename={openRenameModal}
-                            onDelete={(type, path) => { if (type === 'folder') { deleteFolder(path); } else { deleteRequest(path); } }}
-                            onCopy={(path) => copyRequest(path)}
+                            onRename={useReq.openRenameModal}
+                            onDelete={(type, path) => { if (type === 'folder') { activeProject && useReq.handleDeleteFolder(path, activeProject.id); } else { activeProject && useReq.handleDeleteRequest(path, activeProject.id, requestTabs.find(t => t.path === path)?.id); } }}
+                            onCopy={(path) => { if (activeProject) { useReq.handleCopyRequest(path, activeProject.id); } }}
                             onCaseClick={(casePath) => { const node = getNodeByPath(casePath); if (node) useReq.handleCaseTreeClick(node); }}
-                            onToggleCasesExpanded={toggleRequestCasesExpanded}
-                            onAddCase={openAddCaseModal}
-                            onDeleteCase={(casePath) => deleteCase(casePath)}
-                            onDuplicateCase={(casePath) => duplicateCase(casePath)}
-                            onRenameCase={(casePath, currentName) => openCaseRenameFromTree(casePath, currentName)}
+                            onToggleCasesExpanded={useReq.toggleRequestCasesExpanded}
+                            onAddCase={useReq.openAddCaseModal}
+                            onDeleteCase={(casePath) => { if (activeProject) { useReq.handleDeleteCaseFromTree(casePath, activeProject.id); } }}
+                            onDuplicateCase={(casePath) => { if (activeProject) { useReq.handleDuplicateCaseFromTree(casePath, activeProject.id); } }}
+                            onRenameCase={useReq.openCaseRenameFromTree}
                             onClearDragState={clearDragState}
                             onSetDraggingNode={setDraggingNode}
                             onSetDropTargetFolderPath={setDropTargetFolderPath}
@@ -1487,17 +1022,17 @@ function App() {
                                         activeCaseId={activeCaseId}
                                         requestEditorSurface={requestEditorSurface}
                                         curlPreview={curlPreview}
-                                        environmentVariables={currentEnvironmentVariables}
+                                        environmentVariables={useEnv.currentEnvironmentVariables}
                                         projectScripts={projectScripts}
                                         animationEnabled={animationEnabled}
                                         forceListAnimation={forceListAnimation}
                                         onMethodChange={(value) => setApiConfig({ ...apiConfig, method: value })}
                                         onUrlChange={(value) => setApiConfig({ ...apiConfig, url: value })}
-                                        onSend={handleExecuteCurl}
-                                        onSave={saveRequest}
+                                        onSend={() => { if (activeProject) { useReq.handleExecuteCurl(activeProject.id, activeProject.name, selectedEnvironmentId, environments); } }}
+                                        onSave={() => { if (activeProject) { useReq.handleSaveRequest(activeProject.id); } }}
                                         onConfigChange={setApiConfig}
                                         onCurlPreviewChange={setCurlPreview}
-                                        renderVariableAwareInput={renderVariableAwareInput}
+                                        renderVariableAwareInput={(value, onChange, placeholder, style, multiline) => <VariableEditableInput value={value} onChange={onChange} placeholder={placeholder} style={style} environmentVariables={useEnv.currentEnvironmentVariables} multiline={multiline} />}
                                         parseCurlToApiConfig={parseCurlToApiConfig}
                                     />
 
@@ -1575,19 +1110,19 @@ function App() {
             <CreateFolderModal
                 visible={createFolderModal}
                 onClose={() => { setCreateFolderModal(false); setNewFolderName(''); }}
-                onConfirm={createFolder}
+                onConfirm={() => { if (activeProject) { return useReq.handleCreateFolder(activeProject.id); } return Promise.resolve(); }}
             />
 
             <CreateRequestModal
                 visible={createRequestModal}
                 onClose={() => { setCreateRequestModal(false); setNewRequestName(''); }}
-                onConfirm={createRequest}
+                onConfirm={() => { if (activeProject) { return useReq.handleCreateRequest(activeProject.id); } return Promise.resolve(); }}
             />
 
             <RenameModal
                 visible={renameModal}
                 onClose={() => { setRenameModal(false); setRenamePath(''); setRenameValue(''); }}
-                onConfirm={handleRename}
+                onConfirm={useReq.handleRename}
                 title={renameType === 'request' ? '重命名请求' : '重命名文件夹'}
                 initialValue={renameValue}
             />
@@ -1599,7 +1134,7 @@ function App() {
                     setAddCaseTargetPath('');
                     setAddCaseNameInput('');
                 }}
-                onConfirm={confirmAddCaseModal}
+                onConfirm={(name) => { return useReq.confirmAddCaseModal(name); }}
                 initialName={addCaseNameInput}
             />
 
@@ -1610,7 +1145,7 @@ function App() {
                     setCaseRenameCasePath('');
                     setCaseRenameInput('');
                 }}
-                onConfirm={confirmCaseRenameFromTree}
+                onConfirm={useReq.confirmCaseRenameFromTree}
                 initialName={caseRenameInput}
             />
 
