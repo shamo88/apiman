@@ -12,6 +12,15 @@ import { ResponseViewer } from './components/response';
 import { VariableEditableInput, RequestEditor } from './components/request';
 import { buildCurlCommand, parseCurlToApiConfig } from './utils/curlUtils';
 import {
+    findTreeNode,
+    getChildrenByFolderPath,
+    getParentFolderPath,
+    checkDropAppendIntoFolder,
+    checkDropOrdered,
+    getDropHintMessage,
+    replacePathPrefix,
+} from './utils/treeUtils';
+import {
     Project,
     ProjectWorkspaceState,
     ProjectGroupStore,
@@ -105,8 +114,6 @@ function App() {
         currentRequest,
         response,
         formattedResponse,
-        responseBodyHeight,
-        scriptResultsHeight,
         scriptLogsExpanded,
         testResultsExpanded,
         executing,
@@ -150,8 +157,6 @@ function App() {
         setCurrentRequest,
         setResponse,
         setFormattedResponse,
-        setResponseBodyHeight,
-        setScriptResultsHeight,
         setScriptLogsExpanded,
         setTestResultsExpanded,
         setExecuting,
@@ -282,18 +287,6 @@ function App() {
     // Derived value: current active project
     const activeProject = projectTabs.find(t => t.id === activeTab)?.project;
 
-    const toggleFolderCollapse = (folderPath: string) => {
-        useReq.setCollapsedFolders(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(folderPath)) {
-                newSet.delete(folderPath);
-            } else {
-                newSet.add(folderPath);
-            }
-            return newSet;
-        });
-    };
-
     const clearDragState = () => {
         useReq.setDraggingNode(null);
         useReq.setDropTargetFolderPath(null);
@@ -341,68 +334,6 @@ function App() {
 
         const targetState = projectWorkspaceStates[targetTab] || createEmptyWorkspaceState();
         applyWorkspaceState(targetState);
-    };
-
-
-    const filterTreeNodes = (tree: ProjectTree | null, keyword: string, method: string): ProjectTree | null => {
-        if (!tree) return null;
-        const normalizedKeyword = keyword.trim().toLowerCase();
-        const noSearchOrMethodFilter = normalizedKeyword === '' && method === 'ALL';
-
-        if (tree.type === 'case') {
-            return tree;
-        }
-
-        if (tree.type === 'request') {
-            const nameLower = (tree.name || '').toLowerCase();
-            const urlLower = (tree.url || '').toLowerCase();
-
-            const matchName = normalizedKeyword === '' || nameLower.includes(normalizedKeyword);
-            const matchURL = normalizedKeyword === '' || urlLower.includes(normalizedKeyword);
-            const matchMethod = method === 'ALL' || tree.method === method;
-            const caseChildren = (tree.children || []).filter((c): c is ProjectTree => c.type === 'case');
-            const caseNameMatch =
-                normalizedKeyword === '' ||
-                caseChildren.some((c) => (c.name || '').toLowerCase().includes(normalizedKeyword));
-
-            if ((matchName || matchURL || caseNameMatch) && matchMethod) {
-                let nextChildren = tree.children;
-                if (normalizedKeyword !== '' && !matchName && !matchURL && caseNameMatch) {
-                    nextChildren = caseChildren.filter((c) =>
-                        (c.name || '').toLowerCase().includes(normalizedKeyword)
-                    );
-                }
-                return { ...tree, children: nextChildren };
-            }
-            return null;
-        }
-
-        if (tree.type === 'folder') {
-            const children = tree.children ?? [];
-            const filteredChildren = children
-                .map(child => filterTreeNodes(child, keyword, method))
-                .filter((child): child is ProjectTree => child !== null);
-
-            // 无搜索/方法筛选时保留空文件夹，否则新建的空目录不会出现在树里
-            if (filteredChildren.length > 0 || noSearchOrMethodFilter) {
-                return { ...tree, children: filteredChildren };
-            }
-            return null;
-        }
-
-        if (tree.type === 'project') {
-            const children = tree.children ?? [];
-            const filteredChildren = children
-                .map(child => filterTreeNodes(child, keyword, method))
-                .filter((child): child is ProjectTree => child !== null);
-
-            return {
-                ...tree,
-                children: filteredChildren
-            };
-        }
-
-        return tree;
     };
 
 
@@ -506,46 +437,6 @@ function App() {
         setCurlPreview(buildCurlCommand(apiConfig));
     }, [apiConfig.method, apiConfig.url, apiConfig.headers, apiConfig.params, apiConfig.body, apiConfig.bodyType, apiConfig.formData, apiConfig.urlencoded]);
 
-    // Calculate response-body height dynamically
-    useEffect(() => {
-        const calculateResponseBodyHeight = () => {
-            const responsePanel = document.querySelector('.response-panel') as HTMLElement;
-            const responseHeader = document.querySelector('.response-panel .response-header') as HTMLElement;
-            if (responsePanel && responseHeader) {
-                const panelHeight = responsePanel.offsetHeight;
-                const headerHeight = responseHeader.offsetHeight;
-                const bodyHeight = panelHeight - headerHeight - 40; // 40 = tabs height
-                setResponseBodyHeight(Math.max(100, bodyHeight));
-            }
-        };
-
-        calculateResponseBodyHeight();
-
-        // Recalculate on window resize
-        window.addEventListener('resize', calculateResponseBodyHeight);
-        return () => window.removeEventListener('resize', calculateResponseBodyHeight);
-    }, [response]);
-
-    // Calculate script-results-panel height dynamically
-    useEffect(() => {
-        const calculateScriptResultsHeight = () => {
-            const responsePanel = document.querySelector('.response-panel') as HTMLElement;
-            const responseHeader = document.querySelector('.response-panel .response-header') as HTMLElement;
-            if (responsePanel && responseHeader) {
-                const panelHeight = responsePanel.offsetHeight;
-                const headerHeight = responseHeader.offsetHeight;
-                const bodyHeight = panelHeight - headerHeight - 40; // 40 = tabs height
-                setScriptResultsHeight(Math.max(100, bodyHeight));
-            }
-        };
-
-        calculateScriptResultsHeight();
-
-        // Recalculate on window resize
-        window.addEventListener('resize', calculateScriptResultsHeight);
-        return () => window.removeEventListener('resize', calculateScriptResultsHeight);
-    }, [useReq.response]);
-
     const triggerOpenTabAnimation = () => {
         if (forceAnimationTimerRef.current) {
             window.clearTimeout(forceAnimationTimerRef.current);
@@ -623,160 +514,9 @@ function App() {
         }
     };
 
-    const findTreeNode = (tree: ProjectTree | null, key: string): ProjectTree | null => {
-        if (!tree) return null;
-        if ((tree.path || tree.id) === key) return tree;
-        if (tree.children) {
-            for (const child of tree.children) {
-                const found = findTreeNode(child, key);
-                if (found) return found;
-            }
-        }
-        return null;
-    };
-
-    const replacePathPrefix = (path: string, fromPrefix: string, toPrefix: string) => {
-        if (path === fromPrefix) return toPrefix;
-        const normalizedFrom = fromPrefix.endsWith('/') || fromPrefix.endsWith('\\') ? fromPrefix : fromPrefix + '/';
-        if (path.startsWith(normalizedFrom)) {
-            return toPrefix + path.slice(fromPrefix.length);
-        }
-        return path;
-    };
-
-    const getChildrenByFolderPath = (folderPath: string): ProjectTree[] => {
-        if (!currentTree || !currentTree?.path) return [];
-        if (folderPath === currentTree.path) {
-            return currentTree.children || [];
-        }
-        const node = findTreeNode(currentTree, folderPath);
-        if (!node || node.type !== 'folder') return [];
-        return node.children || [];
-    };
-
+    // Tree utility wrappers that pass currentTree
     const getNodeByPath = (path: string): ProjectTree | null => {
-        if (!currentTree) return null;
         return findTreeNode(currentTree, path);
-    };
-
-    const getParentFolderPath = (path: string): string | null => {
-        if (!currentTree || !currentTree?.path) return null;
-
-        let foundParent: string | null = null;
-        const walk = (node: ProjectTree, parentPath: string) => {
-            const nodePath = node.path || node.id;
-            if (nodePath === path) {
-                foundParent = parentPath;
-                return;
-            }
-            if (!node.children || foundParent) return;
-
-            const nextParent = node.type === 'folder' ? nodePath : parentPath;
-            for (const child of node.children) {
-                walk(child, nextParent);
-                if (foundParent) return;
-            }
-        };
-
-        walk(currentTree, currentTree.path);
-        return foundParent;
-    };
-
-    /** 拖入某文件夹（或根）末尾 */
-    const checkDropAppendIntoFolder = (dragNode: { type: 'request' | 'folder'; path: string }, targetFolderPath: string): { ok: boolean; reason?: string } => {
-        if (!currentTree?.path) return { ok: false, reason: 'invalid-target' };
-        if (dragNode.path === targetFolderPath) return { ok: false, reason: 'self' };
-
-        if (dragNode.type === 'folder') {
-            let p: string | null = targetFolderPath;
-            const seen = new Set<string>();
-            while (p) {
-                if (p === dragNode.path) {
-                    return { ok: false, reason: 'child' };
-                }
-                if (seen.has(p)) break;
-                seen.add(p);
-                p = getParentFolderPath(p);
-            }
-        }
-
-        const draggingTreeNode = getNodeByPath(dragNode.path);
-        if (!draggingTreeNode) return { ok: false, reason: 'missing-source' };
-
-        const targetChildren = getChildrenByFolderPath(targetFolderPath);
-        if (dragNode.type === 'request') {
-            const conflict = targetChildren.some(
-                (child) => child.type === 'request' && child.name === draggingTreeNode.name && child.path !== dragNode.path
-            );
-            if (conflict) return { ok: false, reason: 'duplicate-request-name' };
-        } else {
-            const conflict = targetChildren.some(
-                (child) => child.type === 'folder' && child.name === draggingTreeNode.name && child.path !== dragNode.path
-            );
-            if (conflict) return { ok: false, reason: 'duplicate-folder-name' };
-        }
-
-        return { ok: true };
-    };
-
-    const subtreeContainsId = (folderRefPath: string, needleId: string): boolean => {
-        const node = findTreeNode(currentTree, folderRefPath);
-        if (!node) return false;
-        const walk = (n: ProjectTree): boolean => {
-            if (n.id === needleId) return true;
-            return (n.children || []).some(walk);
-        };
-        return walk(node);
-    };
-
-    /** 插入到 parentContainerPath 的子列表中，位于 beforeID 之前；beforeID 为空表示末尾 */
-    const checkDropOrdered = (
-        dragNode: { type: 'request' | 'folder'; path: string },
-        parentContainerPath: string,
-        beforeID: string
-    ): { ok: boolean; reason?: string } => {
-        if (!currentTree?.path) return { ok: false, reason: 'invalid-target' };
-
-        const dragParent = getParentFolderPath(dragNode.path);
-        if (dragParent === null) return { ok: false, reason: 'missing-source' };
-
-        if (dragNode.type === 'folder' && beforeID) {
-            if (subtreeContainsId(dragNode.path, beforeID)) {
-                return { ok: false, reason: 'child' };
-            }
-        }
-
-        const draggingTreeNode = getNodeByPath(dragNode.path);
-        if (!draggingTreeNode) return { ok: false, reason: 'missing-source' };
-
-        if (dragParent !== parentContainerPath) {
-            const targetChildren = getChildrenByFolderPath(parentContainerPath);
-            if (dragNode.type === 'request') {
-                const conflict = targetChildren.some((c) => c.type === 'request' && c.name === draggingTreeNode.name);
-                if (conflict) return { ok: false, reason: 'duplicate-request-name' };
-            } else {
-                const conflict = targetChildren.some(
-                    (c) => c.type === 'folder' && c.name === draggingTreeNode.name && c.path !== dragNode.path
-                );
-                if (conflict) return { ok: false, reason: 'duplicate-folder-name' };
-            }
-        }
-
-        return { ok: true };
-    };
-
-    const getDropHintMessage = (reason?: string) => {
-        const map: Record<string, string> = {
-            'self': '不能拖到自己',
-            'same-parent': '已在该目录',
-            'child': '不能移动到子目录',
-            'duplicate-request-name': '同名接口冲突',
-            'duplicate-folder-name': '同名文件夹冲突',
-            'invalid-target': '目标无效',
-            'missing-source': '源节点不存在',
-        };
-        if (!reason) return '不可放置';
-        return map[reason] || '不可放置';
     };
 
     const moveRequestNode = async (requestPath: string, targetFolderPath: string, beforeID: string = '') => {
@@ -932,7 +672,7 @@ function App() {
                             onSearchChange={(v) => { setSearchKeyword(v); setSearchVersion(p => p + 1); }}
                             onMethodChange={setFilterMethod}
                             onToggleExpand={(key) => { setExpandedKeys(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]); }}
-                            onFolderCollapse={toggleFolderCollapse}
+                            onFolderCollapse={useReq.toggleFolderCollapse}
                             onItemClick={(key, node) => useReq.handleTreeItemClick(node)}
                             onAddRequest={(folderPath) => { setSelectedFolder(folderPath || currentTree?.path || ''); setCreateRequestModal(true); }}
                             onAddFolder={(folderPath) => { setSelectedFolder(folderPath || currentTree?.path || ''); setCreateFolderModal(true); }}
@@ -949,13 +689,13 @@ function App() {
                             onSetDraggingNode={setDraggingNode}
                             onSetDropTargetFolderPath={setDropTargetFolderPath}
                             onSetInvalidDropHint={setInvalidDropHint}
-                            onCheckDropAppendIntoFolder={checkDropAppendIntoFolder}
-                            onCheckDropOrdered={checkDropOrdered}
+                            onCheckDropAppendIntoFolder={(dragNode, targetFolderPath) => checkDropAppendIntoFolder(currentTree, dragNode, targetFolderPath)}
+                            onCheckDropOrdered={(dragNode, parentContainerPath, beforeID) => checkDropOrdered(currentTree, dragNode, parentContainerPath, beforeID)}
                             onGetDropHintMessage={getDropHintMessage}
                             onMoveRequestNode={moveRequestNode}
                             onMoveFolderNode={moveFolderNode}
-                            onGetParentFolderPath={getParentFolderPath}
-                            onGetChildrenByFolderPath={getChildrenByFolderPath as any}
+                            onGetParentFolderPath={(path) => getParentFolderPath(currentTree, path)}
+                            onGetChildrenByFolderPath={(folderPath) => getChildrenByFolderPath(currentTree, folderPath)}
                         />
 
                         <div className="project-main">
@@ -1040,8 +780,6 @@ function App() {
                                         <ResponseViewer
                                             response={response}
                                             formattedResponse={formattedResponse}
-                                            responseBodyHeight={responseBodyHeight}
-                                            scriptResultsHeight={scriptResultsHeight}
                                             scriptLogsExpanded={scriptLogsExpanded}
                                             testResultsExpanded={testResultsExpanded}
                                             animationEnabled={animationEnabled}

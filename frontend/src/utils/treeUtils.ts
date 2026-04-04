@@ -86,6 +86,17 @@ export const replacePathPrefix = (
     return path;
 };
 
+/** Check if subtree contains an ID */
+export const subtreeContainsId = (tree: ProjectTree | null, folderRefPath: string, needleId: string): boolean => {
+    const node = findTreeNode(tree, folderRefPath);
+    if (!node) return false;
+    const walk = (n: ProjectTree): boolean => {
+        if (n.id === needleId) return true;
+        return (n.children || []).some(walk);
+    };
+    return walk(node);
+};
+
 /** Convert ProjectTree to DataNode for AntD Tree */
 export const treeToDataNode = (
     tree: ProjectTree,
@@ -159,4 +170,97 @@ export const filterTreeByKeyword = (
 
     const result = walk(tree);
     return result;
+};
+
+/** Drop hint message mapping */
+export const getDropHintMessage = (reason?: string): string => {
+    const map: Record<string, string> = {
+        'self': '不能拖到自己',
+        'same-parent': '已在该目录',
+        'child': '不能移动到子目录',
+        'duplicate-request-name': '同名接口冲突',
+        'duplicate-folder-name': '同名文件夹冲突',
+        'invalid-target': '目标无效',
+        'missing-source': '源节点不存在',
+    };
+    if (!reason) return '不可放置';
+    return map[reason] || '不可放置';
+};
+
+/** Check if can drop into folder (at the end) */
+export const checkDropAppendIntoFolder = (
+    tree: ProjectTree | null,
+    dragNode: { type: 'request' | 'folder'; path: string },
+    targetFolderPath: string
+): { ok: boolean; reason?: string } => {
+    if (!tree?.path) return { ok: false, reason: 'invalid-target' };
+    if (dragNode.path === targetFolderPath) return { ok: false, reason: 'self' };
+
+    if (dragNode.type === 'folder') {
+        let p: string | null = targetFolderPath;
+        const seen = new Set<string>();
+        while (p) {
+            if (p === dragNode.path) {
+                return { ok: false, reason: 'child' };
+            }
+            if (seen.has(p)) break;
+            seen.add(p);
+            p = getParentFolderPath(tree, p);
+        }
+    }
+
+    const draggingTreeNode = findTreeNode(tree, dragNode.path);
+    if (!draggingTreeNode) return { ok: false, reason: 'missing-source' };
+
+    const targetChildren = getChildrenByFolderPath(tree, targetFolderPath);
+    if (dragNode.type === 'request') {
+        const conflict = targetChildren.some(
+            (child) => child.type === 'request' && child.name === draggingTreeNode.name && child.path !== dragNode.path
+        );
+        if (conflict) return { ok: false, reason: 'duplicate-request-name' };
+    } else {
+        const conflict = targetChildren.some(
+            (child) => child.type === 'folder' && child.name === draggingTreeNode.name && child.path !== dragNode.path
+        );
+        if (conflict) return { ok: false, reason: 'duplicate-folder-name' };
+    }
+
+    return { ok: true };
+};
+
+/** Check if can drop in order (before a specific item) */
+export const checkDropOrdered = (
+    tree: ProjectTree | null,
+    dragNode: { type: 'request' | 'folder'; path: string },
+    parentContainerPath: string,
+    beforeID: string
+): { ok: boolean; reason?: string } => {
+    if (!tree?.path) return { ok: false, reason: 'invalid-target' };
+
+    const dragParent = getParentFolderPath(tree, dragNode.path);
+    if (dragParent === null) return { ok: false, reason: 'missing-source' };
+
+    if (dragNode.type === 'folder' && beforeID) {
+        if (subtreeContainsId(tree, dragNode.path, beforeID)) {
+            return { ok: false, reason: 'child' };
+        }
+    }
+
+    const draggingTreeNode = findTreeNode(tree, dragNode.path);
+    if (!draggingTreeNode) return { ok: false, reason: 'missing-source' };
+
+    if (dragParent !== parentContainerPath) {
+        const targetChildren = getChildrenByFolderPath(tree, parentContainerPath);
+        if (dragNode.type === 'request') {
+            const conflict = targetChildren.some((c) => c.type === 'request' && c.name === draggingTreeNode.name);
+            if (conflict) return { ok: false, reason: 'duplicate-request-name' };
+        } else {
+            const conflict = targetChildren.some(
+                (c) => c.type === 'folder' && c.name === draggingTreeNode.name && c.path !== dragNode.path
+            );
+            if (conflict) return { ok: false, reason: 'duplicate-folder-name' };
+        }
+    }
+
+    return { ok: true };
 };

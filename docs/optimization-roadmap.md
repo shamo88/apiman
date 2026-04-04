@@ -109,7 +109,7 @@
 
 **当前 App.tsx 大小**：
 - 原始：4080 行
-- 当前：1195 行（累计减少 ~2885 行）
+- 当前：933 行（累计减少 ~3147 行，~77% 减少）
 - 目标：500-800 行
 
 **本次优化**：
@@ -124,17 +124,21 @@
 - ✅ 清理未使用的状态变量：newProjectName, newGroupName
 - ✅ 清理未使用的计算变量：groupedProjects, filteredTree, normalizedProjectKeyword, filteredProjects, searchInputRef
 - ✅ 清理未使用的 hook 返回项：searchVersion
-- ✅ **useProjects 集成**：App.tsx 使用 useProjects hook，移除本地 projects/loading 状态和 ~150 行重复函数定义（createGroupWithName, renameGroupWithName, handleAssignProjectGroup, toggleProjectGroupCollapse, openRenameProjectGroupModal, handleDeleteProjectGroup, handleGroupDragStart, handleGroupDragOver, handleGroupDrop, handleOpenProject, handleCloseProjectTab, loadProjects）
+- ✅ **useProjects 集成**：App.tsx 使用 useProjects hook，移除本地 projects/loading 状态和 ~150 行重复函数定义
 - ✅ **useProjects 扩展**：添加 setDraggingProjectId 和 setProjectDropTargetGroup 到 hook 接口，支持 HomePage 组件调用
-- ✅ **useRequest 树刷新回调**：添加 `onTreeRefresh` 回调选项，useRequest 操作后自动通知调用者刷新项目树，解决 useRequest 和 useProjects 之间的树状态协调问题
-- ✅ **useRequest 函数集成**：App.tsx 使用 useRequest 的 handleDeleteRequest/handleCopyRequest/handleDeleteFolder/handleSaveRequest/handleCreateFolder/handleCreateRequest/handleDuplicateCaseFromTree/handleDeleteCaseFromTree/handleCloseRequestTab/loadRequestContent，通过包装函数传入 activeProject.id，移除 ~110 行本地重复函数
-- ✅ **useRequest handleRename 集成**：App.tsx 使用 useReq.handleRename，直接调用 useRequest 的实现
-- ✅ **useRequest confirmAddCaseModal 集成**：App.tsx 直接使用 useReq.confirmAddCaseModal(name)，传入用户输入
+- ✅ **useRequest 树刷新回调**：添加 `onTreeRefresh` 回调选项，useRequest 操作后自动通知调用者刷新项目树
+- ✅ **useRequest 函数集成**：App.tsx 使用 useRequest 的 handleDeleteRequest/handleCopyRequest/handleDeleteFolder/handleSaveRequest/handleCreateFolder/handleCreateRequest/handleDuplicateCaseFromTree/handleDeleteCaseFromTree/handleCloseRequestTab/loadRequestContent，通过包装函数传入 activeProject.id
+- ✅ **useRequest handleRename 集成**：App.tsx 使用 useReq.handleRename
+- ✅ **useRequest confirmAddCaseModal 集成**：App.tsx 直接使用 useReq.confirmAddCaseModal(name)
+- ✅ **useRequest toggleFolderCollapse 集成**：App.tsx 使用 useReq.toggleFolderCollapse
 - ✅ **useEnvironment 扩展**：添加 `currentEnvironmentVariables` 派生状态到 useEnvironment hook
 - ✅ **移除重复函数**：清理 applyEnvironmentVariables, currentEnvironmentVariables, renderVariableAwareInput, hydrateRequestEditor, commitActiveCaseIntoList, refreshProjectTree, toggleRequestCasesExpanded, openAddCaseModal, confirmAddCaseModal, openCaseRenameFromTree, confirmCaseRenameFromTree, handleExecuteCurl, saveRequest, deleteRequest, copyRequest, createFolder, createRequest, duplicateCase, deleteCase, openRenameModal, handleRename, deleteFolder 等本地重复实现
-- ✅ **清理未使用的导入**：移除未使用的 wailsjs 导入（AddRequestCase, CreateFolder, CreateProjectScript, CreateRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequestWithScripts, ExecuteHTTPRequestWithProject, GetProjectTree, GetRequest, ImportPostmanCollection, ListProjects, RenameFolder, RenameRequest, RenameRequestCase）和未使用的类型导入
-- ✅ **简化 moveRequestNode/moveFolderNode**：移除冗余的 tree 状态更新逻辑，直接使用 useReq.moveRequestNode/moveFolderNode
-- ✅ **精简树工具函数**：保留必要的树工具函数（getNodeByPath, getParentFolderPath, getChildrenByFolderPath, checkDropAppendIntoFolder, checkDropOrdered, getDropHintMessage），用于 ProjectSidebar 回调
+- ✅ **清理未使用的导入**：移除未使用的 wailsjs 导入和未使用的类型导入
+- ✅ **简化 moveRequestNode/moveFolderNode**：移除冗余的 tree 状态更新逻辑
+- ✅ **精简树工具函数**：将 treeUtils 函数（findTreeNode, getChildrenByFolderPath, getParentFolderPath, checkDropAppendIntoFolder, checkDropOrdered, getDropHintMessage, replacePathPrefix）移至 treeUtils.ts，App.tsx 保留必要的包装函数
+- ✅ **移除 filterTreeNodes**：删除未使用的 filterTreeNodes 函数
+- ✅ **ResponseViewer 高度计算内聚**：将 responseBodyHeight 和 scriptResultsHeight 的计算逻辑移至 ResponseViewer 组件内部，移除 App.tsx 中的相关 useEffect
+- ✅ **toggleFolderCollapse 移至 useRequest**：将树折叠逻辑添加至 useRequest hook
 
 **Hooks 状态**：
 

@@ -1,12 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tabs } from 'antd';
 import { ResponseCookies, ResponseHeaders, ResponseStatus, ResponseBodyViewer, ScriptResultsPanel } from '../response';
 
 interface ResponseViewerProps {
     response: any;
     formattedResponse: string;
-    responseBodyHeight: number;
-    scriptResultsHeight: number;
     scriptLogsExpanded: boolean;
     testResultsExpanded: boolean;
     animationEnabled: boolean;
@@ -19,8 +17,6 @@ interface ResponseViewerProps {
 export const ResponseViewer: React.FC<ResponseViewerProps> = ({
     response,
     formattedResponse,
-    responseBodyHeight,
-    scriptResultsHeight,
     scriptLogsExpanded,
     testResultsExpanded,
     animationEnabled,
@@ -29,6 +25,27 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
     onScriptLogsExpand,
     onTestResultsExpand,
 }) => {
+    const [responseBodyHeight, setResponseBodyHeight] = useState(300);
+    const [scriptResultsHeight, setScriptResultsHeight] = useState(200);
+
+    useEffect(() => {
+        const calculateHeights = () => {
+            const responsePanel = document.querySelector('.response-panel') as HTMLElement;
+            const responseHeader = document.querySelector('.response-panel .response-header') as HTMLElement;
+            if (responsePanel && responseHeader) {
+                const panelHeight = responsePanel.offsetHeight;
+                const headerHeight = responseHeader.offsetHeight;
+                const bodyHeight = panelHeight - headerHeight - 40;
+                setResponseBodyHeight(Math.max(100, bodyHeight));
+                setScriptResultsHeight(Math.max(100, bodyHeight));
+            }
+        };
+
+        calculateHeights();
+        window.addEventListener('resize', calculateHeights);
+        return () => window.removeEventListener('resize', calculateHeights);
+    }, [response]);
+
     if (!response) return null;
 
     const scriptTabs = response.script_logs?.length || response.tests?.length

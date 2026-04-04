@@ -244,6 +244,7 @@ export interface UseRequestActions {
     handleDeleteFolder: (path: string, projectId: string) => Promise<void>;
     refreshProjectTree: (projectId: string) => Promise<void>;
     toggleRequestCasesExpanded: (requestPath: string) => void;
+    toggleFolderCollapse: (folderPath: string) => void;
     handleCaseTreeClick: (caseNode: ProjectTree) => Promise<void>;
     openAddCaseModal: (targetPath: string) => void;
     confirmAddCaseModal: (name?: string) => Promise<void>;
@@ -872,6 +873,18 @@ export function useRequest(options?: {
         });
     }, []);
 
+    const toggleFolderCollapse = useCallback((folderPath: string) => {
+        setCollapsedFolders(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(folderPath)) {
+                newSet.delete(folderPath);
+            } else {
+                newSet.add(folderPath);
+            }
+            return newSet;
+        });
+    }, []);
+
     const handleCaseTreeClick = useCallback(async (caseNode: ProjectTree) => {
         const p = parseRequestCaseRef(caseNode.path || '');
         if (!p) return;
@@ -1218,6 +1231,7 @@ export function useRequest(options?: {
         handleDeleteFolder,
         refreshProjectTree,
         toggleRequestCasesExpanded,
+        toggleFolderCollapse,
         handleCaseTreeClick,
         openAddCaseModal,
         confirmAddCaseModal,
