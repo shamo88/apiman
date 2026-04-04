@@ -75,6 +75,12 @@
 
 **当前状态**：进行中
 
+**架构原则**：
+1. **Hook 只暴露**：state + action 函数
+2. **组件直接用 Hook**：传 `projectId` 等必要 coordination prop
+3. **验证逻辑在 Hook 内部**：不在 App.tsx wrapper 里
+4. **App.tsx 变薄**：只做组件组合
+
 **已完成**：
 - ✅ Contexts：AppContext、ProjectContext、WorkspaceContext
 - ✅ Hooks：useProjects、useRequest、useEnvironment、useScript、useHistory、useMCP、useUI
@@ -95,40 +101,54 @@
 - ✅ **WorkspaceProvider 集成**：在 main.tsx 中添加 WorkspaceProvider 包装 App
 - ✅ **App.tsx 状态解构**：从 useReq 解构状态，移除 ~45 个重复的状态声明
 - ✅ **useEnvironment Hook 集成**：App.tsx 使用 useEnvironment hook，移除 ~60 行本地环境状态和 ~150 行环境处理函数
+- ✅ **useEnvironment Bug 修复**：修复"添加环境变量"按钮不生效（useEffect 依赖数组问题）
+- ✅ **useEnvironment Bug 修复**：修复"新建环境"按钮不生效（handleCreateEnvironmentClick 是空函数）
+- ✅ **useEnvironment Hook 重构**：暴露 action 函数替代 raw setters（addVariable, removeVariable, updateVariable, updateEnvironmentName, saveEnvironment, deleteEnvironment）
+- ✅ **EnvironmentPanel 重构**：直接使用 useEnvironment hook，只接收 `projectId` prop
+- ✅ **useScript Hook 重构**：暴露 action 函数（createScript, selectScript, updateScriptName 等）
 
 **当前 App.tsx 大小**：
 - 原始：4080 行
-- 当前：2612 行（累计减少 ~60 行 from 本次集成）
+- 当前：2386 行（累计减少 ~136 行）
 - 目标：500-800 行
 
-**App.tsx 当前结构分析**（2522 行）：
-```
-App.tsx (2522 行)
-├── 导入 (1-39)
-├── 状态定义 (~200行)
-├── 树操作辅助 (~200行) - toggleFolderCollapse, clearDragState, checkDrop* 等
-├── 拖拽处理 (~150行)
-├── 项目/文件夹/请求管理 (~400行)
-├── 环境管理 (~150行)
-├── 脚本管理 (~150行)
-├── 搜索过滤 (~50行)
-├── useEffects (~100行)
-├── 渲染逻辑 (~900行) - 已大部分组件化
-└── 模态框/弹窗 (~200行)
-```
+**Hooks 状态**：
 
-**待完成组件化计划**：
+| Hook | Raw Setters | 状态 | 优先级 |
+|------|-------------|------|--------|
+| useEnvironment | 0 | ✅ 已完成 | - |
+| useHistory | 0 | ✅ 已完成 | - |
+| useUI | 0 | ✅ 已完成 | - |
+| useMCP | 0 | ✅ 已完成 | - |
+| useScript | 8 | ⚠️ 需重构 | P2 |
+| useProjects | ~15 | ❌ 需重构 | P3 |
+| useRequest | ~50 | ❌ 需重构 | P3 |
 
-| 优先级 | 模块 | 描述 | 预估减少 |
-|--------|------|------|----------|
+**组件架构状态**：
+
+| Component | Props | 架构 | 状态 |
+|-----------|-------|------|------|
+| HistoryModal | 3 | ✅ 直接用 hook | 已完成 |
+| EnvironmentPanel | 1 | ✅ 直接用 hook | 已完成 |
+| ScriptPanel | 8 | ❌ 传 callback | P2 |
+| MCPSettingsModal | ? | ❌ 传 callback | P2 |
+| 其他简单组件 | - | ✅ 无需改动 | - |
+
+**待完成重构计划**：
+
+| 优先级 | Hook + Component | 描述 | 预估减少 |
+|--------|-----------------|------|----------|
 | P1 | ~~类型定义统一~~ | ✅ 已完成（types/index.ts） | - |
 | P1 | ~~curlUtils 扩展~~ | ✅ 已完成（curlUtils.ts） | - |
 | P1 | ~~变量工具体系~~ | ✅ 已完成（variableUtils.ts） | - |
 | P1 | ~~通用工具函数去重~~ | ✅ 已完成（misc.ts 重复函数已清理） | - |
-| P2 | ~~useScript Hook 集成~~ | ✅ 已完成（useScript hook 集成，移除 ~60 行重复状态） | ~60行 |
-| P2 | ~~useRequest Hook 清理~~ | ✅ 已完成（移除了 hook 中重复的函数定义） | ~20行 |
-| P2 | ~~useRequest Hook 集成~~ | ✅ 已完成（WorkspaceContext 统一状态管理，App.tsx 解构 useReq 状态） | ~500行 |
-| P2 | ~~WorkspaceContext 完善~~ | ✅ 已完成（WorkspaceContext 包含所有状态，WorkspaceProvider 已集成） | ~300行 |
+| P1 | ~~Bug 修复~~ | ✅ 修复环境变量和新建环境按钮 | - |
+| P1 | ~~useEnvironment Hook 重构~~ | ✅ 暴露 action 函数 | ~80行 |
+| P1 | ~~EnvironmentPanel 重构~~ | ✅ 直接用 hook，只传 projectId | - |
+| P2 | ~~useMCP + App.tsx 重构~~ | ✅ useMCP Hook 重构，App.tsx 使用 hook 替代本地状态 | ~48行 |
+| P2 | useScript + ScriptPanel | 移除 raw setters，App.tsx 移除 wrapper | ~80行 |
+| P3 | useProjects 重构 | 暴露 action 函数替代 raw setters | ~200行 |
+| P3 | useRequest 重构 | 暴露 action 函数替代 raw setters | ~500行 |
 
 **组件目录结构**：
 ```
@@ -245,4 +265,4 @@ frontend/src/components/
 
 ---
 
-*最后更新：2026-04-04*
+*最后更新：2026-04-05*

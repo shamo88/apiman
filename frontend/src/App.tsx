@@ -35,6 +35,7 @@ import {
 } from './types';
 import { useScript } from './hooks/useScript';
 import { useEnvironment } from './hooks/useEnvironment';
+import { useMCP } from './hooks/useMCP';
 import { useRequest } from './hooks/useRequest';
 import { trimRightSpaces, getPrimaryName } from './utils/misc';
 
@@ -116,6 +117,18 @@ function App() {
         setSelectedEnvironmentId,
         setActiveEnvironmentTab,
     } = useEnv;
+
+    const {
+        mcpConfig,
+        mcpStatus,
+        mcpEnvironments,
+        mcpLoading,
+        loadMCPConfig,
+        saveAndApplyMCPConfig,
+        loadMCPEnvironments,
+        checkMCPStatus,
+        stopMCP,
+    } = useMCP();
 
     const useReq = useRequest();
 
@@ -215,9 +228,6 @@ function App() {
         setForceListAnimation,
     } = useReq;
 
-    const [mcpConfig, setMCPConfig] = useState<any>({ enabled: false, port: 3847, project_id: '', environment_id: '', api_key: '' });
-    const [mcpStatus, setMCPStatus] = useState<'stopped' | 'running' | 'error'>('stopped');
-    const [mcpEnvironments, setMCPEnvironments] = useState<Environment[]>([]);
     const [projectTabs, setProjectTabs] = useState<ProjectTab[]>([]);
     const [activeTab, setActiveTab] = useState<string>('home');
     const [projectTrees, setProjectTrees] = useState<Record<string, ProjectTree>>({});
@@ -657,7 +667,7 @@ function App() {
             loadProjects();
             loadUiConfig();
             loadProjectGroupsState();
-            loadMCPStatus();
+            checkMCPStatus();
             loadMCPConfig();
         };
         init();
@@ -1010,69 +1020,11 @@ function App() {
         message.success('分组创建成功');
     };
 
-    const loadMCPStatus = async () => {
-        try {
-            const status = await GetMCPStatus();
-            setMCPStatus(status as 'stopped' | 'running' | 'error');
-        } catch (err) {
-            console.error('Failed to get MCP status:', err);
-            setMCPStatus('stopped');
-        }
-    };
-
-    const loadMCPConfig = async () => {
-        try {
-            const config = await LoadMCPConfig();
-            if (config) {
-                setMCPConfig(config);
-            }
-        } catch (err) {
-            console.error('Failed to load MCP config:', err);
-        }
-    };
-
-    const loadMCPEnvironments = async (projectId: string) => {
-        try {
-            const data = await LoadEnvironments(projectId);
-            if (data) {
-                setMCPEnvironments(data);
-            } else {
-                setMCPEnvironments([]);
-            }
-        } catch (err) {
-            console.error('Failed to load MCP environments:', err);
-            setMCPEnvironments([]);
-        }
-    };
-
-    const handleSaveMCPConfig = async (config: any) => {
-        try {
-            // Save config first
-            await SaveMCPConfig(config);
-            setMCPConfig(config);
-
-            // Then start or stop based on enabled flag
-            if (config.enabled) {
-                await StartMCP();
-                setMCPStatus('running');
-            } else {
-                await StopMCP();
-                setMCPStatus('stopped');
-            }
-        } catch (err) {
-            console.error('Failed to save MCP config:', err);
-            setMCPStatus('error');
-            throw err;
-        }
-    };
-
     const handleStopMCP = async () => {
         try {
-            await StopMCP();
-            setMCPStatus('stopped');
+            await stopMCP();
             const config = { ...mcpConfig, enabled: false };
-            await SaveMCPConfig(config);
-            setMCPConfig(config);
+            await saveAndApplyMCPConfig(config);
         } catch (err) {
             console.error('Failed to stop MCP:', err);
             message.error('停止 MCP 失败');
@@ -2408,7 +2360,7 @@ function App() {
                 onClose={() => setMCpModalVisible(false)}
                 projects={projects}
                 mcpConfig={mcpConfig}
-                onSave={handleSaveMCPConfig}
+                onSave={saveAndApplyMCPConfig}
                 currentStatus={mcpStatus}
                 appTheme={appTheme}
                 environments={mcpEnvironments}

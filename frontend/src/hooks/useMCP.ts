@@ -2,23 +2,25 @@ import { useState, useCallback } from 'react';
 import { LoadMCPConfig, SaveMCPConfig, StartMCP, StopMCP, GetMCPStatus, LoadEnvironments } from '../../wailsjs/go/main/App';
 import type { Environment } from '../types';
 
-interface UseMCPReturn {
+export interface UseMCPState {
     mcpConfig: any | null;
     mcpStatus: 'stopped' | 'running' | 'error';
     mcpEnvironments: Environment[];
     mcpLoading: boolean;
-    setMcpConfig: React.Dispatch<React.SetStateAction<any | null>>;
-    setMcpStatus: React.Dispatch<React.SetStateAction<'stopped' | 'running' | 'error'>>;
-    setMcpEnvironments: React.Dispatch<React.SetStateAction<Environment[]>>;
-    loadMCPConfig: () => Promise<void>;
-    saveMCPConfig: (config: any) => Promise<void>;
-    startMCP: () => Promise<void>;
-    stopMCP: () => Promise<void>;
-    checkMCPStatus: () => Promise<void>;
-    loadMCPEnvironments: (projectId: string) => Promise<void>;
 }
 
-export const useMCP = (): UseMCPReturn => {
+export interface UseMCPActions {
+    loadMCPConfig: () => Promise<void>;
+    saveAndApplyMCPConfig: (config: any) => Promise<void>;
+    loadMCPEnvironments: (projectId: string) => Promise<void>;
+    checkMCPStatus: () => Promise<void>;
+    startMCP: () => Promise<void>;
+    stopMCP: () => Promise<void>;
+}
+
+export type UseMCP = UseMCPState & UseMCPActions;
+
+export const useMCP = (): UseMCP => {
     const [mcpConfig, setMcpConfig] = useState<any | null>(null);
     const [mcpStatus, setMcpStatus] = useState<'stopped' | 'running' | 'error'>('stopped');
     const [mcpEnvironments, setMcpEnvironments] = useState<Environment[]>([]);
@@ -41,16 +43,37 @@ export const useMCP = (): UseMCPReturn => {
         }
     }, []);
 
-    const saveMCPConfig = useCallback(async (config: any) => {
+    const saveAndApplyMCPConfig = useCallback(async (config: any) => {
         setMcpLoading(true);
         try {
+            // Save config first
             await SaveMCPConfig(config);
             setMcpConfig(config);
+
+            // Then start or stop based on enabled flag
+            if (config.enabled) {
+                await StartMCP();
+                setMcpStatus('running');
+            } else {
+                await StopMCP();
+                setMcpStatus('stopped');
+            }
         } catch (e) {
             console.error('Failed to save MCP config:', e);
+            setMcpStatus('error');
             throw e;
         } finally {
             setMcpLoading(false);
+        }
+    }, []);
+
+    const loadMCPEnvironments = useCallback(async (projectId: string) => {
+        try {
+            const envs = await LoadEnvironments(projectId);
+            setMcpEnvironments(envs || []);
+        } catch (e) {
+            console.error('Failed to load MCP environments:', e);
+            setMcpEnvironments([]);
         }
     }, []);
 
@@ -97,29 +120,16 @@ export const useMCP = (): UseMCPReturn => {
         }
     }, []);
 
-    const loadMCPEnvironments = useCallback(async (projectId: string) => {
-        try {
-            const envs = await LoadEnvironments(projectId);
-            setMcpEnvironments(envs || []);
-        } catch (e) {
-            console.error('Failed to load MCP environments:', e);
-            setMcpEnvironments([]);
-        }
-    }, []);
-
     return {
         mcpConfig,
         mcpStatus,
         mcpEnvironments,
         mcpLoading,
-        setMcpConfig,
-        setMcpStatus,
-        setMcpEnvironments,
         loadMCPConfig,
-        saveMCPConfig,
+        saveAndApplyMCPConfig,
+        loadMCPEnvironments,
+        checkMCPStatus,
         startMCP,
         stopMCP,
-        checkMCPStatus,
-        loadMCPEnvironments,
     };
 };
