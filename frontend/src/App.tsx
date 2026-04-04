@@ -29,6 +29,7 @@ import {
 import { useScriptContext } from './contexts/ScriptContext';
 import { useEnvironment } from './hooks/useEnvironment';
 import { useMCP } from './hooks/useMCP';
+import { useProjects } from './hooks/useProjects';
 import { useRequest } from './hooks/useRequest';
 import { trimRightSpaces, getPrimaryName } from './utils/misc';
 
@@ -45,8 +46,6 @@ interface ProjectTree {
 
 function App() {
     const [status, setStatus] = useState('初始化中...');
-    const [projects, setProjects] = useState<Project[]>([]);
-    const [loading, setLoading] = useState(false);
     const [createProjectModal, setCreateProjectModal] = useState(false);
     const [cookieModalVisible, setCookieModalVisible] = useState(false);
     const [cookieInput, setCookieInput] = useState('');
@@ -97,6 +96,8 @@ function App() {
         loadMCPEnvironments,
         checkMCPStatus,
     } = useMCP();
+
+    const useProjs = useProjects();
 
     const useReq = useRequest();
 
@@ -195,9 +196,72 @@ function App() {
         setForceListAnimation,
     } = useReq;
 
-    const [projectTabs, setProjectTabs] = useState<ProjectTab[]>([]);
-    const [activeTab, setActiveTab] = useState<string>('home');
-    const [projectTrees, setProjectTrees] = useState<Record<string, ProjectTree>>({});
+    // Use state and functions from useProjects hook
+    const {
+        loading,
+        projects,
+        projectTabs,
+        activeTab,
+        setActiveTab,
+        projectTrees,
+        setProjectTrees,
+        collapsedFolders: projectCollapsedFolders,
+        setCollapsedFolders: setProjectCollapsedFolders,
+        expandedKeys: projectExpandedKeys,
+        setExpandedKeys: setProjectExpandedKeys,
+        projectGroups,
+        projectGroupAssignments,
+        collapsedProjectGroups,
+        setCollapsedProjectGroups,
+        draggingProjectId,
+        projectDropTargetGroup,
+        setDraggingProjectId,
+        setProjectDropTargetGroup,
+        draggingGroupName,
+        groupSortDropTarget,
+        createGroupModal,
+        newGroupName,
+        setCreateGroupModal,
+        setNewGroupName,
+        renameProjectModal,
+        renameProjectId,
+        renameProjectValue,
+        setRenameProjectModal,
+        setRenameProjectId,
+        setRenameProjectValue,
+        renameGroupModal,
+        renameGroupValue,
+        editingGroupName,
+        setRenameGroupModal,
+        setRenameGroupValue,
+        setEditingGroupName,
+        projectSearchKeyword,
+        setProjectSearchKeyword,
+        projectGroupsLoaded,
+        setProjectGroupsLoaded,
+        setProjectTabs,
+        // Raw setters for group state
+        setProjectGroups,
+        setProjectGroupAssignments,
+        setDraggingGroupName,
+        setGroupSortDropTarget,
+        // Group operations
+        createGroupWithName,
+        renameGroupWithName,
+        handleAssignProjectGroup,
+        toggleProjectGroupCollapse,
+        openRenameProjectGroupModal,
+        handleDeleteProjectGroup,
+        // Drag and drop
+        handleGroupDragStart,
+        handleGroupDragOver,
+        handleGroupDrop,
+        // Project operations
+        loadProjects,
+        handleOpenProject,
+        handleCloseProjectTab,
+    } = useProjs;
+
     const [projectWorkspaceStates, setProjectWorkspaceStates] = useState<Record<string, ProjectWorkspaceState>>({});
     const [animationEnabled, setListAnimationEnabled] = useState(false);
     const [appTheme, setAppTheme] = useState<'light' | 'dark'>(() => {
@@ -205,22 +269,6 @@ function App() {
         const saved = localStorage.getItem('apiman-theme');
         return saved === 'dark' || saved === 'light' ? saved : 'light';
     });
-    const [projectSearchKeyword, setProjectSearchKeyword] = useState('');
-    const [projectGroups, setProjectGroups] = useState<string[]>([]);
-    const [projectGroupAssignments, setProjectGroupAssignments] = useState<Record<string, string>>({});
-    const [createGroupModal, setCreateGroupModal] = useState(false);
-    const [renameProjectModal, setRenameProjectModal] = useState(false);
-    const [renameProjectId, setRenameProjectId] = useState('');
-    const [renameProjectValue, setRenameProjectValue] = useState('');
-    const [collapsedProjectGroups, setCollapsedProjectGroups] = useState<Set<string>>(new Set());
-    const [draggingProjectId, setDraggingProjectId] = useState<string | null>(null);
-    const [projectDropTargetGroup, setProjectDropTargetGroup] = useState<string | null>(null);
-    const [renameGroupModal, setRenameGroupModal] = useState(false);
-    const [renameGroupValue, setRenameGroupValue] = useState('');
-    const [editingGroupName, setEditingGroupName] = useState('');
-    const [draggingGroupName, setDraggingGroupName] = useState<string | null>(null);
-    const [groupSortDropTarget, setGroupSortDropTarget] = useState<string | null>(null);
-    const [projectGroupsLoaded, setProjectGroupsLoaded] = useState(false);
     const [sidebarMenu, setSidebarMenu] = useState<'apis' | 'environments' | 'scripts'>('apis');
     const forceAnimationTimerRef = React.useRef<number | null>(null);
     const movedHighlightTimerRef = React.useRef<number | null>(null);
@@ -730,21 +778,6 @@ function App() {
         }, 400);
     };
 
-    const loadProjects = async () => {
-        setLoading(true);
-        try {
-            const projectList = await ListProjects();
-            setProjects((projectList || []) as unknown as Project[]);
-            setStatus(`已加载 ${(projectList || []).length} 个项目`);
-        } catch (error: any) {
-            console.error('Failed to load projects:', error);
-            setStatus(`错误: ${error?.message || error}`);
-            message.error('加载项目失败');
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const handleImportPostman = async (file: File) => {
         setImporting(true);
         try {
@@ -830,50 +863,6 @@ function App() {
         }
     };
 
-    const createGroupWithName = async (groupName: string) => {
-        const name = groupName.trim();
-        if (!name) {
-            message.warning('请输入分组名称');
-            return;
-        }
-        if (name === DEFAULT_PROJECT_GROUP) {
-            message.warning('该名称为系统默认分组，请使用其他名称');
-            return;
-        }
-        if (projectGroups.includes(name)) {
-            message.warning('分组名称已存在');
-            return;
-        }
-        setProjectGroups(prev => [...prev, name]);
-        message.success('分组创建成功');
-    };
-
-    const renameGroupWithName = async (groupName: string) => {
-        const oldName = editingGroupName;
-        const newName = groupName.trim();
-        if (!newName || !oldName) return;
-        if (newName === oldName) return;
-        if (newName === DEFAULT_PROJECT_GROUP) {
-            message.warning('该名称为系统默认分组，请使用其他名称');
-            return;
-        }
-        if (projectGroups.includes(newName)) {
-            message.warning('分组名称已存在');
-            return;
-        }
-        setProjectGroups(prev => prev.map(g => g === oldName ? newName : g));
-        setProjectGroupAssignments(prev => {
-            const next = { ...prev };
-            Object.keys(next).forEach(key => {
-                if (next[key] === oldName) {
-                    next[key] = newName;
-                }
-            });
-            return next;
-        });
-        message.success('分组重命名成功');
-    };
-
     const loadGlobalCookies = async () => {
         try {
             const data = await LoadGlobalCookies();
@@ -885,163 +874,6 @@ function App() {
         } catch (err) {
             console.error('Failed to load cookies:', err);
             setGlobalCookies([]);
-        }
-    };
-
-    const handleAssignProjectGroup = (projectId: string, groupName: string) => {
-        if (!groupName || groupName === DEFAULT_PROJECT_GROUP) {
-            setProjectGroupAssignments(prev => {
-                const next = { ...prev };
-                delete next[projectId];
-                return next;
-            });
-            return;
-        }
-        setProjectGroupAssignments(prev => ({ ...prev, [projectId]: groupName }));
-    };
-
-    const toggleProjectGroupCollapse = (groupName: string) => {
-        setCollapsedProjectGroups(prev => {
-            const next = new Set(prev);
-            if (next.has(groupName)) {
-                next.delete(groupName);
-            } else {
-                next.add(groupName);
-            }
-            return next;
-        });
-    };
-
-    const openRenameProjectGroupModal = (groupName: string) => {
-        if (groupName === DEFAULT_PROJECT_GROUP) {
-            message.warning('默认分组不支持重命名');
-            return;
-        }
-        setEditingGroupName(groupName);
-        setRenameGroupValue(groupName);
-        setRenameGroupModal(true);
-    };
-
-    const handleDeleteProjectGroup = (groupName: string) => {
-        if (groupName === DEFAULT_PROJECT_GROUP) {
-            message.warning('默认分组不支持删除');
-            return;
-        }
-        const affectedCount = Object.values(projectGroupAssignments).filter(name => name === groupName).length;
-        Modal.confirm({
-            title: '删除分组',
-            content: affectedCount > 0
-                ? `该分组下有 ${affectedCount} 个项目，删除后将自动移动到"${DEFAULT_PROJECT_GROUP}"。是否继续？`
-                : '确定删除该分组吗？',
-            onOk: () => {
-                setProjectGroups(prev => prev.filter(name => name !== groupName));
-                setProjectGroupAssignments(prev => {
-                    const next = { ...prev };
-                    Object.keys(next).forEach(projectId => {
-                        if (next[projectId] === groupName) {
-                            delete next[projectId];
-                        }
-                    });
-                    return next;
-                });
-                setCollapsedProjectGroups(prev => {
-                    const next = new Set(prev);
-                    next.delete(groupName);
-                    return next;
-                });
-                message.success('分组已删除');
-            }
-        });
-    };
-
-    const handleGroupDragStart = (groupName: string, e: React.DragEvent) => {
-        if (groupName === DEFAULT_PROJECT_GROUP) return;
-        e.stopPropagation();
-        e.dataTransfer.effectAllowed = 'move';
-        setDraggingGroupName(groupName);
-    };
-
-    const handleGroupDragOver = (groupName: string, e: React.DragEvent) => {
-        if (!draggingGroupName) return;
-        if (groupName === DEFAULT_PROJECT_GROUP || groupName === draggingGroupName) return;
-        e.preventDefault();
-        e.stopPropagation();
-        e.dataTransfer.dropEffect = 'move';
-        setGroupSortDropTarget(groupName);
-    };
-
-    const handleGroupDrop = (groupName: string, e: React.DragEvent) => {
-        if (!draggingGroupName) return;
-        if (groupName === DEFAULT_PROJECT_GROUP || groupName === draggingGroupName) return;
-        e.preventDefault();
-        e.stopPropagation();
-        setProjectGroups(prev => {
-            const sourceIndex = prev.indexOf(draggingGroupName);
-            const targetIndex = prev.indexOf(groupName);
-            if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return prev;
-            const next = [...prev];
-            next.splice(sourceIndex, 1);
-            const insertIndex = next.indexOf(groupName);
-            next.splice(insertIndex, 0, draggingGroupName);
-            return next;
-        });
-        setDraggingGroupName(null);
-        setGroupSortDropTarget(null);
-    };
-
-    const handleOpenProject = async (project: Project) => {
-        const existingTab = projectTabs.find(t => t.project.id === project.id);
-        if (existingTab) {
-            switchProjectTab(existingTab.id);
-        } else {
-            const newTab: ProjectTab = {
-                id: project.id,
-                title: project.name,
-                project: project,
-            };
-            if (activeTab !== 'home') {
-                const currentState = captureCurrentWorkspaceState();
-                setProjectWorkspaceStates(prev => ({ ...prev, [activeTab]: currentState }));
-            }
-            setProjectTabs([...projectTabs, newTab]);
-            setProjectWorkspaceStates(prev => ({ ...prev, [newTab.id]: createEmptyWorkspaceState() }));
-            setActiveTab(newTab.id);
-            resetWorkspaceState();
-            triggerOpenTabAnimation();
-
-            setLoading(true);
-            try {
-                const tree = await GetProjectTree(project.id);
-                setProjectTrees(prev => ({ ...prev, [project.id]: tree }));
-                const folderKeys = collectFolderKeys(tree);
-                setCollapsedFolders(prev => {
-                    const next = new Set(prev);
-                    folderKeys.forEach((key) => next.add(key));
-                    return next;
-                });
-                setExpandedKeys([project.id]);
-            } catch (error: any) {
-                console.error('Failed to load project tree:', error);
-            } finally {
-                setLoading(false);
-            }
-        }
-    };
-
-    const handleCloseProjectTab = (tabId: string) => {
-        setProjectTabs(projectTabs.filter(t => t.id !== tabId));
-        setProjectWorkspaceStates(prev => {
-            const next = { ...prev };
-            delete next[tabId];
-            return next;
-        });
-        if (activeTab === tabId) {
-            const remaining = projectTabs.filter(t => t.id !== tabId);
-            if (remaining.length > 0) {
-                switchProjectTab(remaining[0].id, true);
-            } else {
-                switchProjectTab('home', true);
-            }
         }
     };
 
@@ -1451,7 +1283,6 @@ function App() {
     };
 
     const loadRequestContent = async (path: string) => {
-        setLoading(true);
         try {
             setSidebarHighlightedCasePath('');
             const request = await GetRequest(path);
@@ -1459,8 +1290,6 @@ function App() {
             setCurrentRequest(request as CurlRequest);
         } catch (error: any) {
             console.error('Failed to load request:', error);
-        } finally {
-            setLoading(false);
         }
     };
 

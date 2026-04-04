@@ -109,7 +109,7 @@
 
 **当前 App.tsx 大小**：
 - 原始：4080 行
-- 当前：2101 行（累计减少 ~263 行）
+- 当前：1930 行（累计减少 ~434 行）
 - 目标：500-800 行
 
 **本次优化**：
@@ -124,6 +124,8 @@
 - ✅ 清理未使用的状态变量：newProjectName, newGroupName
 - ✅ 清理未使用的计算变量：groupedProjects, filteredTree, normalizedProjectKeyword, filteredProjects, searchInputRef
 - ✅ 清理未使用的 hook 返回项：searchVersion
+- ✅ **useProjects 集成**：App.tsx 使用 useProjects hook，移除本地 projects/loading 状态和 ~150 行重复函数定义（createGroupWithName, renameGroupWithName, handleAssignProjectGroup, toggleProjectGroupCollapse, openRenameProjectGroupModal, handleDeleteProjectGroup, handleGroupDragStart, handleGroupDragOver, handleGroupDrop, handleOpenProject, handleCloseProjectTab, loadProjects）
+- ✅ **useProjects 扩展**：添加 setDraggingProjectId 和 setProjectDropTargetGroup 到 hook 接口，支持 HomePage 组件调用
 
 **Hooks 状态**：
 
@@ -134,7 +136,7 @@
 | useUI | 0 | ✅ 已完成 | - |
 | useMCP | 0 | ✅ 已完成 | - |
 | useScript | 0 | ✅ 已完成 | - |
-| useProjects | ~15 | ❌ 需重构 | P3 |
+| useProjects | ~8 | ✅ 已完成集成 | P3 (部分) |
 | useRequest | ~50 | ❌ 需重构 | P3 |
 
 **组件架构状态**：
@@ -160,7 +162,7 @@
 | P1 | ~~EnvironmentPanel 重构~~ | ✅ 直接用 hook，只传 projectId | - |
 | P2 | ~~useMCP + App.tsx 重构~~ | ✅ useMCP Hook 重构，App.tsx 使用 hook 替代本地状态 | ~48行 |
 | P2 | ~~useScript + ScriptPanel~~ | ✅ useScript Hook 重构，ScriptContext 共享状态，ScriptPanel 直接用 context | ~8行 |
-| P3 | useProjects 重构 | ⚠️ 需要架构调整：useProjects 不暴露 group 相关的 raw setters，需先改造 App.tsx 的 group 函数或扩展 useProjects | ~200行 |
+| P3 | useProjects 重构 | ✅ 已完成集成：App.tsx 使用 useProjects hook，移除本地重复状态和函数 | ~200行 |
 | P3 | useRequest 重构 | 暴露 action 函数替代 raw setters | ~500行 |
 
 **组件目录结构**：

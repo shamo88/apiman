@@ -49,6 +49,14 @@ export interface UseProjectsReturn {
   projectSearchKeyword: string;
   loading: boolean;
 
+  // Raw setters for group/project state (for external coordination)
+  setProjectGroups: React.Dispatch<React.SetStateAction<string[]>>;
+  setProjectGroupAssignments: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  setDraggingProjectId: React.Dispatch<React.SetStateAction<string | null>>;
+  setProjectDropTargetGroup: React.Dispatch<React.SetStateAction<string | null>>;
+  setDraggingGroupName: React.Dispatch<React.SetStateAction<string | null>>;
+  setGroupSortDropTarget: React.Dispatch<React.SetStateAction<string | null>>;
+
   // Project Tab State (for external coordination)
   projectTabs: ProjectTab[];
   activeTab: string;
@@ -723,6 +731,14 @@ export function useProjects(options: UseProjectsOptions = {}): UseProjectsReturn
     editingGroupName,
     projectSearchKeyword,
     loading,
+
+    // Raw setters for group state
+    setProjectGroups,
+    setProjectGroupAssignments,
+    setDraggingProjectId,
+    setProjectDropTargetGroup,
+    setDraggingGroupName,
+    setGroupSortDropTarget,
 
     // Project Tab State
     projectTabs,
