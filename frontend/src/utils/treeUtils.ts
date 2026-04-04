@@ -1,14 +1,5 @@
 import type { DataNode } from 'antd/es/tree';
-
-export interface ProjectTree {
-    id: string;
-    name: string;
-    type: string;
-    method?: string;
-    url?: string;
-    children?: ProjectTree[];
-    path?: string;
-}
+import type { ProjectTree } from '../types';
 
 /** Find a tree node by path */
 export const findTreeNode = (tree: ProjectTree | null, path: string): ProjectTree | null => {

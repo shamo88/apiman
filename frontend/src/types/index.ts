@@ -9,7 +9,7 @@ export interface Project {
 export interface ProjectTree {
     id: string;
     name: string;
-    type: 'project' | 'folder' | 'request' | 'case';
+    type: string;
     method?: string;
     url?: string;
     children?: ProjectTree[];

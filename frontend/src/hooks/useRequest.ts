@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { message, Modal } from 'antd';
 import {
     GetRequest,
@@ -31,6 +31,9 @@ import {
     RequestTab,
     ProjectTree,
     Environment,
+    parseRequestCaseRef,
+    requestRefFromIds,
+    createEmptyWorkspaceState,
 } from '../types';
 import { ApiConfig } from '../utils/apiConfig';
 import {
@@ -118,17 +121,6 @@ const buildCurlCommand = (c: ApiConfig): string => {
     return parts.join(' \\\n  ');
 };
 
-/** Parse request case reference path */
-export const parseRequestCaseRef = (path: string): { projectId: string; requestId: string; caseId: string } | null => {
-    if (!path.startsWith('requestCase|')) return null;
-    const parts = path.slice('requestCase|'.length).split('|');
-    if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return null;
-    return { projectId: parts[0], requestId: parts[1], caseId: parts[2] };
-};
-
-/** Create request reference path from IDs */
-export const requestRefFromIds = (projectId: string, requestId: string) => `request|${projectId}|${requestId}`;
-
 export interface UseRequestState {
     // Request tabs
     requestTabs: RequestTab[];
@@ -181,52 +173,52 @@ export interface UseRequestState {
 
 export interface UseRequestActions {
     // Tab management
-    setRequestTabs: (tabs: RequestTab[]) => void;
-    setActiveRequestTab: (tabId: string) => void;
-    setCurrentRequest: (request: CurlRequest | null) => void;
-    setResponse: (response: any) => void;
-    setFormattedResponse: (formatted: string) => void;
-    setResponseBodyHeight: (height: number) => void;
-    setScriptResultsHeight: (height: number) => void;
-    setScriptLogsExpanded: (expanded: boolean) => void;
-    setTestResultsExpanded: (expanded: boolean) => void;
-    setExecuting: (executing: boolean) => void;
-    setApiConfig: (config: ApiConfig) => void;
-    setInterfaceApiConfig: (config: ApiConfig) => void;
-    setCurlPreview: (curl: string) => void;
-    setRequestCases: (cases: RequestCaseState[]) => void;
-    setActiveCaseId: (caseId: string) => void;
-    setRequestEditorSurface: (surface: RequestEditorSurface) => void;
-    setSidebarHighlightedCasePath: (path: string) => void;
-    setExpandedRequestPaths: (paths: Set<string>) => void;
+    setRequestTabs: React.Dispatch<React.SetStateAction<RequestTab[]>>;
+    setActiveRequestTab: React.Dispatch<React.SetStateAction<string>>;
+    setCurrentRequest: React.Dispatch<React.SetStateAction<CurlRequest | null>>;
+    setResponse: React.Dispatch<React.SetStateAction<any>>;
+    setFormattedResponse: React.Dispatch<React.SetStateAction<string>>;
+    setResponseBodyHeight: React.Dispatch<React.SetStateAction<number>>;
+    setScriptResultsHeight: React.Dispatch<React.SetStateAction<number>>;
+    setScriptLogsExpanded: React.Dispatch<React.SetStateAction<boolean>>;
+    setTestResultsExpanded: React.Dispatch<React.SetStateAction<boolean>>;
+    setExecuting: React.Dispatch<React.SetStateAction<boolean>>;
+    setApiConfig: React.Dispatch<React.SetStateAction<ApiConfig>>;
+    setInterfaceApiConfig: React.Dispatch<React.SetStateAction<ApiConfig>>;
+    setCurlPreview: React.Dispatch<React.SetStateAction<string>>;
+    setRequestCases: React.Dispatch<React.SetStateAction<RequestCaseState[]>>;
+    setActiveCaseId: React.Dispatch<React.SetStateAction<string>>;
+    setRequestEditorSurface: React.Dispatch<React.SetStateAction<RequestEditorSurface>>;
+    setSidebarHighlightedCasePath: React.Dispatch<React.SetStateAction<string>>;
+    setExpandedRequestPaths: React.Dispatch<React.SetStateAction<Set<string>>>;
     // Case modal actions
-    setCaseRenameModalOpen: (open: boolean) => void;
-    setCaseRenameCasePath: (path: string) => void;
-    setCaseRenameInput: (input: string) => void;
-    setAddCaseModalOpen: (open: boolean) => void;
-    setAddCaseTargetPath: (path: string) => void;
-    setAddCaseNameInput: (input: string) => void;
+    setCaseRenameModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    setCaseRenameCasePath: React.Dispatch<React.SetStateAction<string>>;
+    setCaseRenameInput: React.Dispatch<React.SetStateAction<string>>;
+    setAddCaseModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    setAddCaseTargetPath: React.Dispatch<React.SetStateAction<string>>;
+    setAddCaseNameInput: React.Dispatch<React.SetStateAction<string>>;
     // Create modal actions
-    setCreateFolderModal: (open: boolean) => void;
-    setNewFolderName: (name: string) => void;
-    setCreateRequestModal: (open: boolean) => void;
-    setNewRequestName: (name: string) => void;
+    setCreateFolderModal: React.Dispatch<React.SetStateAction<boolean>>;
+    setNewFolderName: React.Dispatch<React.SetStateAction<string>>;
+    setCreateRequestModal: React.Dispatch<React.SetStateAction<boolean>>;
+    setNewRequestName: React.Dispatch<React.SetStateAction<string>>;
     // Rename modal actions
-    setRenameModal: (open: boolean) => void;
-    setRenameType: (type: 'request' | 'folder') => void;
-    setRenamePath: (path: string) => void;
-    setRenameValue: (value: string) => void;
+    setRenameModal: React.Dispatch<React.SetStateAction<boolean>>;
+    setRenameType: React.Dispatch<React.SetStateAction<'request' | 'folder'>>;
+    setRenamePath: React.Dispatch<React.SetStateAction<string>>;
+    setRenameValue: React.Dispatch<React.SetStateAction<string>>;
     // Tree state actions
-    setSelectedFolder: (folder: string | null) => void;
-    setSelectedKeys: (keys: string[]) => void;
-    setSearchKeyword: (keyword: string) => void;
-    setFilterMethod: (method: string) => void;
-    setCollapsedFolders: (folders: Set<string>) => void;
-    setDraggingNode: (node: { type: 'request' | 'folder'; path: string } | null) => void;
-    setDropTargetFolderPath: (path: string | null) => void;
-    setInvalidDropHint: (hint: { message: string; x: number; y: number } | null) => void;
-    setMovedHighlightPath: (path: string | null) => void;
-    setExpandedKeys: (keys: string[]) => void;
+    setSelectedFolder: React.Dispatch<React.SetStateAction<string | null>>;
+    setSelectedKeys: React.Dispatch<React.SetStateAction<string[]>>;
+    setSearchKeyword: React.Dispatch<React.SetStateAction<string>>;
+    setFilterMethod: React.Dispatch<React.SetStateAction<string>>;
+    setCollapsedFolders: React.Dispatch<React.SetStateAction<Set<string>>>;
+    setDraggingNode: React.Dispatch<React.SetStateAction<{ type: 'request' | 'folder'; path: string } | null>>;
+    setDropTargetFolderPath: React.Dispatch<React.SetStateAction<string | null>>;
+    setInvalidDropHint: React.Dispatch<React.SetStateAction<{ message: string; x: number; y: number } | null>>;
+    setMovedHighlightPath: React.Dispatch<React.SetStateAction<string | null>>;
+    setExpandedKeys: React.Dispatch<React.SetStateAction<string[]>>;
     // Request operations
     handleCreateFolder: (projectId: string) => Promise<void>;
     handleCreateRequest: (projectId: string) => Promise<void>;
@@ -263,22 +255,6 @@ export interface UseRequestActions {
 }
 
 export type UseRequest = UseRequestState & UseRequestActions;
-
-/** Create empty workspace state */
-const createEmptyWorkspaceState = (): ProjectWorkspaceState => ({
-    requestTabs: [],
-    activeRequestTab: '',
-    currentRequest: null,
-    response: null,
-    selectedKeys: [],
-    apiConfig: createDefaultApiConfig(),
-    selectedEnvironmentId: '',
-    requestCases: [],
-    activeCaseId: '',
-    interfaceApiConfig: createDefaultApiConfig(),
-    requestEditorSurface: 'plain',
-    sidebarHighlightedCasePath: ''
-});
 
 /** Convert CurlRequest to ApiConfig */
 const apiConfigFromRequest = (r: CurlRequest, fallbackName: string): ApiConfig => {

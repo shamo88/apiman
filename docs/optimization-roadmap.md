@@ -83,39 +83,46 @@
 - ✅ 删除废弃的 `renderApiList` 函数（377行）
 - ✅ 删除废弃的 `convertTreeToDataNode` 函数（35行）
 - ✅ 删除废弃的 `getStatusColor` 函数（7行）
-- ✅ 清理未使用的图标导入（7个图标）
+- ✅ 清理未使用的图标导入（10个图标）
+- ✅ 删除重复的树工具函数（62行）
+- ✅ 清理 misc.ts 重复函数
+- ✅ 清理未使用的 antd 导入：Row, Button, Dropdown, Tooltip, Upload, Input, searchInputRef
+- ✅ 清理未使用的 wailsjs 导入：SaveGlobalCookies, SaveAppConfig, ListHistory, GetHistoryEntry, DeleteHistory, ClearHistory, SearchHistory
+- ✅ 清理未使用的工具函数导入：escapeHtml, getCaretOffset, setCaretOffset, renderHighlightedVariableHtml, isBuiltInGenerator, builtInGenerators, getVariableSuggestions, containsVariablePlaceholder
 
 **当前 App.tsx 大小**：
 - 原始：4080 行
-- 当前：3187 行（累计减少 893 行）
+- 当前：2612 行（累计减少 ~60 行 from 本次集成）
 - 目标：500-800 行
 
-**App.tsx 当前结构分析**：
+**App.tsx 当前结构分析**（2522 行）：
 ```
-App.tsx (3187 行)
-├── 类型定义 (17-145, ~130行) - Project, ProjectTree, CurlRequest 等
-├── 辅助函数 (147-575, ~430行)
-│   ├── apiConfig 相关 (~80行)
-│   ├── curl 相关 (~200行) - buildCurlCommand, parseCurlToApiConfig
-│   └── 变量相关 (~100行) - builtInGenerators, getVariableSuggestions
-├── 状态定义 (578-748, ~170行)
-├── 事件处理函数 (750-1270, ~520行)
-├── useEffects (1274-1400, ~130行)
-├── 更多事件处理 (1400-2737, ~1340行)
-└── 渲染逻辑 (2787-3187, ~400行) - 已大部分组件化
+App.tsx (2522 行)
+├── 导入 (1-39)
+├── 状态定义 (~200行)
+├── 树操作辅助 (~200行) - toggleFolderCollapse, clearDragState, checkDrop* 等
+├── 拖拽处理 (~150行)
+├── 项目/文件夹/请求管理 (~400行)
+├── 环境管理 (~150行)
+├── 脚本管理 (~150行)
+├── 搜索过滤 (~50行)
+├── useEffects (~100行)
+├── 渲染逻辑 (~900行) - 已大部分组件化
+└── 模态框/弹窗 (~200行)
 ```
 
 **待完成组件化计划**：
 
 | 优先级 | 模块 | 描述 | 预估减少 |
 |--------|------|------|----------|
-| P1 | **类型定义统一** | 将 `Project`, `ProjectTree`, `CurlRequest`, `ApiConfig` 等移动到 `types/index.ts` | ~130行 |
-| P1 | **curlUtils 扩展** | `buildCurlCommand`, `parseCurlToApiConfig` 移动到 `utils/curlUtils.ts` | ~200行 |
-| P1 | **变量工具体系** | `builtInGenerators`, `getVariableSuggestions` 等移动到 `utils/variableUtils.ts` | ~100行 |
-| P2 | **WorkspaceContext 完善** | 将 `ProjectWorkspaceState` 相关状态和函数提取到 `contexts/WorkspaceContext.tsx` | ~500行 |
-| P2 | **useScriptEditor Hook** | 脚本编辑器相关逻辑提取到 `hooks/useScriptEditor.ts` | ~200行 |
-| P2 | **useRequestEditor Hook** | 请求编辑器状态管理提取到 `hooks/useRequestEditor.ts` | ~300行 |
-| P3 | **通用工具函数** | `getMethodColor`, `formatSidebarMethodLabel` 移动到 `utils/misc.ts` | ~30行 |
+| P1 | ~~类型定义统一~~ | ✅ 已完成（types/index.ts） | - |
+| P1 | ~~curlUtils 扩展~~ | ✅ 已完成（curlUtils.ts） | - |
+| P1 | ~~变量工具体系~~ | ✅ 已完成（variableUtils.ts） | - |
+| P1 | ~~通用工具函数去重~~ | ✅ 已完成（misc.ts 重复函数已清理） | - |
+| P2 | ~~useScript Hook 集成~~ | ✅ 已完成（useScript hook 集成，移除 ~60 行重复状态） | ~60行 |
+| P2 | ~~useRequest Hook 清理~~ | ✅ 已完成（移除了 hook 中重复的函数定义） | ~20行 |
+| P2 | **useRequest Hook 集成** | 进行中（需替换 42 个状态声明 + 数百处调用，setter 类型不兼容 React 函数式更新） | ~500-800行 |
+| P2 | **WorkspaceContext 完善** | App.tsx 尚未使用已存在的 `WorkspaceContext` | ~300行 |
 
 **组件目录结构**：
 ```
@@ -232,4 +239,4 @@ frontend/src/components/
 
 ---
 
-*最后更新：2026-04-03*
+*最后更新：2026-04-04*

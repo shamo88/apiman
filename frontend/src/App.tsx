@@ -34,6 +34,7 @@ import {
     requestRefFromIds,
 } from './types';
 import { useHistory } from './hooks/useHistory';
+import { useScript } from './hooks/useScript';
 import { trimRightSpaces, getPrimaryName } from './utils/misc';
 
 // ProjectTree interface - uses string type to match Wails generated model
@@ -83,6 +84,30 @@ function App() {
         searchHistory,
         clearHistorySearch,
     } = useHistory();
+
+    const {
+        projectScripts,
+        editingScriptId,
+        scriptFormName,
+        scriptFormDescription,
+        scriptFormContent,
+        scriptsLoading,
+        scriptSaving,
+        scriptHelpVisible,
+        setProjectScripts,
+        setEditingScriptId,
+        setScriptFormName,
+        setScriptFormDescription,
+        setScriptFormContent,
+        setScriptsLoading,
+        setScriptSaving,
+        setScriptHelpVisible,
+        loadProjectScriptsData: loadProjectScriptsDataFromHook,
+        handleCreateScript: handleCreateScriptBase,
+        handleSelectScriptEditor,
+        handleSaveScript: handleSaveScriptBase,
+        handleDeleteScriptCurrent: handleDeleteScriptCurrentBase,
+    } = useScript();
 
     const [mcpConfig, setMCPConfig] = useState<any>({ enabled: false, port: 3847, project_id: '', environment_id: '', api_key: '' });
     const [mcpStatus, setMCPStatus] = useState<'stopped' | 'running' | 'error'>('stopped');
@@ -173,14 +198,6 @@ function App() {
     const [envSaving, setEnvSaving] = useState(false);
     const [environmentTabs, setEnvironmentTabs] = useState<EnvironmentEditorTab[]>([]);
     const [activeEnvironmentTab, setActiveEnvironmentTab] = useState<string>('');
-    const [projectScripts, setProjectScripts] = useState<ProjectScript[]>([]);
-    const [editingScriptId, setEditingScriptId] = useState<string>('');
-    const [scriptFormName, setScriptFormName] = useState('');
-    const [scriptFormDescription, setScriptFormDescription] = useState('');
-    const [scriptFormContent, setScriptFormContent] = useState('// 在这里编写 JavaScript 脚本\n');
-    const [scriptsLoading, setScriptsLoading] = useState(false);
-    const [scriptSaving, setScriptSaving] = useState(false);
-    const [scriptHelpVisible, setScriptHelpVisible] = useState(false);
     const forceAnimationTimerRef = React.useRef<number | null>(null);
     const movedHighlightTimerRef = React.useRef<number | null>(null);
 
@@ -508,13 +525,6 @@ function App() {
         } finally {
             setScriptSaving(false);
         }
-    };
-
-    const handleSelectScriptEditor = (script: ProjectScript) => {
-        setEditingScriptId(script.id);
-        setScriptFormName(script.name);
-        setScriptFormDescription(script.description || '');
-        setScriptFormContent(script.content || '');
     };
 
     const handleSaveScript = async () => {
