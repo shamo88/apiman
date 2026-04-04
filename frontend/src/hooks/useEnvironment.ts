@@ -199,12 +199,8 @@ export function useEnvironment(): UseEnvironment {
         if (!activeTab) return;
         if (activeTab.isNew) {
             setEditingEnvironmentId('');
-            if (!environmentFormName) {
-                setEnvironmentFormName(`环境${environments.length + 1}`);
-            }
-            if (!environmentFormVariables.length) {
-                setEnvironmentFormVariables([createEnvironmentVariableRow()]);
-            }
+            setEnvironmentFormName(prev => prev || `环境${environments.length + 1}`);
+            setEnvironmentFormVariables(prev => prev.length ? prev : [createEnvironmentVariableRow()]);
             return;
         }
         if (!activeTab.environmentId) return;
@@ -213,7 +209,7 @@ export function useEnvironment(): UseEnvironment {
         setEditingEnvironmentId(env.id);
         setEnvironmentFormName(env.name);
         setEnvironmentFormVariables(environmentToRows(env.variables));
-    }, [activeEnvironmentTab, environmentTabs, environments, environmentFormName, environmentFormVariables.length, environmentToRows]);
+    }, [activeEnvironmentTab, environmentTabs, environments, environmentToRows]);
 
     // Handle environment deletion or selection changes
     useEffect(() => {

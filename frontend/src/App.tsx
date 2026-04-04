@@ -33,8 +33,8 @@ import {
     parseRequestCaseRef,
     requestRefFromIds,
 } from './types';
-import { useHistory } from './hooks/useHistory';
 import { useScript } from './hooks/useScript';
+import { useEnvironment } from './hooks/useEnvironment';
 import { useRequest } from './hooks/useRequest';
 import { trimRightSpaces, getPrimaryName } from './utils/misc';
 
@@ -61,31 +61,6 @@ function App() {
     const [mcpModalVisible, setMCpModalVisible] = useState(false);
     const [historyModalVisible, setHistoryModalVisible] = useState(false);
 
-    // Use history hook to replace duplicate state
-    const {
-        historyList,
-        historyDetail,
-        historyLoading,
-        historySearchProject,
-        historySearchName,
-        historySearchURL,
-        historySearchMethod,
-        historySearchStatus,
-        historySearchSource,
-        setHistoryList,
-        setHistoryDetail,
-        setHistoryLoading,
-        setHistorySearchProject,
-        setHistorySearchName,
-        setHistorySearchURL,
-        setHistorySearchMethod,
-        setHistorySearchStatus,
-        setHistorySearchSource,
-        loadHistoryList,
-        searchHistory,
-        clearHistorySearch,
-    } = useHistory();
-
     const {
         projectScripts,
         editingScriptId,
@@ -110,7 +85,133 @@ function App() {
         handleDeleteScriptCurrent: handleDeleteScriptCurrentBase,
     } = useScript();
 
+    // Use environment hook to replace duplicate local state
+    const useEnv = useEnvironment();
+    const {
+        environments,
+        selectedEnvironmentId,
+        environmentsInitiallyLoaded,
+        editingEnvironmentId,
+        environmentFormName,
+        environmentFormVariables,
+        envLoading,
+        envSaving,
+        environmentTabs,
+        activeEnvironmentTab,
+        loadEnvironmentsData,
+        openEnvironmentEditor,
+        openCreateEnvironmentTab,
+        closeEnvironmentTab,
+        resetEnvironmentEditor,
+        environmentToRows,
+        rowsToEnvironmentVariables,
+        handleCreateEnvironmentClick,
+        handleSaveEnvironment,
+        handleDeleteEnvironmentCurrent,
+        setSelectedEnvironmentId,
+        setEnvironmentFormName,
+        setEnvironmentFormVariables,
+        setEnvironmentTabs,
+        setActiveEnvironmentTab,
+    } = useEnv;
+
     const useReq = useRequest();
+
+    // Destructure state from useReq to replace duplicate local state
+    const {
+        // Request tabs
+        requestTabs,
+        activeRequestTab,
+        currentRequest,
+        response,
+        formattedResponse,
+        responseBodyHeight,
+        scriptResultsHeight,
+        scriptLogsExpanded,
+        testResultsExpanded,
+        executing,
+        apiConfig,
+        interfaceApiConfig,
+        curlPreview,
+        requestCases,
+        activeCaseId,
+        requestEditorSurface,
+        sidebarHighlightedCasePath,
+        expandedRequestPaths,
+        caseRenameModalOpen,
+        caseRenameCasePath,
+        caseRenameInput,
+        addCaseModalOpen,
+        addCaseTargetPath,
+        addCaseNameInput,
+        createFolderModal,
+        newFolderName,
+        createRequestModal,
+        newRequestName,
+        renameModal,
+        renameType,
+        renamePath,
+        renameValue,
+        selectedFolder,
+        selectedKeys,
+        searchKeyword,
+        filterMethod,
+        collapsedFolders,
+        draggingNode,
+        dropTargetFolderPath,
+        invalidDropHint,
+        movedHighlightPath,
+        expandedKeys,
+        importing,
+        searchVersion,
+        forceListAnimation,
+        // Setters
+        setRequestTabs,
+        setActiveRequestTab,
+        setCurrentRequest,
+        setResponse,
+        setFormattedResponse,
+        setResponseBodyHeight,
+        setScriptResultsHeight,
+        setScriptLogsExpanded,
+        setTestResultsExpanded,
+        setExecuting,
+        setApiConfig,
+        setInterfaceApiConfig,
+        setCurlPreview,
+        setRequestCases,
+        setActiveCaseId,
+        setRequestEditorSurface,
+        setSidebarHighlightedCasePath,
+        setExpandedRequestPaths,
+        setCaseRenameModalOpen,
+        setCaseRenameCasePath,
+        setCaseRenameInput,
+        setAddCaseModalOpen,
+        setAddCaseTargetPath,
+        setAddCaseNameInput,
+        setCreateFolderModal,
+        setNewFolderName,
+        setCreateRequestModal,
+        setNewRequestName,
+        setRenameModal,
+        setRenameType,
+        setRenamePath,
+        setRenameValue,
+        setSelectedFolder,
+        setSelectedKeys,
+        setSearchKeyword,
+        setFilterMethod,
+        setCollapsedFolders,
+        setDraggingNode,
+        setDropTargetFolderPath,
+        setInvalidDropHint,
+        setMovedHighlightPath,
+        setExpandedKeys,
+        setImporting,
+        setSearchVersion,
+        setForceListAnimation,
+    } = useReq;
 
     const [mcpConfig, setMCPConfig] = useState<any>({ enabled: false, port: 3847, project_id: '', environment_id: '', api_key: '' });
     const [mcpStatus, setMCPStatus] = useState<'stopped' | 'running' | 'error'>('stopped');
@@ -118,53 +219,6 @@ function App() {
     const [projectTabs, setProjectTabs] = useState<ProjectTab[]>([]);
     const [activeTab, setActiveTab] = useState<string>('home');
     const [projectTrees, setProjectTrees] = useState<Record<string, ProjectTree>>({});
-    const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
-    const [requestTabs, setRequestTabs] = useState<RequestTab[]>([]);
-    const [activeRequestTab, setActiveRequestTab] = useState<string>('');
-    const [currentRequest, setCurrentRequest] = useState<CurlRequest | null>(null);
-    const [response, setResponse] = useState<any>(null);
-    const [formattedResponse, setFormattedResponse] = useState<string>('');
-    const [responseBodyHeight, setResponseBodyHeight] = useState<number>(200);
-    const [scriptResultsHeight, setScriptResultsHeight] = useState<number>(200);
-    const [executing, setExecuting] = useState(false);
-    const [scriptLogsExpanded, setScriptLogsExpanded] = useState(true);
-    const [testResultsExpanded, setTestResultsExpanded] = useState(true);
-    const [createFolderModal, setCreateFolderModal] = useState(false);
-    const [newFolderName, setNewFolderName] = useState('');
-    const [createRequestModal, setCreateRequestModal] = useState(false);
-    const [newRequestName, setNewRequestName] = useState('');
-    const [renameModal, setRenameModal] = useState(false);
-    const [renameType, setRenameType] = useState<'request' | 'folder'>('request');
-    const [renamePath, setRenamePath] = useState('');
-    const [renameValue, setRenameValue] = useState('');
-    const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
-    const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
-    const [apiConfig, setApiConfig] = useState<ApiConfig>(createDefaultApiConfig());
-    const [curlPreview, setCurlPreview] = useState<string>('');
-    const [requestCases, setRequestCases] = useState<RequestCaseState[]>([]);
-    const [activeCaseId, setActiveCaseId] = useState<string>('');
-    const [interfaceApiConfig, setInterfaceApiConfig] = useState<ApiConfig>(createDefaultApiConfig());
-    const [requestEditorSurface, setRequestEditorSurface] = useState<RequestEditorSurface>('plain');
-    const [sidebarHighlightedCasePath, setSidebarHighlightedCasePath] = useState<string>('');
-    const [expandedRequestPaths, setExpandedRequestPaths] = useState<Set<string>>(() => new Set());
-    const [caseRenameModalOpen, setCaseRenameModalOpen] = useState(false);
-    const [caseRenameCasePath, setCaseRenameCasePath] = useState('');
-    const [caseRenameInput, setCaseRenameInput] = useState('');
-    const [addCaseModalOpen, setAddCaseModalOpen] = useState(false);
-    const [addCaseTargetPath, setAddCaseTargetPath] = useState('');
-    const [addCaseNameInput, setAddCaseNameInput] = useState('');
-    const [searchKeyword, setSearchKeyword] = useState('');
-    const [filterMethod, setFilterMethod] = useState<string>('ALL');
-    const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
-    const [draggingNode, setDraggingNode] = useState<{ type: 'request' | 'folder'; path: string } | null>(null);
-    const [dropTargetFolderPath, setDropTargetFolderPath] = useState<string | null>(null);
-    const [invalidDropHint, setInvalidDropHint] = useState<{ message: string; x: number; y: number } | null>(null);
-    const [movedHighlightPath, setMovedHighlightPath] = useState<string | null>(null);
-    const searchInputRef = React.useRef<InputRef>(null);
-    const renameInputRef = React.useRef<InputRef>(null);
-    const renameSelectionEndRef = React.useRef<number>(0);
-    const [importing, setImporting] = useState(false);
-    const [searchVersion, setSearchVersion] = useState(0);
     const [projectWorkspaceStates, setProjectWorkspaceStates] = useState<Record<string, ProjectWorkspaceState>>({});
     const [animationEnabled, setListAnimationEnabled] = useState(false);
     const [appTheme, setAppTheme] = useState<'light' | 'dark'>(() => {
@@ -172,7 +226,6 @@ function App() {
         const saved = localStorage.getItem('apiman-theme');
         return saved === 'dark' || saved === 'light' ? saved : 'light';
     });
-    const [forceListAnimation, setForceListAnimation] = useState(false);
     const [projectSearchKeyword, setProjectSearchKeyword] = useState('');
     const [projectGroups, setProjectGroups] = useState<string[]>([]);
     const [projectGroupAssignments, setProjectGroupAssignments] = useState<Record<string, string>>({});
@@ -191,18 +244,11 @@ function App() {
     const [groupSortDropTarget, setGroupSortDropTarget] = useState<string | null>(null);
     const [projectGroupsLoaded, setProjectGroupsLoaded] = useState(false);
     const [sidebarMenu, setSidebarMenu] = useState<'apis' | 'environments' | 'scripts'>('apis');
-    const [environments, setEnvironments] = useState<Environment[]>([]);
-    const [selectedEnvironmentId, setSelectedEnvironmentId] = useState<string>('');
-    const [environmentsInitiallyLoaded, setEnvironmentsInitiallyLoaded] = useState(false);
-    const [editingEnvironmentId, setEditingEnvironmentId] = useState<string>('');
-    const [environmentFormName, setEnvironmentFormName] = useState('');
-    const [environmentFormVariables, setEnvironmentFormVariables] = useState<EnvironmentVariableRow[]>([createEnvironmentVariableRow()]);
-    const [envLoading, setEnvLoading] = useState(false);
-    const [envSaving, setEnvSaving] = useState(false);
-    const [environmentTabs, setEnvironmentTabs] = useState<EnvironmentEditorTab[]>([]);
-    const [activeEnvironmentTab, setActiveEnvironmentTab] = useState<string>('');
     const forceAnimationTimerRef = React.useRef<number | null>(null);
     const movedHighlightTimerRef = React.useRef<number | null>(null);
+    const searchInputRef = React.useRef<InputRef>(null);
+    const renameInputRef = React.useRef<InputRef>(null);
+    const renameSelectionEndRef = React.useRef<number>(0);
 
     // Ant Design 的下拉弹层会挂载到 body（portal）。因此需要把主题 class 挂到 html 上，
     // 才能让弹层也吃到深色主题的 CSS 变量与覆盖样式。
@@ -450,41 +496,6 @@ function App() {
         setSidebarHighlightedCasePath(state.sidebarHighlightedCasePath || '');
     };
 
-    const environmentToRows = (variables: Record<string, string>): EnvironmentVariableRow[] => {
-        const rows = Object.entries(variables || {}).map(([key, value]) => createEnvironmentVariableRow(key, value));
-        return rows.length > 0 ? rows : [createEnvironmentVariableRow()];
-    };
-
-    const rowsToEnvironmentVariables = (rows: EnvironmentVariableRow[]): Record<string, string> => {
-        return rows.reduce((acc, item) => {
-            const key = item.key.trim();
-            if (!key) return acc;
-            acc[key] = item.value;
-            return acc;
-        }, {} as Record<string, string>);
-    };
-
-    const resetEnvironmentEditor = () => {
-        setEditingEnvironmentId('');
-        setEnvironmentFormName('');
-        setEnvironmentFormVariables([createEnvironmentVariableRow()]);
-    };
-
-    const loadEnvironmentsData = async (projectID: string) => {
-        setEnvLoading(true);
-        setEnvironmentsInitiallyLoaded(false);
-        try {
-            const envs = await LoadEnvironments(projectID);
-            setEnvironments(envs || []);
-        } catch (error: any) {
-            console.error('Failed to load environments:', error);
-            message.error(`加载环境失败: ${error?.message || error}`);
-            setEnvironments([]);
-        } finally {
-            setEnvLoading(false);
-        }
-    };
-
     const loadProjectScriptsData = async (projectID: string) => {
         setScriptsLoading(true);
         try {
@@ -573,46 +584,6 @@ function App() {
                     message.error(`删除脚本失败: ${error?.message || error}`);
                 }
             }
-        });
-    };
-
-    const openEnvironmentEditor = (env: Environment) => {
-        const tabKey = `env-${env.id}`;
-        setEnvironmentTabs(prev => {
-            if (prev.some(tab => tab.key === tabKey)) return prev;
-            return [...prev, { key: tabKey, title: env.name, environmentId: env.id }];
-        });
-        setActiveEnvironmentTab(tabKey);
-        setEditingEnvironmentId(env.id);
-        setEnvironmentFormName(env.name);
-        setEnvironmentFormVariables(environmentToRows(env.variables));
-    };
-
-    const openCreateEnvironmentTab = () => {
-        const p = projectTabs.find(t => t.id === activeTab)?.project;
-        if (!p?.id) {
-            message.warning('请先打开项目');
-            return;
-        }
-        const tabKey = `new-env-${Date.now()}`;
-        setEnvironmentTabs(prev => [...prev, { key: tabKey, title: '新建环境', isNew: true }]);
-        setActiveEnvironmentTab(tabKey);
-        setEditingEnvironmentId('');
-        setEnvironmentFormName(`环境${environments.length + 1}`);
-        setEnvironmentFormVariables([createEnvironmentVariableRow()]);
-        setSidebarMenu('environments');
-    };
-
-    const closeEnvironmentTab = (tabKey: string) => {
-        setEnvironmentTabs(prev => {
-            const next = prev.filter(tab => tab.key !== tabKey);
-            if (activeEnvironmentTab === tabKey) {
-                setActiveEnvironmentTab(next[0]?.key || '');
-                if (next.length === 0) {
-                    resetEnvironmentEditor();
-                }
-            }
-            return next;
         });
     };
 
@@ -716,31 +687,6 @@ function App() {
     }, []);
 
     useEffect(() => {
-        if (environments.length === 0) {
-            if (selectedEnvironmentId) {
-                setSelectedEnvironmentId('');
-            }
-            if (editingEnvironmentId) {
-                resetEnvironmentEditor();
-            }
-            return;
-        }
-
-        // Auto-select first environment only on initial load, not on subsequent changes
-        // This preserves user's explicit selection of "不使用环境"
-        if (!environmentsInitiallyLoaded) {
-            if (!selectedEnvironmentId) {
-                setSelectedEnvironmentId(environments[0].id);
-            }
-            setEnvironmentsInitiallyLoaded(true);
-        }
-
-        if (editingEnvironmentId && !environments.some(env => env.id === editingEnvironmentId)) {
-            resetEnvironmentEditor();
-        }
-    }, [environments, selectedEnvironmentId, editingEnvironmentId, environmentsInitiallyLoaded]);
-
-    useEffect(() => {
         const activeProject = projectTabs.find(t => t.id === activeTab)?.project;
         if (!activeProject?.id) {
             setProjectScripts([]);
@@ -748,45 +694,11 @@ function App() {
             setScriptFormName('');
             setScriptFormDescription('');
             setScriptFormContent('// 在这里编写 JavaScript 脚本\n');
-            setEnvironments([]);
-            setEnvironmentsInitiallyLoaded(false);
             return;
         }
         loadProjectScriptsData(activeProject.id);
         loadEnvironmentsData(activeProject.id);
     }, [activeTab, projectTabs]);
-
-    useEffect(() => {
-        setEnvironmentTabs(prev => prev
-            .filter(tab => tab.isNew || (tab.environmentId && environments.some(env => env.id === tab.environmentId)))
-            .map(tab => {
-                if (tab.isNew || !tab.environmentId) return tab;
-                const env = environments.find(item => item.id === tab.environmentId);
-                return env ? { ...tab, title: env.name } : tab;
-            }));
-    }, [environments]);
-
-    useEffect(() => {
-        if (!activeEnvironmentTab) return;
-        const activeTab = environmentTabs.find(tab => tab.key === activeEnvironmentTab);
-        if (!activeTab) return;
-        if (activeTab.isNew) {
-            setEditingEnvironmentId('');
-            if (!environmentFormName) {
-                setEnvironmentFormName(`环境${environments.length + 1}`);
-            }
-            if (!environmentFormVariables.length) {
-                setEnvironmentFormVariables([createEnvironmentVariableRow()]);
-            }
-            return;
-        }
-        if (!activeTab.environmentId) return;
-        const env = environments.find(item => item.id === activeTab.environmentId);
-        if (!env) return;
-        setEditingEnvironmentId(env.id);
-        setEnvironmentFormName(env.name);
-        setEnvironmentFormVariables(environmentToRows(env.variables));
-    }, [activeEnvironmentTab, environmentTabs, environments]);
 
     useEffect(() => {
         const projectIds = new Set(projects.map(p => p.id));
@@ -1934,64 +1846,23 @@ function App() {
         }
     };
 
-    const handleCreateEnvironmentClick = () => {
-        openCreateEnvironmentTab();
-    };
-
-    const handleSaveEnvironment = async () => {
+    // Environment action wrappers - convert () => void interface for EnvironmentPanel
+    const handleEnvironmentSave = () => {
         const projectId = projectTabs.find(t => t.id === activeTab)?.project?.id;
-        if (!projectId) {
-            message.warning('请先打开项目');
-            return;
-        }
-        const name = environmentFormName.trim();
-        if (!name) {
-            message.warning('请输入环境名称');
-            return;
-        }
-
-        const variables = rowsToEnvironmentVariables(environmentFormVariables);
-        setEnvSaving(true);
-        try {
-            if (editingEnvironmentId) {
-                await UpdateEnvironment(projectId, editingEnvironmentId, name, variables);
-                message.success('环境已更新');
-            } else {
-                const created = await CreateEnvironment(projectId, name, variables);
-                message.success('环境已创建');
-                setSelectedEnvironmentId(created.id);
-                setEnvironmentTabs(prev => prev.map(tab => tab.key === activeEnvironmentTab
-                    ? { key: `env-${created.id}`, title: created.name, environmentId: created.id }
-                    : tab));
-                setActiveEnvironmentTab(`env-${created.id}`);
-                setEditingEnvironmentId(created.id);
-            }
-            await loadEnvironmentsData(projectId);
-        } catch (error: any) {
-            message.error(`保存环境失败: ${error?.message || error}`);
-        } finally {
-            setEnvSaving(false);
+        if (projectId) {
+            handleSaveEnvironment(projectId);
         }
     };
 
-    const handleDeleteEnvironmentCurrent = async () => {
+    const handleEnvironmentDelete = () => {
         const projectId = projectTabs.find(t => t.id === activeTab)?.project?.id;
-        if (!projectId || !editingEnvironmentId) return;
-        Modal.confirm({
-            title: '删除环境',
-            content: '确定删除当前环境吗？删除后无法恢复。',
-            onOk: async () => {
-                try {
-                    await DeleteEnvironment(projectId, editingEnvironmentId);
-                    message.success('环境已删除');
-                    await loadEnvironmentsData(projectId);
-                    setEnvironmentTabs(prev => prev.filter(tab => tab.environmentId !== editingEnvironmentId));
-                    resetEnvironmentEditor();
-                } catch (error: any) {
-                    message.error(`删除环境失败: ${error?.message || error}`);
-                }
-            }
-        });
+        if (projectId) {
+            handleDeleteEnvironmentCurrent(projectId);
+        }
+    };
+
+    const handleCreateEnvironment = () => {
+        openCreateEnvironmentTab(projectTabs, activeTab);
     };
 
     const handleSaveRequest = async () => {
@@ -2306,7 +2177,7 @@ function App() {
                             onSidebarMenuChange={setSidebarMenu}
                             onCreateFolder={() => setCreateFolderModal(true)}
                             onCreateRequest={() => setCreateRequestModal(true)}
-                            onCreateEnvironment={handleCreateEnvironmentClick}
+                            onCreateEnvironment={handleCreateEnvironment}
                             onCreateScript={handleCreateScript}
                             onEnvironmentSelect={(env) => openEnvironmentEditor(env)}
                             onScriptSelect={(script) => handleSelectScriptEditor(script)}
@@ -2389,8 +2260,8 @@ function App() {
                                                 })}
                                                 onVariablesAdd={() => setEnvironmentFormVariables(prev => [...prev, createEnvironmentVariableRow()])}
                                                 onReset={resetEnvironmentEditor}
-                                                onDelete={handleDeleteEnvironmentCurrent}
-                                                onSave={handleSaveEnvironment}
+                                                onDelete={handleEnvironmentDelete}
+                                                onSave={handleEnvironmentSave}
                                                 createEnvironmentVariableRow={createEnvironmentVariableRow}
                                             />
                                         </>
@@ -2583,35 +2454,15 @@ function App() {
 
             <HistoryModal
                 visible={historyModalVisible}
-                onClose={() => { setHistoryModalVisible(false); setHistoryDetail(null); }}
+                onClose={() => setHistoryModalVisible(false)}
                 appTheme={appTheme}
-                historyList={historyList}
-                setHistoryList={setHistoryList}
-                historyDetail={historyDetail}
-                setHistoryDetail={setHistoryDetail}
-                historyLoading={historyLoading}
-                setHistoryLoading={setHistoryLoading}
-                historySearchProject={historySearchProject}
-                setHistorySearchProject={setHistorySearchProject}
-                historySearchName={historySearchName}
-                setHistorySearchName={setHistorySearchName}
-                historySearchURL={historySearchURL}
-                setHistorySearchURL={setHistorySearchURL}
-                historySearchMethod={historySearchMethod}
-                setHistorySearchMethod={setHistorySearchMethod}
-                historySearchStatus={historySearchStatus}
-                setHistorySearchStatus={setHistorySearchStatus}
-                historySearchSource={historySearchSource}
-                setHistorySearchSource={setHistorySearchSource}
-                onSearch={searchHistory}
-                onClearSearch={clearHistorySearch}
             />
 
             <AppFooter
                 mcpStatus={mcpStatus}
                 onOpenCookie={() => { setCookieModalVisible(true); loadGlobalCookies(); }}
                 onOpenMCP={() => setMCpModalVisible(true)}
-                onOpenHistory={() => { setHistoryModalVisible(true); clearHistorySearch(); }}
+                onOpenHistory={() => setHistoryModalVisible(true)}
             />
         </div>
     );

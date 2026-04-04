@@ -89,6 +89,12 @@
 - ✅ 清理未使用的 antd 导入：Row, Button, Dropdown, Tooltip, Upload, Input, searchInputRef
 - ✅ 清理未使用的 wailsjs 导入：SaveGlobalCookies, SaveAppConfig, ListHistory, GetHistoryEntry, DeleteHistory, ClearHistory, SearchHistory
 - ✅ 清理未使用的工具函数导入：escapeHtml, getCaretOffset, setCaretOffset, renderHighlightedVariableHtml, isBuiltInGenerator, builtInGenerators, getVariableSuggestions, containsVariablePlaceholder
+- ✅ **WorkspaceContext 扩展**：添加了缺失的状态（createFolderModal, newFolderName, createRequestModal, newRequestName, renameModal, renameType, renamePath, renameValue, selectedFolder, selectedKeys, searchKeyword, filterMethod, collapsedFolders, draggingNode, dropTargetFolderPath, invalidDropHint, movedHighlightPath, expandedKeys）
+- ✅ **WorkspaceContext setter 类型**：改为 `React.Dispatch<React.SetStateAction<T>>` 以兼容函数式更新
+- ✅ **useRequest 使用 WorkspaceContext**：移除本地 useState，改为使用 WorkspaceContext
+- ✅ **WorkspaceProvider 集成**：在 main.tsx 中添加 WorkspaceProvider 包装 App
+- ✅ **App.tsx 状态解构**：从 useReq 解构状态，移除 ~45 个重复的状态声明
+- ✅ **useEnvironment Hook 集成**：App.tsx 使用 useEnvironment hook，移除 ~60 行本地环境状态和 ~150 行环境处理函数
 
 **当前 App.tsx 大小**：
 - 原始：4080 行
@@ -121,8 +127,8 @@ App.tsx (2522 行)
 | P1 | ~~通用工具函数去重~~ | ✅ 已完成（misc.ts 重复函数已清理） | - |
 | P2 | ~~useScript Hook 集成~~ | ✅ 已完成（useScript hook 集成，移除 ~60 行重复状态） | ~60行 |
 | P2 | ~~useRequest Hook 清理~~ | ✅ 已完成（移除了 hook 中重复的函数定义） | ~20行 |
-| P2 | **useRequest Hook 集成** | 进行中（需替换 42 个状态声明 + 数百处调用，setter 类型不兼容 React 函数式更新） | ~500-800行 |
-| P2 | **WorkspaceContext 完善** | App.tsx 尚未使用已存在的 `WorkspaceContext` | ~300行 |
+| P2 | ~~useRequest Hook 集成~~ | ✅ 已完成（WorkspaceContext 统一状态管理，App.tsx 解构 useReq 状态） | ~500行 |
+| P2 | ~~WorkspaceContext 完善~~ | ✅ 已完成（WorkspaceContext 包含所有状态，WorkspaceProvider 已集成） | ~300行 |
 
 **组件目录结构**：
 ```

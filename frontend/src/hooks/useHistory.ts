@@ -1,48 +1,85 @@
 import { useState, useCallback } from 'react';
-import { ListHistory, GetHistoryEntry, DeleteHistory, ClearHistory, SearchHistory } from '../../wailsjs/go/main/App';
+import { ListHistory, GetHistoryEntry, ClearHistory, SearchHistory } from '../../wailsjs/go/main/App';
+import { models } from '../../wailsjs/go/models';
 
-interface UseHistoryReturn {
-    historyList: any[];
-    historyDetail: any | null;
+export interface UseHistoryReturn {
+    // Data
+    historyList: models.RequestHistory[];
+    historyDetail: models.RequestHistory | null;
     historyLoading: boolean;
-    historySearchProject: string;
-    historySearchName: string;
-    historySearchURL: string;
-    historySearchMethod: string;
-    historySearchStatus: string;
-    historySearchSource: string;
-    setHistoryList: React.Dispatch<React.SetStateAction<any[]>>;
-    setHistoryDetail: (detail: any | null) => void;
-    setHistoryLoading: React.Dispatch<React.SetStateAction<boolean>>;
-    setHistorySearchProject: (value: string) => void;
-    setHistorySearchName: (value: string) => void;
-    setHistorySearchURL: (value: string) => void;
-    setHistorySearchMethod: (value: string) => void;
-    setHistorySearchStatus: (value: string) => void;
-    setHistorySearchSource: (value: string) => void;
+
+    // Search params
+    searchParams: {
+        project?: string;
+        name?: string;
+        url?: string;
+        method?: string;
+        status?: number;
+        source?: string;
+    };
+    setSearchProject: (value: string) => void;
+    setSearchName: (value: string) => void;
+    setSearchURL: (value: string) => void;
+    setSearchMethod: (value: string) => void;
+    setSearchStatus: (value: string) => void;
+    setSearchSource: (value: string) => void;
+
+    // Actions
     loadHistoryList: () => Promise<void>;
     loadHistoryDetail: (id: string) => Promise<void>;
+    clearDetail: () => void;
     searchHistory: () => Promise<void>;
-    clearHistorySearch: () => void;
-    handleClearHistory: () => Promise<void>;
+    clearSearch: () => void;
+    clearAllHistory: () => Promise<void>;
 }
 
 export const useHistory = (): UseHistoryReturn => {
-    const [historyList, setHistoryList] = useState<any[]>([]);
-    const [historyDetail, setHistoryDetail] = useState<any | null>(null);
+    const [historyList, setHistoryList] = useState<models.RequestHistory[]>([]);
+    const [historyDetail, setHistoryDetail] = useState<models.RequestHistory | null>(null);
     const [historyLoading, setHistoryLoading] = useState(false);
-    const [historySearchProject, setHistorySearchProject] = useState('');
-    const [historySearchName, setHistorySearchName] = useState('');
-    const [historySearchURL, setHistorySearchURL] = useState('');
-    const [historySearchMethod, setHistorySearchMethod] = useState('');
-    const [historySearchStatus, setHistorySearchStatus] = useState('');
-    const [historySearchSource, setHistorySearchSource] = useState('');
+
+    // Search params - managed by hook
+    const [searchParams, setSearchParams] = useState<{
+        project?: string;
+        name?: string;
+        url?: string;
+        method?: string;
+        status?: number;
+        source?: string;
+    }>({});
+
+    const setSearchProject = useCallback((value: string) => {
+        setSearchParams(prev => ({ ...prev, project: value || undefined }));
+    }, []);
+
+    const setSearchName = useCallback((value: string) => {
+        setSearchParams(prev => ({ ...prev, name: value || undefined }));
+    }, []);
+
+    const setSearchURL = useCallback((value: string) => {
+        setSearchParams(prev => ({ ...prev, url: value || undefined }));
+    }, []);
+
+    const setSearchMethod = useCallback((value: string) => {
+        setSearchParams(prev => ({ ...prev, method: value || undefined }));
+    }, []);
+
+    const setSearchStatus = useCallback((value: string) => {
+        setSearchParams(prev => ({
+            ...prev,
+            status: value ? parseInt(value, 10) || undefined : undefined
+        }));
+    }, []);
+
+    const setSearchSource = useCallback((value: string) => {
+        setSearchParams(prev => ({ ...prev, source: value || undefined }));
+    }, []);
 
     const loadHistoryList = useCallback(async () => {
         setHistoryLoading(true);
         try {
             const list = await ListHistory(100);
-            setHistoryList(list || []);
+            setHistoryList((list || []) as unknown as models.RequestHistory[]);
         } catch (e) {
             console.error('Failed to load history:', e);
             setHistoryList([]);
@@ -52,10 +89,14 @@ export const useHistory = (): UseHistoryReturn => {
     }, []);
 
     const loadHistoryDetail = useCallback(async (id: string) => {
+        if (!id) {
+            setHistoryDetail(null);
+            return;
+        }
         setHistoryLoading(true);
         try {
             const detail = await GetHistoryEntry(id);
-            setHistoryDetail(detail);
+            setHistoryDetail(detail as unknown as models.RequestHistory);
         } catch (e) {
             console.error('Failed to load history detail:', e);
         } finally {
@@ -63,36 +104,29 @@ export const useHistory = (): UseHistoryReturn => {
         }
     }, []);
 
+    const clearDetail = useCallback(() => {
+        setHistoryDetail(null);
+    }, []);
+
     const searchHistory = useCallback(async () => {
         setHistoryLoading(true);
         try {
-            const params: any = {};
-            if (historySearchProject) params.project = historySearchProject;
-            if (historySearchName) params.name = historySearchName;
-            if (historySearchURL) params.url = historySearchURL;
-            if (historySearchMethod) params.method = historySearchMethod.toUpperCase();
-            if (historySearchStatus) params.status = parseInt(historySearchStatus, 10) || 0;
-            if (historySearchSource) params.source = historySearchSource.toUpperCase();
-            const result = await SearchHistory(params, 100);
-            setHistoryList(result || []);
+            const wailsParams = models.HistorySearchParams.createFrom(searchParams);
+            const result = await SearchHistory(wailsParams, 100);
+            setHistoryList((result || []) as unknown as models.RequestHistory[]);
         } catch (e) {
             console.error('Failed to search history:', e);
         } finally {
             setHistoryLoading(false);
         }
-    }, [historySearchProject, historySearchName, historySearchURL, historySearchMethod, historySearchStatus, historySearchSource]);
+    }, [searchParams]);
 
-    const clearHistorySearch = useCallback(() => {
-        setHistorySearchProject('');
-        setHistorySearchName('');
-        setHistorySearchURL('');
-        setHistorySearchMethod('');
-        setHistorySearchStatus('');
-        setHistorySearchSource('');
+    const clearSearch = useCallback(() => {
+        setSearchParams({});
         loadHistoryList();
     }, [loadHistoryList]);
 
-    const handleClearHistory = useCallback(async () => {
+    const clearAllHistory = useCallback(async () => {
         try {
             await ClearHistory();
             setHistoryList([]);
@@ -102,28 +136,26 @@ export const useHistory = (): UseHistoryReturn => {
     }, []);
 
     return {
+        // Data
         historyList,
         historyDetail,
         historyLoading,
-        historySearchProject,
-        historySearchName,
-        historySearchURL,
-        historySearchMethod,
-        historySearchStatus,
-        historySearchSource,
-        setHistoryList,
-        setHistoryDetail,
-        setHistoryLoading,
-        setHistorySearchProject,
-        setHistorySearchName,
-        setHistorySearchURL,
-        setHistorySearchMethod,
-        setHistorySearchStatus,
-        setHistorySearchSource,
+
+        // Search params
+        searchParams,
+        setSearchProject,
+        setSearchName,
+        setSearchURL,
+        setSearchMethod,
+        setSearchStatus,
+        setSearchSource,
+
+        // Actions
         loadHistoryList,
         loadHistoryDetail,
+        clearDetail,
         searchHistory,
-        clearHistorySearch,
-        handleClearHistory,
+        clearSearch,
+        clearAllHistory,
     };
 };

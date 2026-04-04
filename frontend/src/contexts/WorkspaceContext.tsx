@@ -42,6 +42,30 @@ export interface WorkspaceState {
     addCaseTargetPath: string;
     addCaseNameInput: string;
 
+    // Create modals
+    createFolderModal: boolean;
+    newFolderName: string;
+    createRequestModal: boolean;
+    newRequestName: string;
+
+    // Rename modal
+    renameModal: boolean;
+    renameType: 'request' | 'folder';
+    renamePath: string;
+    renameValue: string;
+
+    // Tree state
+    selectedFolder: string | null;
+    selectedKeys: string[];
+    searchKeyword: string;
+    filterMethod: string;
+    collapsedFolders: Set<string>;
+    draggingNode: { type: 'request' | 'folder'; path: string } | null;
+    dropTargetFolderPath: string | null;
+    invalidDropHint: { message: string; x: number; y: number } | null;
+    movedHighlightPath: string | null;
+    expandedKeys: string[];
+
     // UI state
     scriptHelpVisible: boolean;
     importing: boolean;
@@ -58,48 +82,72 @@ interface RequestTab {
 // Workspace-level actions interface
 export interface WorkspaceActions {
     // Request tabs
-    setRequestTabs: (tabs: RequestTab[]) => void;
-    setActiveRequestTab: (tab: string) => void;
+    setRequestTabs: React.Dispatch<React.SetStateAction<RequestTab[]>>;
+    setActiveRequestTab: React.Dispatch<React.SetStateAction<string>>;
 
     // Current request
-    setCurrentRequest: (request: CurlRequest | null) => void;
+    setCurrentRequest: React.Dispatch<React.SetStateAction<CurlRequest | null>>;
 
     // Response
-    setResponse: (response: any) => void;
-    setFormattedResponse: (response: string) => void;
-    setResponseBodyHeight: (height: number) => void;
-    setScriptResultsHeight: (height: number) => void;
-    setScriptLogsExpanded: (expanded: boolean) => void;
-    setTestResultsExpanded: (expanded: boolean) => void;
+    setResponse: React.Dispatch<React.SetStateAction<any>>;
+    setFormattedResponse: React.Dispatch<React.SetStateAction<string>>;
+    setResponseBodyHeight: React.Dispatch<React.SetStateAction<number>>;
+    setScriptResultsHeight: React.Dispatch<React.SetStateAction<number>>;
+    setScriptLogsExpanded: React.Dispatch<React.SetStateAction<boolean>>;
+    setTestResultsExpanded: React.Dispatch<React.SetStateAction<boolean>>;
 
     // Execution
-    setExecuting: (executing: boolean) => void;
+    setExecuting: React.Dispatch<React.SetStateAction<boolean>>;
 
     // API Config
-    setApiConfig: (config: ApiConfig) => void;
-    setInterfaceApiConfig: (config: ApiConfig) => void;
-    setCurlPreview: (preview: string) => void;
+    setApiConfig: React.Dispatch<React.SetStateAction<ApiConfig>>;
+    setInterfaceApiConfig: React.Dispatch<React.SetStateAction<ApiConfig>>;
+    setCurlPreview: React.Dispatch<React.SetStateAction<string>>;
 
     // Request cases
-    setRequestCases: (cases: RequestCaseState[]) => void;
-    setActiveCaseId: (id: string) => void;
-    setRequestEditorSurface: (surface: RequestEditorSurface) => void;
-    setSidebarHighlightedCasePath: (path: string) => void;
-    setExpandedRequestPaths: (paths: Set<string>) => void;
+    setRequestCases: React.Dispatch<React.SetStateAction<RequestCaseState[]>>;
+    setActiveCaseId: React.Dispatch<React.SetStateAction<string>>;
+    setRequestEditorSurface: React.Dispatch<React.SetStateAction<RequestEditorSurface>>;
+    setSidebarHighlightedCasePath: React.Dispatch<React.SetStateAction<string>>;
+    setExpandedRequestPaths: React.Dispatch<React.SetStateAction<Set<string>>>;
 
     // Case modals
-    setCaseRenameModalOpen: (open: boolean) => void;
-    setCaseRenameCasePath: (path: string) => void;
-    setCaseRenameInput: (input: string) => void;
-    setAddCaseModalOpen: (open: boolean) => void;
-    setAddCaseTargetPath: (path: string) => void;
-    setAddCaseNameInput: (input: string) => void;
+    setCaseRenameModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    setCaseRenameCasePath: React.Dispatch<React.SetStateAction<string>>;
+    setCaseRenameInput: React.Dispatch<React.SetStateAction<string>>;
+    setAddCaseModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    setAddCaseTargetPath: React.Dispatch<React.SetStateAction<string>>;
+    setAddCaseNameInput: React.Dispatch<React.SetStateAction<string>>;
+
+    // Create modals
+    setCreateFolderModal: React.Dispatch<React.SetStateAction<boolean>>;
+    setNewFolderName: React.Dispatch<React.SetStateAction<string>>;
+    setCreateRequestModal: React.Dispatch<React.SetStateAction<boolean>>;
+    setNewRequestName: React.Dispatch<React.SetStateAction<string>>;
+
+    // Rename modal
+    setRenameModal: React.Dispatch<React.SetStateAction<boolean>>;
+    setRenameType: React.Dispatch<React.SetStateAction<'request' | 'folder'>>;
+    setRenamePath: React.Dispatch<React.SetStateAction<string>>;
+    setRenameValue: React.Dispatch<React.SetStateAction<string>>;
+
+    // Tree state
+    setSelectedFolder: React.Dispatch<React.SetStateAction<string | null>>;
+    setSelectedKeys: React.Dispatch<React.SetStateAction<string[]>>;
+    setSearchKeyword: React.Dispatch<React.SetStateAction<string>>;
+    setFilterMethod: React.Dispatch<React.SetStateAction<string>>;
+    setCollapsedFolders: React.Dispatch<React.SetStateAction<Set<string>>>;
+    setDraggingNode: React.Dispatch<React.SetStateAction<{ type: 'request' | 'folder'; path: string } | null>>;
+    setDropTargetFolderPath: React.Dispatch<React.SetStateAction<string | null>>;
+    setInvalidDropHint: React.Dispatch<React.SetStateAction<{ message: string; x: number; y: number } | null>>;
+    setMovedHighlightPath: React.Dispatch<React.SetStateAction<string | null>>;
+    setExpandedKeys: React.Dispatch<React.SetStateAction<string[]>>;
 
     // UI state
-    setScriptHelpVisible: (visible: boolean) => void;
-    setImporting: (importing: boolean) => void;
-    setSearchVersion: (version: number) => void;
-    setForceListAnimation: (force: boolean) => void;
+    setScriptHelpVisible: React.Dispatch<React.SetStateAction<boolean>>;
+    setImporting: React.Dispatch<React.SetStateAction<boolean>>;
+    setSearchVersion: React.Dispatch<React.SetStateAction<number>>;
+    setForceListAnimation: React.Dispatch<React.SetStateAction<boolean>>;
 
     // Workspace state helpers
     resetWorkspaceState: () => void;
@@ -197,6 +245,30 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
     const [addCaseModalOpen, setAddCaseModalOpen] = useState(false);
     const [addCaseTargetPath, setAddCaseTargetPath] = useState('');
     const [addCaseNameInput, setAddCaseNameInput] = useState('');
+
+    // Create modals
+    const [createFolderModal, setCreateFolderModal] = useState(false);
+    const [newFolderName, setNewFolderName] = useState('');
+    const [createRequestModal, setCreateRequestModal] = useState(false);
+    const [newRequestName, setNewRequestName] = useState('');
+
+    // Rename modal
+    const [renameModal, setRenameModal] = useState(false);
+    const [renameType, setRenameType] = useState<'request' | 'folder'>('request');
+    const [renamePath, setRenamePath] = useState('');
+    const [renameValue, setRenameValue] = useState('');
+
+    // Tree state
+    const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+    const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+    const [searchKeyword, setSearchKeyword] = useState('');
+    const [filterMethod, setFilterMethod] = useState<string>('ALL');
+    const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
+    const [draggingNode, setDraggingNode] = useState<{ type: 'request' | 'folder'; path: string } | null>(null);
+    const [dropTargetFolderPath, setDropTargetFolderPath] = useState<string | null>(null);
+    const [invalidDropHint, setInvalidDropHint] = useState<{ message: string; x: number; y: number } | null>(null);
+    const [movedHighlightPath, setMovedHighlightPath] = useState<string | null>(null);
+    const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
 
     // UI state
     const [scriptHelpVisible, setScriptHelpVisible] = useState(false);
@@ -312,6 +384,48 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
         setAddCaseTargetPath,
         addCaseNameInput,
         setAddCaseNameInput,
+
+        // Create modals
+        createFolderModal,
+        setCreateFolderModal,
+        newFolderName,
+        setNewFolderName,
+        createRequestModal,
+        setCreateRequestModal,
+        newRequestName,
+        setNewRequestName,
+
+        // Rename modal
+        renameModal,
+        setRenameModal,
+        renameType,
+        setRenameType,
+        renamePath,
+        setRenamePath,
+        renameValue,
+        setRenameValue,
+
+        // Tree state
+        selectedFolder,
+        setSelectedFolder,
+        selectedKeys,
+        setSelectedKeys,
+        searchKeyword,
+        setSearchKeyword,
+        filterMethod,
+        setFilterMethod,
+        collapsedFolders,
+        setCollapsedFolders,
+        draggingNode,
+        setDraggingNode,
+        dropTargetFolderPath,
+        setDropTargetFolderPath,
+        invalidDropHint,
+        setInvalidDropHint,
+        movedHighlightPath,
+        setMovedHighlightPath,
+        expandedKeys,
+        setExpandedKeys,
 
         // UI state
         scriptHelpVisible,

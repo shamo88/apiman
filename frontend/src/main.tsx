@@ -2,6 +2,8 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import './style.css'
 import App from './App'
+import { WorkspaceProvider } from './contexts/WorkspaceContext'
+
 const container = document.getElementById('root')
 
 if (!container) {
@@ -28,7 +30,9 @@ console.log('✅ React root created, rendering App...')
 
 root.render(
     <React.StrictMode>
-        <App />
+        <WorkspaceProvider>
+            <App />
+        </WorkspaceProvider>
     </React.StrictMode>
 )
 

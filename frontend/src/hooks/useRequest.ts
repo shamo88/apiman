@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { message, Modal } from 'antd';
 import {
     GetRequest,
@@ -33,8 +33,8 @@ import {
     Environment,
     parseRequestCaseRef,
     requestRefFromIds,
-    createEmptyWorkspaceState,
 } from '../types';
+import { useWorkspaceContext } from '../contexts/WorkspaceContext';
 import { ApiConfig } from '../utils/apiConfig';
 import {
     createDefaultApiConfig,
@@ -169,6 +169,12 @@ export interface UseRequestState {
     invalidDropHint: { message: string; x: number; y: number } | null;
     movedHighlightPath: string | null;
     expandedKeys: string[];
+
+    // UI state
+    scriptHelpVisible: boolean;
+    importing: boolean;
+    searchVersion: number;
+    forceListAnimation: boolean;
 }
 
 export interface UseRequestActions {
@@ -219,6 +225,11 @@ export interface UseRequestActions {
     setInvalidDropHint: React.Dispatch<React.SetStateAction<{ message: string; x: number; y: number } | null>>;
     setMovedHighlightPath: React.Dispatch<React.SetStateAction<string | null>>;
     setExpandedKeys: React.Dispatch<React.SetStateAction<string[]>>;
+    // UI state actions
+    setScriptHelpVisible: React.Dispatch<React.SetStateAction<boolean>>;
+    setImporting: React.Dispatch<React.SetStateAction<boolean>>;
+    setSearchVersion: React.Dispatch<React.SetStateAction<number>>;
+    setForceListAnimation: React.Dispatch<React.SetStateAction<boolean>>;
     // Request operations
     handleCreateFolder: (projectId: string) => Promise<void>;
     handleCreateRequest: (projectId: string) => Promise<void>;
@@ -301,57 +312,127 @@ const apiConfigFromRequest = (r: CurlRequest, fallbackName: string): ApiConfig =
 };
 
 export function useRequest(): UseRequest {
-    // Request tabs
-    const [requestTabs, setRequestTabs] = useState<RequestTab[]>([]);
-    const [activeRequestTab, setActiveRequestTab] = useState<string>('');
-    const [currentRequest, setCurrentRequest] = useState<CurlRequest | null>(null);
-    const [response, setResponse] = useState<any>(null);
-    const [formattedResponse, setFormattedResponse] = useState<string>('');
-    const [responseBodyHeight, setResponseBodyHeight] = useState<number>(200);
-    const [scriptResultsHeight, setScriptResultsHeight] = useState<number>(200);
-    const [scriptLogsExpanded, setScriptLogsExpanded] = useState<boolean>(true);
-    const [testResultsExpanded, setTestResultsExpanded] = useState<boolean>(true);
-    const [executing, setExecuting] = useState<boolean>(false);
-    const [apiConfig, setApiConfig] = useState<ApiConfig>(createDefaultApiConfig());
-    const [interfaceApiConfig, setInterfaceApiConfig] = useState<ApiConfig>(createDefaultApiConfig());
-    const [curlPreview, setCurlPreview] = useState<string>('');
-    const [requestCases, setRequestCases] = useState<RequestCaseState[]>([]);
-    const [activeCaseId, setActiveCaseId] = useState<string>('');
-    const [requestEditorSurface, setRequestEditorSurface] = useState<RequestEditorSurface>('plain');
-    const [sidebarHighlightedCasePath, setSidebarHighlightedCasePath] = useState<string>('');
-    const [expandedRequestPaths, setExpandedRequestPaths] = useState<Set<string>>(() => new Set());
+    // Use WorkspaceContext for all state
+    const {
+        // Request tabs
+        requestTabs,
+        setRequestTabs,
+        activeRequestTab,
+        setActiveRequestTab,
 
-    // Case modals
-    const [caseRenameModalOpen, setCaseRenameModalOpen] = useState<boolean>(false);
-    const [caseRenameCasePath, setCaseRenameCasePath] = useState<string>('');
-    const [caseRenameInput, setCaseRenameInput] = useState<string>('');
-    const [addCaseModalOpen, setAddCaseModalOpen] = useState<boolean>(false);
-    const [addCaseTargetPath, setAddCaseTargetPath] = useState<string>('');
-    const [addCaseNameInput, setAddCaseNameInput] = useState<string>('');
+        // Current request
+        currentRequest,
+        setCurrentRequest,
 
-    // Create modals
-    const [createFolderModal, setCreateFolderModal] = useState<boolean>(false);
-    const [newFolderName, setNewFolderName] = useState<string>('');
-    const [createRequestModal, setCreateRequestModal] = useState<boolean>(false);
-    const [newRequestName, setNewRequestName] = useState<string>('');
+        // Response
+        response,
+        setResponse,
+        formattedResponse,
+        setFormattedResponse,
+        responseBodyHeight,
+        setResponseBodyHeight,
+        scriptResultsHeight,
+        setScriptResultsHeight,
+        scriptLogsExpanded,
+        setScriptLogsExpanded,
+        testResultsExpanded,
+        setTestResultsExpanded,
 
-    // Rename modal
-    const [renameModal, setRenameModal] = useState<boolean>(false);
-    const [renameType, setRenameType] = useState<'request' | 'folder'>('request');
-    const [renamePath, setRenamePath] = useState<string>('');
-    const [renameValue, setRenameValue] = useState<string>('');
+        // Execution
+        executing,
+        setExecuting,
 
-    // Tree state
-    const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
-    const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
-    const [searchKeyword, setSearchKeyword] = useState<string>('');
-    const [filterMethod, setFilterMethod] = useState<string>('ALL');
-    const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
-    const [draggingNode, setDraggingNode] = useState<{ type: 'request' | 'folder'; path: string } | null>(null);
-    const [dropTargetFolderPath, setDropTargetFolderPath] = useState<string | null>(null);
-    const [invalidDropHint, setInvalidDropHint] = useState<{ message: string; x: number; y: number } | null>(null);
-    const [movedHighlightPath, setMovedHighlightPath] = useState<string | null>(null);
-    const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
+        // API Config
+        apiConfig,
+        setApiConfig,
+        interfaceApiConfig,
+        setInterfaceApiConfig,
+        curlPreview,
+        setCurlPreview,
+
+        // Request cases
+        requestCases,
+        setRequestCases,
+        activeCaseId,
+        setActiveCaseId,
+        requestEditorSurface,
+        setRequestEditorSurface,
+        sidebarHighlightedCasePath,
+        setSidebarHighlightedCasePath,
+        expandedRequestPaths,
+        setExpandedRequestPaths,
+
+        // Case modals
+        caseRenameModalOpen,
+        setCaseRenameModalOpen,
+        caseRenameCasePath,
+        setCaseRenameCasePath,
+        caseRenameInput,
+        setCaseRenameInput,
+        addCaseModalOpen,
+        setAddCaseModalOpen,
+        addCaseTargetPath,
+        setAddCaseTargetPath,
+        addCaseNameInput,
+        setAddCaseNameInput,
+
+        // Create modals
+        createFolderModal,
+        setCreateFolderModal,
+        newFolderName,
+        setNewFolderName,
+        createRequestModal,
+        setCreateRequestModal,
+        newRequestName,
+        setNewRequestName,
+
+        // Rename modal
+        renameModal,
+        setRenameModal,
+        renameType,
+        setRenameType,
+        renamePath,
+        setRenamePath,
+        renameValue,
+        setRenameValue,
+
+        // Tree state
+        selectedFolder,
+        setSelectedFolder,
+        selectedKeys,
+        setSelectedKeys,
+        searchKeyword,
+        setSearchKeyword,
+        filterMethod,
+        setFilterMethod,
+        collapsedFolders,
+        setCollapsedFolders,
+        draggingNode,
+        setDraggingNode,
+        dropTargetFolderPath,
+        setDropTargetFolderPath,
+        invalidDropHint,
+        setInvalidDropHint,
+        movedHighlightPath,
+        setMovedHighlightPath,
+        expandedKeys,
+        setExpandedKeys,
+
+        // UI state
+        scriptHelpVisible,
+        setScriptHelpVisible,
+        importing,
+        setImporting,
+        searchVersion,
+        setSearchVersion,
+        forceListAnimation,
+        setForceListAnimation,
+
+        // Workspace helpers
+        resetWorkspaceState,
+        captureCurrentWorkspaceState,
+        applyWorkspaceState,
+    } = useWorkspaceContext();
 
     // Helper functions
     const applyEnvironmentVariables = useCallback((input: string, variables: Record<string, string>): string => {
@@ -987,65 +1068,6 @@ export function useRequest(): UseRequest {
         }
     }, [currentRequest]);
 
-    // Workspace state management
-    const resetWorkspaceState = useCallback(() => {
-        const emptyState = createEmptyWorkspaceState();
-        setRequestTabs(emptyState.requestTabs);
-        setActiveRequestTab(emptyState.activeRequestTab);
-        setCurrentRequest(emptyState.currentRequest);
-        setResponse(emptyState.response);
-        setFormattedResponse('');
-        setSelectedKeys(emptyState.selectedKeys);
-        setApiConfig(emptyState.apiConfig);
-        setRequestCases(emptyState.requestCases);
-        setActiveCaseId(emptyState.activeCaseId);
-        setInterfaceApiConfig(emptyState.interfaceApiConfig);
-        setRequestEditorSurface(emptyState.requestEditorSurface);
-        setSidebarHighlightedCasePath(emptyState.sidebarHighlightedCasePath);
-        setExpandedRequestPaths(new Set());
-    }, []);
-
-    const captureCurrentWorkspaceState = useCallback((): ProjectWorkspaceState => ({
-        requestTabs,
-        activeRequestTab,
-        currentRequest,
-        response,
-        selectedKeys,
-        apiConfig,
-        selectedEnvironmentId: '',
-        requestCases,
-        activeCaseId,
-        interfaceApiConfig,
-        requestEditorSurface,
-        sidebarHighlightedCasePath
-    }), [
-        requestTabs,
-        activeRequestTab,
-        currentRequest,
-        response,
-        selectedKeys,
-        apiConfig,
-        requestCases,
-        activeCaseId,
-        interfaceApiConfig,
-        requestEditorSurface,
-        sidebarHighlightedCasePath
-    ]);
-
-    const applyWorkspaceState = useCallback((state: ProjectWorkspaceState) => {
-        setRequestTabs(state.requestTabs);
-        setActiveRequestTab(state.activeRequestTab);
-        setCurrentRequest(state.currentRequest);
-        setResponse(state.response);
-        setSelectedKeys(state.selectedKeys);
-        setApiConfig(state.apiConfig);
-        setRequestCases(state.requestCases || []);
-        setActiveCaseId(state.activeCaseId || '');
-        setInterfaceApiConfig(state.interfaceApiConfig || createDefaultApiConfig());
-        setRequestEditorSurface(state.requestEditorSurface || 'plain');
-        setSidebarHighlightedCasePath(state.sidebarHighlightedCasePath || '');
-    }, []);
-
     return {
         // State
         requestTabs,
@@ -1091,6 +1113,12 @@ export function useRequest(): UseRequest {
         movedHighlightPath,
         expandedKeys,
 
+        // UI state
+        scriptHelpVisible,
+        importing,
+        searchVersion,
+        forceListAnimation,
+
         // Setters
         setRequestTabs,
         setActiveRequestTab,
@@ -1134,6 +1162,12 @@ export function useRequest(): UseRequest {
         setInvalidDropHint,
         setMovedHighlightPath,
         setExpandedKeys,
+
+        // UI state setters
+        setScriptHelpVisible,
+        setImporting,
+        setSearchVersion,
+        setForceListAnimation,
 
         // Actions
         handleCreateFolder,

@@ -2,96 +2,65 @@ import React, { useEffect } from 'react';
 import { Modal, Table, Button, Input, Select, Row, Col } from 'antd';
 import { JsonView, darkStyles, allExpanded } from 'react-json-view-lite';
 import 'react-json-view-lite/dist/index.css';
-import { ClearHistory, GetHistoryEntry, SearchHistory, ListHistory } from '../../../wailsjs/go/main/App';
+import { ClearHistory, GetHistoryEntry } from '../../../wailsjs/go/main/App';
 import { getMethodColor, getStatusColor } from '../../utils/ui';
+import { useHistory } from '../../hooks/useHistory';
 
 interface HistoryModalProps {
     visible: boolean;
     onClose: () => void;
     appTheme: 'light' | 'dark';
-    // List state
-    historyList: any[];
-    setHistoryList: React.Dispatch<React.SetStateAction<any[]>>;
-    // Detail state
-    historyDetail: any | null;
-    setHistoryDetail: (detail: any | null) => void;
-    // Loading state
-    historyLoading: boolean;
-    setHistoryLoading: React.Dispatch<React.SetStateAction<boolean>>;
-    // Search fields
-    historySearchProject: string;
-    setHistorySearchProject: (v: string) => void;
-    historySearchName: string;
-    setHistorySearchName: (v: string) => void;
-    historySearchURL: string;
-    setHistorySearchURL: (v: string) => void;
-    historySearchMethod: string;
-    setHistorySearchMethod: (v: string) => void;
-    historySearchStatus: string;
-    setHistorySearchStatus: (v: string) => void;
-    historySearchSource: string;
-    setHistorySearchSource: (v: string) => void;
-    // Actions
-    onSearch: () => void;
-    onClearSearch: () => void;
 }
 
 export const HistoryModal: React.FC<HistoryModalProps> = ({
     visible,
     onClose,
     appTheme,
-    historyList,
-    setHistoryList,
-    historyDetail,
-    setHistoryDetail,
-    historyLoading,
-    setHistoryLoading,
-    historySearchProject,
-    setHistorySearchProject,
-    historySearchName,
-    setHistorySearchName,
-    historySearchURL,
-    setHistorySearchURL,
-    historySearchMethod,
-    setHistorySearchMethod,
-    historySearchStatus,
-    setHistorySearchStatus,
-    historySearchSource,
-    setHistorySearchSource,
-    onSearch,
-    onClearSearch,
 }) => {
+    const {
+        historyList,
+        historyDetail,
+        historyLoading,
+        setSearchProject,
+        setSearchName,
+        setSearchURL,
+        setSearchMethod,
+        setSearchStatus,
+        setSearchSource,
+        loadHistoryList,
+        loadHistoryDetail,
+        clearDetail,
+        searchHistory,
+        clearSearch,
+        clearAllHistory,
+    } = useHistory();
+
     useEffect(() => {
         if (visible) {
-            onSearch();
+            loadHistoryList();
         }
-    }, [visible]);
+    }, [visible, loadHistoryList]);
 
-    const handleClearAll = async () => {
+    const handleClearAll = () => {
         Modal.confirm({
             title: '确认清空',
             content: '确定要清空所有历史记录吗？',
             onOk: async () => {
-                try {
-                    await ClearHistory();
-                    setHistoryList([]);
-                } catch (e) {
-                    console.error('Failed to clear history:', e);
-                }
+                await clearAllHistory();
             },
         });
     };
 
     const handleTableRowClick = async (record: any) => {
-        setHistoryLoading(true);
-        try {
-            const detail = await GetHistoryEntry(record.id);
-            setHistoryDetail(detail);
-        } catch (e) {
-            console.error('Failed to load history detail:', e);
-        } finally {
-            setHistoryLoading(false);
-        }
+        await loadHistoryDetail(record.id);
+    };
+
+    const handleSearch = async () => {
+        await searchHistory();
+    };
+
+    const handleClearSearch = () => {
+        clearSearch();
     };
 
     return (
@@ -113,40 +82,33 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                             <Input
                                 size='small'
                                 placeholder='项目'
-                                value={historySearchProject}
-                                onChange={(e) => setHistorySearchProject(e.target.value)}
-                                onPressEnter={onSearch}
+                                onChange={(e) => setSearchProject(e.target.value)}
+                                onPressEnter={handleSearch}
                                 style={{ width: 120 }}
                                 allowClear
-                                onClear={() => setHistorySearchProject('')}
                             />
                             <Input
                                 size='small'
                                 placeholder='请求名称'
-                                value={historySearchName}
-                                onChange={(e) => setHistorySearchName(e.target.value)}
-                                onPressEnter={onSearch}
+                                onChange={(e) => setSearchName(e.target.value)}
+                                onPressEnter={handleSearch}
                                 style={{ width: 120 }}
                                 allowClear
-                                onClear={() => setHistorySearchName('')}
                             />
                             <Input
                                 size='small'
                                 placeholder='URL'
-                                value={historySearchURL}
-                                onChange={(e) => setHistorySearchURL(e.target.value)}
-                                onPressEnter={onSearch}
+                                onChange={(e) => setSearchURL(e.target.value)}
+                                onPressEnter={handleSearch}
                                 style={{ flex: 1 }}
                                 allowClear
-                                onClear={() => setHistorySearchURL('')}
                             />
                         </div>
                         <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                             <Select
                                 size='small'
                                 placeholder='方法'
-                                value={historySearchMethod || undefined}
-                                onChange={(v) => setHistorySearchMethod(v || '')}
+                                onChange={(v) => setSearchMethod(v || '')}
                                 style={{ width: 100 }}
                                 allowClear
                             >
@@ -161,26 +123,23 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                             <Input
                                 size='small'
                                 placeholder='状态码'
-                                value={historySearchStatus}
-                                onChange={(e) => setHistorySearchStatus(e.target.value)}
-                                onPressEnter={onSearch}
+                                onChange={(e) => setSearchStatus(e.target.value)}
+                                onPressEnter={handleSearch}
                                 style={{ width: 80 }}
                                 allowClear
-                                onClear={() => setHistorySearchStatus('')}
                             />
                             <Select
                                 size='small'
                                 placeholder='来源'
-                                value={historySearchSource || undefined}
-                                onChange={(v) => setHistorySearchSource(v || '')}
+                                onChange={(v) => setSearchSource(v || '')}
                                 style={{ width: 100 }}
                                 allowClear
                             >
                                 <Select.Option value="GUI">GUI</Select.Option>
                                 <Select.Option value="MCP">MCP</Select.Option>
                             </Select>
-                            <Button size='small' type='primary' onClick={onSearch}>搜索</Button>
-                            <Button size='small' onClick={onClearSearch}>重置</Button>
+                            <Button size='small' type='primary' onClick={handleSearch}>搜索</Button>
+                            <Button size='small' onClick={handleClearSearch}>重置</Button>
                         </div>
                     </div>
                     <Table
@@ -208,7 +167,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                             { title: '方法', dataIndex: 'method', width: 60, render: (v) => <span style={{ color: getMethodColor(v) }}>{v}</span> },
                             { title: 'URL', dataIndex: 'url', ellipsis: true },
                             { title: '状态', dataIndex: 'status_code', width: 60, render: (v) => <span style={{ color: getStatusColor(v) }}>{v || '-'}</span> },
-                            { title: '耗时', dataIndex: 'duration', width: 70, render: (v) => v ? `${v}ms` : '-' },
+                            { title: '耗时', dataIndex: 'duration', width: 70, render: (v, record) => record.response?.duration ? `${record.response.duration}ms` : '-' },
                         ]}
                     />
                 </div>
@@ -217,7 +176,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
             <Modal
                 title={historyDetail ? `${historyDetail.request_name || '请求详情'} - ${historyDetail.method}` : '请求详情'}
                 open={!!historyDetail}
-                onCancel={() => setHistoryDetail(null)}
+                onCancel={() => clearDetail()}
                 footer={null}
                 width={1200}
                 destroyOnClose
