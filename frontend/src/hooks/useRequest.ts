@@ -255,6 +255,7 @@ export interface UseRequestActions {
     handleCloseRequestTab: (tabIdToClose?: string) => void;
     moveRequestNode: (requestPath: string, targetFolderPath: string, beforeID: string, projectId: string) => Promise<void>;
     moveFolderNode: (folderPath: string, targetFolderPath: string, beforeID: string, projectId: string) => Promise<void>;
+    markMovedHighlight: (path: string) => void;
     // Workspace state
     resetWorkspaceState: () => void;
     captureCurrentWorkspaceState: () => ProjectWorkspaceState;
@@ -320,6 +321,9 @@ export function useRequest(options?: {
     useEffect(() => {
         treeRefreshCallbackRef.current = options?.onTreeRefresh;
     }, [options?.onTreeRefresh]);
+
+    // Highlight timeout ref
+    const movedHighlightTimerRef = useRef<number | null>(null);
 
     // Use WorkspaceContext for all state
     const {
@@ -1041,6 +1045,17 @@ export function useRequest(options?: {
         });
     }, [activeRequestTab, loadRequestContent]);
 
+    const markMovedHighlight = useCallback((path: string) => {
+        if (movedHighlightTimerRef.current) {
+            window.clearTimeout(movedHighlightTimerRef.current);
+        }
+        setMovedHighlightPath(path);
+        movedHighlightTimerRef.current = window.setTimeout(() => {
+            setMovedHighlightPath(null);
+            movedHighlightTimerRef.current = null;
+        }, 2000);
+    }, []);
+
     const moveRequestNode = useCallback(async (
         requestPath: string,
         targetFolderPath: string,
@@ -1066,7 +1081,7 @@ export function useRequest(options?: {
                 next.delete(targetFolderPath);
                 return next;
             });
-            setMovedHighlightPath(newRequestPath);
+            markMovedHighlight(newRequestPath);
             message.success('接口移动成功');
         } catch (error: any) {
             message.error(`移动失败: ${error?.message || error}`);
@@ -1108,7 +1123,7 @@ export function useRequest(options?: {
                 next.delete(targetFolderPath);
                 return next;
             });
-            setMovedHighlightPath(newFolderPath);
+            markMovedHighlight(newFolderPath);
             message.success('文件夹移动成功');
         } catch (error: any) {
             message.error(`移动失败: ${error?.message || error}`);
@@ -1242,6 +1257,7 @@ export function useRequest(options?: {
         handleCloseRequestTab,
         moveRequestNode,
         moveFolderNode,
+        markMovedHighlight,
         resetWorkspaceState,
         captureCurrentWorkspaceState,
         applyWorkspaceState,

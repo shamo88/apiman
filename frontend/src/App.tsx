@@ -272,7 +272,6 @@ function App() {
     });
     const [sidebarMenu, setSidebarMenu] = useState<'apis' | 'environments' | 'scripts'>('apis');
     const forceAnimationTimerRef = React.useRef<number | null>(null);
-    const movedHighlightTimerRef = React.useRef<number | null>(null);
     const renameInputRef = React.useRef<InputRef>(null);
     const renameSelectionEndRef = React.useRef<number>(0);
 
@@ -291,17 +290,6 @@ function App() {
         useReq.setDraggingNode(null);
         useReq.setDropTargetFolderPath(null);
         useReq.setInvalidDropHint(null);
-    };
-
-    const markMovedNode = (path: string) => {
-        if (movedHighlightTimerRef.current) {
-            window.clearTimeout(movedHighlightTimerRef.current);
-        }
-        useReq.setMovedHighlightPath(path);
-        movedHighlightTimerRef.current = window.setTimeout(() => {
-            useReq.setMovedHighlightPath(null);
-            movedHighlightTimerRef.current = null;
-        }, 2000);
     };
 
     // Re-export workspace state functions from useRequest
@@ -387,9 +375,6 @@ function App() {
             if (forceAnimationTimerRef.current) {
                 window.clearTimeout(forceAnimationTimerRef.current);
             }
-            if (movedHighlightTimerRef.current) {
-                window.clearTimeout(movedHighlightTimerRef.current);
-            }
         };
     }, []);
 
@@ -437,17 +422,6 @@ function App() {
         setCurlPreview(buildCurlCommand(apiConfig));
     }, [apiConfig.method, apiConfig.url, apiConfig.headers, apiConfig.params, apiConfig.body, apiConfig.bodyType, apiConfig.formData, apiConfig.urlencoded]);
 
-    const triggerOpenTabAnimation = () => {
-        if (forceAnimationTimerRef.current) {
-            window.clearTimeout(forceAnimationTimerRef.current);
-        }
-        setForceListAnimation(true);
-        forceAnimationTimerRef.current = window.setTimeout(() => {
-            setForceListAnimation(false);
-            forceAnimationTimerRef.current = null;
-        }, 400);
-    };
-
     const uploadProps: UploadProps = {
         name: 'file',
         multiple: false,
@@ -477,29 +451,6 @@ function App() {
         setRenameProjectModal(true);
     };
 
-    const renameProjectWithName = async (name: string) => {
-        if (!renameProjectId) return;
-        const newName = name.trim();
-        if (!newName) return;
-        try {
-            const renamed = await RenameProject(renameProjectId, newName);
-            setProjectTabs(prev => prev.map(tab => (
-                tab.project.id === renameProjectId
-                    ? { ...tab, title: renamed.name, project: { ...tab.project, name: renamed.name } }
-                    : tab
-            )));
-            message.success('项目重命名成功');
-            await loadProjects();
-        } catch (error: any) {
-            const msg = String(error?.message || error || '');
-            if (msg.includes('同名') || msg.includes('已存在')) {
-                message.warning('重命名失败：已存在同名项目');
-            } else {
-                message.error(`重命名失败: ${msg}`);
-            }
-        }
-    };
-
     const loadGlobalCookies = async () => {
         try {
             const data = await LoadGlobalCookies();
@@ -517,28 +468,6 @@ function App() {
     // Tree utility wrappers that pass currentTree
     const getNodeByPath = (path: string): ProjectTree | null => {
         return findTreeNode(currentTree, path);
-    };
-
-    const moveRequestNode = async (requestPath: string, targetFolderPath: string, beforeID: string = '') => {
-        if (!activeProject) return;
-
-        try {
-            await useReq.moveRequestNode(requestPath, targetFolderPath, beforeID ?? '', activeProject.id);
-            markMovedNode(requestPath);
-        } catch (error: any) {
-            message.error(`移动失败: ${error?.message || error}`);
-        }
-    };
-
-    const moveFolderNode = async (folderPath: string, targetFolderPath: string, beforeID: string = '') => {
-        if (!activeProject) return;
-
-        try {
-            await useReq.moveFolderNode(folderPath, targetFolderPath, beforeID ?? '', activeProject.id);
-            markMovedNode(folderPath);
-        } catch (error: any) {
-            message.error(`移动失败: ${error?.message || error}`);
-        }
     };
 
     // Environment action wrappers - convert () => void interface for EnvironmentPanel
@@ -692,8 +621,22 @@ function App() {
                             onCheckDropAppendIntoFolder={(dragNode, targetFolderPath) => checkDropAppendIntoFolder(currentTree, dragNode, targetFolderPath)}
                             onCheckDropOrdered={(dragNode, parentContainerPath, beforeID) => checkDropOrdered(currentTree, dragNode, parentContainerPath, beforeID)}
                             onGetDropHintMessage={getDropHintMessage}
-                            onMoveRequestNode={moveRequestNode}
-                            onMoveFolderNode={moveFolderNode}
+                            onMoveRequestNode={async (requestPath, targetFolderPath, beforeID = '') => {
+                                if (!activeProject) return;
+                                try {
+                                    await useReq.moveRequestNode(requestPath, targetFolderPath, beforeID ?? '', activeProject.id);
+                                } catch (error: any) {
+                                    message.error(`移动失败: ${error?.message || error}`);
+                                }
+                            }}
+                            onMoveFolderNode={async (folderPath, targetFolderPath, beforeID = '') => {
+                                if (!activeProject) return;
+                                try {
+                                    await useReq.moveFolderNode(folderPath, targetFolderPath, beforeID ?? '', activeProject.id);
+                                } catch (error: any) {
+                                    message.error(`移动失败: ${error?.message || error}`);
+                                }
+                            }}
                             onGetParentFolderPath={(path) => getParentFolderPath(currentTree, path)}
                             onGetChildrenByFolderPath={(folderPath) => getChildrenByFolderPath(currentTree, folderPath)}
                         />
@@ -830,7 +773,7 @@ function App() {
                     setRenameProjectId('');
                     setRenameProjectValue('');
                 }}
-                onConfirm={renameProjectWithName}
+                onConfirm={useProjs.renameProjectWithName}
                 initialValue={renameProjectValue}
             />
 
