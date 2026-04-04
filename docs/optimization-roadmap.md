@@ -109,7 +109,7 @@
 
 **当前 App.tsx 大小**：
 - 原始：4080 行
-- 当前：2386 行（累计减少 ~136 行）
+- 当前：2378 行（累计减少 ~144 行）
 - 目标：500-800 行
 
 **Hooks 状态**：
@@ -120,7 +120,7 @@
 | useHistory | 0 | ✅ 已完成 | - |
 | useUI | 0 | ✅ 已完成 | - |
 | useMCP | 0 | ✅ 已完成 | - |
-| useScript | 8 | ⚠️ 需重构 | P2 |
+| useScript | 0 | ✅ 已完成 | - |
 | useProjects | ~15 | ❌ 需重构 | P3 |
 | useRequest | ~50 | ❌ 需重构 | P3 |
 
@@ -130,8 +130,8 @@
 |-----------|-------|------|------|
 | HistoryModal | 3 | ✅ 直接用 hook | 已完成 |
 | EnvironmentPanel | 1 | ✅ 直接用 hook | 已完成 |
-| ScriptPanel | 8 | ❌ 传 callback | P2 |
-| MCPSettingsModal | ? | ❌ 传 callback | P2 |
+| ScriptPanel | 1 | ✅ 直接用 context | 已完成 |
+| MCPSettingsModal | 7 | ⚠️ 传 props | P2 |
 | 其他简单组件 | - | ✅ 无需改动 | - |
 
 **待完成重构计划**：
@@ -146,7 +146,7 @@
 | P1 | ~~useEnvironment Hook 重构~~ | ✅ 暴露 action 函数 | ~80行 |
 | P1 | ~~EnvironmentPanel 重构~~ | ✅ 直接用 hook，只传 projectId | - |
 | P2 | ~~useMCP + App.tsx 重构~~ | ✅ useMCP Hook 重构，App.tsx 使用 hook 替代本地状态 | ~48行 |
-| P2 | useScript + ScriptPanel | 移除 raw setters，App.tsx 移除 wrapper | ~80行 |
+| P2 | ~~useScript + ScriptPanel~~ | ✅ useScript Hook 重构，ScriptContext 共享状态，ScriptPanel 直接用 context | ~8行 |
 | P3 | useProjects 重构 | 暴露 action 函数替代 raw setters | ~200行 |
 | P3 | useRequest 重构 | 暴露 action 函数替代 raw setters | ~500行 |
 

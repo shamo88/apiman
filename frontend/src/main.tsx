@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './style.css'
 import App from './App'
 import { WorkspaceProvider } from './contexts/WorkspaceContext'
+import { ScriptProvider } from './contexts/ScriptContext'
 
 const container = document.getElementById('root')
 
@@ -31,7 +32,9 @@ console.log('✅ React root created, rendering App...')
 root.render(
     <React.StrictMode>
         <WorkspaceProvider>
-            <App />
+            <ScriptProvider>
+                <App />
+            </ScriptProvider>
         </WorkspaceProvider>
     </React.StrictMode>
 )

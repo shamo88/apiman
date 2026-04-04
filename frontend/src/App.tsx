@@ -33,7 +33,7 @@ import {
     parseRequestCaseRef,
     requestRefFromIds,
 } from './types';
-import { useScript } from './hooks/useScript';
+import { useScriptContext } from './contexts/ScriptContext';
 import { useEnvironment } from './hooks/useEnvironment';
 import { useMCP } from './hooks/useMCP';
 import { useRequest } from './hooks/useRequest';
@@ -88,7 +88,7 @@ function App() {
         saveScript,
         deleteScript,
         toggleScriptHelp,
-    } = useScript();
+    } = useScriptContext();
 
     // Use environment hook to replace duplicate local state
     const useEnv = useEnvironment();
@@ -2188,17 +2188,7 @@ function App() {
                                 <div className="request-panel">
                                     {editingScriptId ? (
                                         <ScriptPanel
-                                            scriptFormName={scriptFormName}
-                                            scriptFormDescription={scriptFormDescription}
-                                            scriptFormContent={scriptFormContent}
-                                            scriptSaving={scriptSaving}
-                                            appTheme={appTheme}
-                                            onNameChange={setScriptFormName}
-                                            onDescriptionChange={setScriptFormDescription}
-                                            onContentChange={setScriptFormContent}
-                                            onHelpClick={() => setScriptHelpVisible(true)}
-                                            onDelete={handleDeleteScriptCurrent}
-                                            onSave={handleSaveScript}
+                                            projectId={projectTabs.find(t => t.id === activeTab)?.project?.id || ''}
                                         />
                                     ) : (
                                         <Empty description="请先在左侧选择脚本，或点击新建" />

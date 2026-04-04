@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { ListProjectScripts, CreateProjectScript, UpdateProjectScript, DeleteProjectScript } from '../../wailsjs/go/main/App';
 import { ProjectScript } from '../types';
 
-interface UseScriptReturn {
+export interface UseScriptReturn {
     // State
     projectScripts: ProjectScript[];
     editingScriptId: string;
