@@ -35,6 +35,7 @@ import {
 } from './types';
 import { useHistory } from './hooks/useHistory';
 import { useScript } from './hooks/useScript';
+import { useRequest } from './hooks/useRequest';
 import { trimRightSpaces, getPrimaryName } from './utils/misc';
 
 // ProjectTree interface - uses string type to match Wails generated model
@@ -109,13 +110,15 @@ function App() {
         handleDeleteScriptCurrent: handleDeleteScriptCurrentBase,
     } = useScript();
 
+    const useReq = useRequest();
+
     const [mcpConfig, setMCPConfig] = useState<any>({ enabled: false, port: 3847, project_id: '', environment_id: '', api_key: '' });
     const [mcpStatus, setMCPStatus] = useState<'stopped' | 'running' | 'error'>('stopped');
     const [mcpEnvironments, setMCPEnvironments] = useState<Environment[]>([]);
     const [projectTabs, setProjectTabs] = useState<ProjectTab[]>([]);
     const [activeTab, setActiveTab] = useState<string>('home');
-    const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
     const [projectTrees, setProjectTrees] = useState<Record<string, ProjectTree>>({});
+    const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
     const [requestTabs, setRequestTabs] = useState<RequestTab[]>([]);
     const [activeRequestTab, setActiveRequestTab] = useState<string>('');
     const [currentRequest, setCurrentRequest] = useState<CurlRequest | null>(null);
@@ -558,13 +561,13 @@ function App() {
                     await loadProjectScriptsData(currentProject.id);
                     setApiConfig((prev) => ({
                         ...prev,
-                        preScripts: prev.preScripts.filter(id => id !== editingScriptId),
-                        postScripts: prev.postScripts.filter(id => id !== editingScriptId),
+                        preScripts: prev.preScripts.filter((id: string) => id !== editingScriptId),
+                        postScripts: prev.postScripts.filter((id: string) => id !== editingScriptId),
                     }));
                     setInterfaceApiConfig((prev) => ({
                         ...prev,
-                        preScripts: prev.preScripts.filter(id => id !== editingScriptId),
-                        postScripts: prev.postScripts.filter(id => id !== editingScriptId),
+                        preScripts: prev.preScripts.filter((id: string) => id !== editingScriptId),
+                        postScripts: prev.postScripts.filter((id: string) => id !== editingScriptId),
                     }));
                 } catch (error: any) {
                     message.error(`删除脚本失败: ${error?.message || error}`);
@@ -894,7 +897,7 @@ function App() {
         // Recalculate on window resize
         window.addEventListener('resize', calculateScriptResultsHeight);
         return () => window.removeEventListener('resize', calculateScriptResultsHeight);
-    }, [response]);
+    }, [useReq.response]);
 
     const triggerOpenTabAnimation = () => {
         if (forceAnimationTimerRef.current) {
@@ -1474,23 +1477,23 @@ function App() {
         if (!currentProject) return;
 
         try {
-            const newRequestPath = await MoveRequest(requestPath, targetFolderPath, beforeID ?? '');
+            await useReq.moveRequestNode(requestPath, targetFolderPath, beforeID ?? '', currentProject.id);
 
-            setRequestTabs(prev => prev.map(tab =>
-                tab.path === requestPath ? { ...tab, path: newRequestPath } : tab
+            useReq.setRequestTabs(prev => prev.map(tab =>
+                tab.path === requestPath ? { ...tab, path: requestPath } : tab
             ));
-            if (currentRequest?.path === requestPath) {
-                setCurrentRequest({ ...currentRequest, path: newRequestPath });
+            if (useReq.currentRequest?.path === requestPath) {
+                useReq.setCurrentRequest({ ...useReq.currentRequest, path: requestPath });
             }
 
             const tree = await GetProjectTree(currentProject.id);
             setProjectTrees(prev => ({ ...prev, [currentProject.id]: tree }));
-            setCollapsedFolders(prev => {
+            useReq.setCollapsedFolders(prev => {
                 const next = new Set(prev);
                 next.delete(targetFolderPath);
                 return next;
             });
-            markMovedNode(newRequestPath);
+            markMovedNode(requestPath);
             message.success('接口移动成功');
         } catch (error: any) {
             message.error(`移动失败: ${error?.message || error}`);
@@ -1502,28 +1505,28 @@ function App() {
         if (!currentProject) return;
 
         try {
-            const newFolderPath = await MoveFolder(folderPath, targetFolderPath, beforeID ?? '');
+            await useReq.moveFolderNode(folderPath, targetFolderPath, beforeID ?? '', currentProject.id);
 
-            setRequestTabs(prev => prev.map(tab => ({
+            useReq.setRequestTabs(prev => prev.map(tab => ({
                 ...tab,
-                path: replacePathPrefix(tab.path, folderPath, newFolderPath)
+                path: replacePathPrefix(tab.path, folderPath, folderPath)
             })));
 
-            if (currentRequest?.path) {
-                const nextPath = replacePathPrefix(currentRequest.path, folderPath, newFolderPath);
-                if (nextPath !== currentRequest.path) {
-                    setCurrentRequest({ ...currentRequest, path: nextPath });
+            if (useReq.currentRequest?.path) {
+                const nextPath = replacePathPrefix(useReq.currentRequest.path, folderPath, folderPath);
+                if (nextPath !== useReq.currentRequest.path) {
+                    useReq.setCurrentRequest({ ...useReq.currentRequest, path: nextPath });
                 }
             }
 
             const tree = await GetProjectTree(currentProject.id);
             setProjectTrees(prev => ({ ...prev, [currentProject.id]: tree }));
-            setCollapsedFolders(prev => {
+            useReq.setCollapsedFolders(prev => {
                 const next = new Set(prev);
                 next.delete(targetFolderPath);
                 return next;
             });
-            markMovedNode(newFolderPath);
+            markMovedNode(folderPath);
             message.success('文件夹移动成功');
         } catch (error: any) {
             message.error(`移动失败: ${error?.message || error}`);
@@ -1567,6 +1570,7 @@ function App() {
                 setSidebarHighlightedCasePath('');
                 const request = await GetRequest(treeNode.path);
                 hydrateRequestEditor(request);
+                setCurrentRequest(request as CurlRequest);
 
                 const existingTab = requestTabs.find(t => t.path === treeNode.path);
                 if (existingTab) {
@@ -1608,11 +1612,13 @@ function App() {
     ) => <VariableEditableInput value={value} onChange={onChange} placeholder={placeholder} style={style} environmentVariables={currentEnvironmentVariables} multiline={multiline} />;
 
     const hydrateRequestEditor = (request: any, preferredCaseId?: string) => {
+        useReq.hydrateRequestEditor(request, preferredCaseId);
+
+        // Also update App-level state that RequestEditor reads from
         const name = request.name || '';
         const preScripts = request.pre_scripts || [];
         const postScripts = request.post_scripts || [];
-        setCurrentRequest(request as CurlRequest);
-        const reqCases = request.cases as models.HttpRequestCase[] | undefined;
+        const reqCases = request.cases as any[];
         const attachScripts = (cfg: ApiConfig): ApiConfig => ({
             ...cfg,
             preScripts: [...preScripts],
@@ -1629,7 +1635,7 @@ function App() {
             const cr = request as CurlRequest;
             const ifaceSpec = cr.interface_spec;
             const ifaceCfg: ApiConfig = ifaceSpec
-                ? attachScripts({ ...apiConfigFromHttpSpec(ifaceSpec, name) })
+                ? attachScripts({ ...apiConfigFromHttpSpec(ifaceSpec as any, name) })
                 : attachScripts(apiConfigFromRequest(cr, name));
             setInterfaceApiConfig(ifaceCfg);
             setRequestCases(rows);
@@ -1687,6 +1693,7 @@ function App() {
         try {
             const request = await GetRequest(reqPath);
             hydrateRequestEditor(request, p.caseId);
+            setCurrentRequest(request as CurlRequest);
             setSidebarHighlightedCasePath(caseNode.path || '');
             const existingTab = requestTabs.find((t) => t.path === reqPath);
             if (existingTab) {
@@ -1835,6 +1842,7 @@ function App() {
             setSidebarHighlightedCasePath('');
             const request = await GetRequest(path);
             hydrateRequestEditor(request);
+            setCurrentRequest(request as CurlRequest);
         } catch (error: any) {
             console.error('Failed to load request:', error);
         } finally {
