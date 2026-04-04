@@ -109,7 +109,7 @@
 
 **当前 App.tsx 大小**：
 - 原始：4080 行
-- 当前：1854 行（累计减少 ~510 行）
+- 当前：1660 行（累计减少 ~704 行）
 - 目标：500-800 行
 
 **本次优化**：
@@ -127,7 +127,7 @@
 - ✅ **useProjects 集成**：App.tsx 使用 useProjects hook，移除本地 projects/loading 状态和 ~150 行重复函数定义（createGroupWithName, renameGroupWithName, handleAssignProjectGroup, toggleProjectGroupCollapse, openRenameProjectGroupModal, handleDeleteProjectGroup, handleGroupDragStart, handleGroupDragOver, handleGroupDrop, handleOpenProject, handleCloseProjectTab, loadProjects）
 - ✅ **useProjects 扩展**：添加 setDraggingProjectId 和 setProjectDropTargetGroup 到 hook 接口，支持 HomePage 组件调用
 - ✅ **useRequest 树刷新回调**：添加 `onTreeRefresh` 回调选项，useRequest 操作后自动通知调用者刷新项目树，解决 useRequest 和 useProjects 之间的树状态协调问题
-- ✅ **useRequest 函数集成**：App.tsx 使用 useRequest 的 handleDeleteRequest/handleCopyRequest/handleDeleteFolder/handleSaveRequest，通过包装函数传入 activeProject.id，移除 ~50 行本地重复函数
+- ✅ **useRequest 函数集成**：App.tsx 使用 useRequest 的 handleDeleteRequest/handleCopyRequest/handleDeleteFolder/handleSaveRequest/handleCreateFolder/handleCreateRequest/handleDuplicateCaseFromTree/handleDeleteCaseFromTree/handleCloseRequestTab/loadRequestContent，通过包装函数传入 activeProject.id，移除 ~110 行本地重复函数
 
 **Hooks 状态**：
 

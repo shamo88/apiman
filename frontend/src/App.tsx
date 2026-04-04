@@ -2,7 +2,7 @@ import { HomeOutlined } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
 import { Empty, InputRef, message, Modal, Tabs } from 'antd';
 import React, { useEffect, useState } from 'react';
-import { AddRequestCase, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteProject, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequestWithScripts, ExecuteHTTPRequestWithProject, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, LoadAppConfig, LoadGlobalCookies, RenameFolder, RenameProject, RenameRequest, RenameRequestCase } from '../wailsjs/go/main/App';
+import { AddRequestCase, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequestWithScripts, ExecuteHTTPRequestWithProject, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, LoadAppConfig, LoadGlobalCookies, RenameFolder, RenameProject, RenameRequest, RenameRequestCase } from '../wailsjs/go/main/App';
 import './App.css';
 import { ScriptHelpWindow, TitleBar } from './components/layout';
 import { MCPSettingsModal, HistoryModal, CookieModal, AddCaseModal, RenameCaseModal, CreateFolderModal, CreateRequestModal, RenameModal, CreateProjectModal, CreateGroupModal, RenameProjectModal, RenameGroupModal } from './components/modals';
@@ -67,6 +67,7 @@ function App() {
         setScriptHelpVisible,
         loadProjectScriptsData,
         selectScript,
+        createScript,
     } = useScriptContext();
 
     // Use environment hook to replace duplicate local state
@@ -528,22 +529,9 @@ function App() {
     };
 
     const handleCreateScript = async () => {
-        if (!activeProject?.id) return;
-        const scriptName = `脚本${projectScripts.length + 1}`;
-        setScriptSaving(true);
-        try {
-            const created = await CreateProjectScript(activeProject.id, scriptName, '', '// 在这里编写 JavaScript 脚本\n');
-            message.success('脚本已创建');
-            await loadProjectScriptsData(activeProject.id);
-            setEditingScriptId(created.id);
-            setScriptFormName(created.name);
-            setScriptFormDescription(created.description || '');
-            setScriptFormContent(created.content || '');
+        if (activeProject) {
+            await createScript(activeProject.id);
             setSidebarMenu('scripts');
-        } catch (error: any) {
-            message.error(`创建脚本失败: ${error?.message || error}`);
-        } finally {
-            setScriptSaving(false);
         }
     };
 
@@ -818,24 +806,6 @@ function App() {
         }
     };
 
-    const handleDeleteProject = async (projectId: string, e?: React.MouseEvent) => {
-        e?.stopPropagation();
-        Modal.confirm({
-            title: '删除项目',
-            content: '确定要删除这个项目吗？此操作不可恢复。',
-            onOk: async () => {
-                try {
-                    await DeleteProject(projectId);
-                    message.success('项目已删除');
-                    setProjectTabs(projectTabs.filter(t => t.project.id !== projectId));
-                    loadProjects();
-                } catch (error: any) {
-                    message.error(`删除失败: ${error?.message || error}`);
-                }
-            }
-        });
-    };
-
     const openRenameProjectModal = (project: Project, e?: React.MouseEvent) => {
         e?.stopPropagation();
         setRenameProjectId(project.id);
@@ -877,38 +847,6 @@ function App() {
         } catch (err) {
             console.error('Failed to load cookies:', err);
             setGlobalCookies([]);
-        }
-    };
-
-    const handleCreateFolder = async () => {
-        if (!newFolderName.trim() || !activeProject) {
-            message.warning('请先选择一个项目');
-            return;
-        }
-
-        const parentPath = selectedFolder || "";
-        try {
-            await CreateFolder(activeProject.id, parentPath, newFolderName);
-            message.success('文件夹创建成功');
-            setCreateFolderModal(false);
-            setNewFolderName('');
-            const tree = await GetProjectTree(activeProject.id);
-            setProjectTrees(prev => ({ ...prev, [activeProject.id]: tree }));
-
-            // 清除折叠状态以显示新创建的文件夹
-            if (!selectedFolder) {
-                // 如果是在根目录创建，清除所有折叠状态
-                setCollapsedFolders(new Set());
-            } else {
-                // 如果是在某个文件夹内创建，确保父文件夹展开
-                setCollapsedFolders(prev => {
-                    const newSet = new Set(prev);
-                    newSet.delete(selectedFolder);
-                    return newSet;
-                });
-            }
-        } catch (error: any) {
-            message.error(`创建失败: ${error?.message || error}`);
         }
     };
 
@@ -980,63 +918,6 @@ function App() {
             message.success('文件夹移动成功');
         } catch (error: any) {
             message.error(`移动失败: ${error?.message || error}`);
-        }
-    };
-
-    const handleCreateRequest = async () => {
-        if (!newRequestName.trim() || !activeProject) {
-            message.warning('请先选择一个项目');
-            return;
-        }
-
-        const parentPath = selectedFolder || "";
-        try {
-            await CreateRequest(activeProject.id, parentPath, newRequestName, toWailsHttpSpec(createDefaultApiConfig()));
-            message.success('请求创建成功');
-            setCreateRequestModal(false);
-            setNewRequestName('');
-            const tree = await GetProjectTree(activeProject.id);
-            setProjectTrees(prev => ({ ...prev, [activeProject.id]: tree }));
-
-            // 清除折叠状态以显示新创建的请求
-            if (!selectedFolder) {
-                setCollapsedFolders(new Set());
-            } else {
-                setCollapsedFolders(prev => {
-                    const newSet = new Set(prev);
-                    newSet.delete(selectedFolder);
-                    return newSet;
-                });
-            }
-        } catch (error: any) {
-            message.error(`创建失败: ${error?.message || error}`);
-        }
-    };
-
-    const handleTreeItemClick = async (treeNode: ProjectTree) => {
-        if (treeNode.type === 'request' && treeNode.path) {
-            try {
-                setSidebarHighlightedCasePath('');
-                const request = await GetRequest(treeNode.path);
-                hydrateRequestEditor(request);
-                setCurrentRequest(request as CurlRequest);
-
-                const existingTab = requestTabs.find(t => t.path === treeNode.path);
-                if (existingTab) {
-                    setActiveRequestTab(existingTab.id);
-                } else {
-                    const newTab: RequestTab = {
-                        id: `request-${Date.now()}`,
-                        title: request.name || treeNode.name.replace(/\.curl$/i, ''),
-                        path: treeNode.path,
-                    };
-                    setRequestTabs([...requestTabs, newTab]);
-                    setActiveRequestTab(newTab.id);
-                }
-            } catch (error: any) {
-                console.error('Failed to load request:', error);
-                message.error('加载请求失败');
-            }
         }
     };
 
@@ -1135,33 +1016,6 @@ function App() {
         });
     };
 
-    const handleCaseTreeClick = async (caseNode: ProjectTree) => {
-        const p = parseRequestCaseRef(caseNode.path || '');
-        if (!p) return;
-        const reqPath = requestRefFromIds(p.projectId, p.requestId);
-        try {
-            const request = await GetRequest(reqPath);
-            hydrateRequestEditor(request, p.caseId);
-            setCurrentRequest(request as CurlRequest);
-            setSidebarHighlightedCasePath(caseNode.path || '');
-            const existingTab = requestTabs.find((t) => t.path === reqPath);
-            if (existingTab) {
-                setActiveRequestTab(existingTab.id);
-            } else {
-                const newTab: RequestTab = {
-                    id: `request-${Date.now()}`,
-                    title: request.name || caseNode.name,
-                    path: reqPath,
-                };
-                setRequestTabs([...requestTabs, newTab]);
-                setActiveRequestTab(newTab.id);
-            }
-        } catch (error: any) {
-            console.error('Failed to load case:', error);
-            message.error('加载用例失败');
-        }
-    };
-
     const openAddCaseModal = (requestPath: string) => {
         setAddCaseTargetPath(requestPath);
         setAddCaseNameInput('');
@@ -1194,48 +1048,6 @@ function App() {
         }
     };
 
-    const handleDuplicateCaseFromTree = async (casePath: string) => {
-        const p = parseRequestCaseRef(casePath);
-        if (!p) return;
-        const reqPath = requestRefFromIds(p.projectId, p.requestId);
-        try {
-            await DuplicateRequestCase(reqPath, p.caseId);
-            message.success('已复制用例');
-            setExpandedRequestPaths((prev) => new Set(prev).add(reqPath));
-            await refreshProjectTree();
-            if (currentRequest?.path === reqPath) {
-                const r = await GetRequest(reqPath);
-                const aid = (r as CurlRequest).active_case_id;
-                hydrateRequestEditor(r, typeof aid === 'string' ? aid : undefined);
-            }
-        } catch (error: any) {
-            message.error(`复制失败: ${error?.message || error}`);
-        }
-    };
-
-    const handleDeleteCaseFromTree = (casePath: string) => {
-        const p = parseRequestCaseRef(casePath);
-        if (!p) return;
-        const reqPath = requestRefFromIds(p.projectId, p.requestId);
-        Modal.confirm({
-            title: '删除用例',
-            content: '确定删除该用例吗？',
-            onOk: async () => {
-                try {
-                    await DeleteRequestCase(reqPath, p.caseId);
-                    message.success('用例已删除');
-                    await refreshProjectTree();
-                    if (currentRequest?.path === reqPath) {
-                        const r = await GetRequest(reqPath);
-                        hydrateRequestEditor(r);
-                    }
-                } catch (error: any) {
-                    message.error(`删除失败: ${error?.message || error}`);
-                }
-            },
-        });
-    };
-
     const openCaseRenameFromTree = (casePath: string, currentName: string) => {
         setCaseRenameCasePath(casePath);
         setCaseRenameInput(currentName);
@@ -1260,39 +1072,6 @@ function App() {
             }
         } catch (error: any) {
             message.error(`重命名失败: ${error?.message || error}`);
-        }
-    };
-
-    const handleCloseRequestTab = (tabId: string) => {
-        setRequestTabs(requestTabs.filter(t => t.id !== tabId));
-        if (activeRequestTab === tabId) {
-            const remaining = requestTabs.filter(t => t.id !== tabId);
-            if (remaining.length > 0) {
-                setActiveRequestTab(remaining[0].id);
-                const lastRequest = remaining[remaining.length - 1];
-                loadRequestContent(lastRequest.path);
-            } else {
-                setActiveRequestTab('');
-                setCurrentRequest(null);
-                setResponse(null);
-                setRequestCases([]);
-                setActiveCaseId('');
-                setInterfaceApiConfig(createDefaultApiConfig());
-                setRequestEditorSurface('plain');
-                setSidebarHighlightedCasePath('');
-                setApiConfig(createDefaultApiConfig());
-            }
-        }
-    };
-
-    const loadRequestContent = async (path: string) => {
-        try {
-            setSidebarHighlightedCasePath('');
-            const request = await GetRequest(path);
-            hydrateRequestEditor(request);
-            setCurrentRequest(request as CurlRequest);
-        } catch (error: any) {
-            console.error('Failed to load request:', error);
         }
     };
 
@@ -1402,6 +1181,33 @@ function App() {
     const copyRequest = (path: string) => {
         if (activeProject) {
             useReq.handleCopyRequest(path, activeProject.id);
+        }
+    };
+
+    const createFolder = () => {
+        if (activeProject) {
+            return useReq.handleCreateFolder(activeProject.id);
+        }
+        return Promise.resolve();
+    };
+
+    const createRequest = () => {
+        if (activeProject) {
+            return useReq.handleCreateRequest(activeProject.id);
+        }
+        return Promise.resolve();
+    };
+
+    const duplicateCase = (casePath: string) => {
+        if (activeProject) {
+            return useReq.handleDuplicateCaseFromTree(casePath, activeProject.id);
+        }
+        return Promise.resolve();
+    };
+
+    const deleteCase = (casePath: string) => {
+        if (activeProject) {
+            useReq.handleDeleteCaseFromTree(casePath, activeProject.id);
         }
     };
 
@@ -1548,7 +1354,7 @@ function App() {
                             setGroupSortDropTarget(null);
                         }}
                         onOpenProject={handleOpenProject}
-                        onDeleteProject={handleDeleteProject}
+                        onDeleteProject={useProjs.handleDeleteProject}
                         onRenameProject={(project) => openRenameProjectModal(project)}
                         onCreateGroupWithName={createGroupWithName}
                         onDeleteGroup={handleDeleteProjectGroup}
@@ -1592,17 +1398,17 @@ function App() {
                             onMethodChange={setFilterMethod}
                             onToggleExpand={(key) => { setExpandedKeys(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]); }}
                             onFolderCollapse={toggleFolderCollapse}
-                            onItemClick={(key, node) => handleTreeItemClick(node)}
+                            onItemClick={(key, node) => useReq.handleTreeItemClick(node)}
                             onAddRequest={(folderPath) => { setSelectedFolder(folderPath || currentTree?.path || ''); setCreateRequestModal(true); }}
                             onAddFolder={(folderPath) => { setSelectedFolder(folderPath || currentTree?.path || ''); setCreateFolderModal(true); }}
                             onRename={openRenameModal}
                             onDelete={(type, path) => { if (type === 'folder') { deleteFolder(path); } else { deleteRequest(path); } }}
                             onCopy={(path) => copyRequest(path)}
-                            onCaseClick={(casePath) => { const node = getNodeByPath(casePath); if (node) handleCaseTreeClick(node); }}
+                            onCaseClick={(casePath) => { const node = getNodeByPath(casePath); if (node) useReq.handleCaseTreeClick(node); }}
                             onToggleCasesExpanded={toggleRequestCasesExpanded}
                             onAddCase={openAddCaseModal}
-                            onDeleteCase={(casePath) => handleDeleteCaseFromTree(casePath)}
-                            onDuplicateCase={(casePath) => { const node = getNodeByPath(casePath); if (node) handleDuplicateCaseFromTree(node.path!); }}
+                            onDeleteCase={(casePath) => deleteCase(casePath)}
+                            onDuplicateCase={(casePath) => duplicateCase(casePath)}
                             onRenameCase={(casePath, currentName) => openCaseRenameFromTree(casePath, currentName)}
                             onClearDragState={clearDragState}
                             onSetDraggingNode={setDraggingNode}
@@ -1626,9 +1432,9 @@ function App() {
                                     environments={environments}
                                     animationEnabled={animationEnabled || forceListAnimation}
                                     onTabChange={setActiveRequestTab}
-                                    onTabClose={handleCloseRequestTab}
+                                    onTabClose={useReq.handleCloseRequestTab}
                                     onEnvironmentChange={setSelectedEnvironmentId}
-                                    loadRequestContent={loadRequestContent}
+                                    loadRequestContent={useReq.loadRequestContent}
                                 />
                             )}
 
@@ -1769,13 +1575,13 @@ function App() {
             <CreateFolderModal
                 visible={createFolderModal}
                 onClose={() => { setCreateFolderModal(false); setNewFolderName(''); }}
-                onConfirm={handleCreateFolder}
+                onConfirm={createFolder}
             />
 
             <CreateRequestModal
                 visible={createRequestModal}
                 onClose={() => { setCreateRequestModal(false); setNewRequestName(''); }}
-                onConfirm={handleCreateRequest}
+                onConfirm={createRequest}
             />
 
             <RenameModal
