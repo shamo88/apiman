@@ -2419,7 +2419,7 @@ function App() {
                                     )}
                                 </div>
                             ) : currentRequest ? (
-                                <>
+                                <div className="request-response-container">
                                     <RequestEditor
                                         apiConfig={apiConfig}
                                         executing={executing}
@@ -2456,7 +2456,7 @@ function App() {
                                             onTestResultsExpand={() => setTestResultsExpanded(!testResultsExpanded)}
                                         />
                                     )}
-                                </>
+                                </div>
                             ) : (
                                 <EmptyState text="选择一个请求开始测试" />
                             )}
