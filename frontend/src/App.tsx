@@ -2,8 +2,7 @@ import { HomeOutlined } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
 import { Empty, InputRef, message, Modal, Tabs } from 'antd';
 import React, { useEffect, useState } from 'react';
-import { AddRequestCase, CopyRequest, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteFolder, DeleteProject, DeleteRequest, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequestWithScripts, ExecuteHTTPRequestWithProject, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, LoadAppConfig, LoadGlobalCookies, PullGitRepo, RenameFolder, RenameProject, RenameRequest, RenameRequestCase, UpdateRequest, UpdateRequestScripts } from '../wailsjs/go/main/App';
-import { models } from '../wailsjs/go/models';
+import { AddRequestCase, CreateFolder, CreateProject, CreateProjectScript, CreateRequest, DeleteProject, DeleteRequestCase, DuplicateRequestCase, ExecuteHTTPRequestWithScripts, ExecuteHTTPRequestWithProject, GetProjectTree, GetRequest, ImportPostmanCollection, InitProjectsDir, ListProjects, LoadAppConfig, LoadGlobalCookies, RenameFolder, RenameProject, RenameRequest, RenameRequestCase } from '../wailsjs/go/main/App';
 import './App.css';
 import { ScriptHelpWindow, TitleBar } from './components/layout';
 import { MCPSettingsModal, HistoryModal, CookieModal, AddCaseModal, RenameCaseModal, CreateFolderModal, CreateRequestModal, RenameModal, CreateProjectModal, CreateGroupModal, RenameProjectModal, RenameGroupModal } from './components/modals';
@@ -99,7 +98,11 @@ function App() {
 
     const useProjs = useProjects();
 
-    const useReq = useRequest();
+    const useReq = useRequest({
+        onTreeRefresh: (projectId, tree) => {
+            setProjectTrees(prev => ({ ...prev, [projectId]: tree }));
+        }
+    });
 
     // Destructure state from useReq to replace duplicate local state
     const {
@@ -1382,89 +1385,23 @@ function App() {
         openCreateEnvironmentTab(projectTabs, activeTab);
     };
 
-    const handleSaveRequest = async () => {
-        if (!currentRequest?.path) return;
-
-        try {
-            // 保存前先 pull 最新代码
-            await PullGitRepo();
-
-            if (requestCases.length === 0) {
-                await UpdateRequest(
-                    currentRequest.path,
-                    toWailsHttpSpec({ ...apiConfig, name: currentRequest.name }),
-                    null as any,
-                    ''
-                );
-            } else {
-                const committed =
-                    requestEditorSurface === 'case' ? commitActiveCaseIntoList() : requestCases;
-                setRequestCases(committed);
-                const ifaceSource =
-                    requestEditorSurface === 'interface' ? apiConfig : interfaceApiConfig;
-                const wailsCases = committed.map((c) =>
-                    models.HttpRequestCase.createFrom({
-                        id: c.id,
-                        name: (c.name || '').trim() || '未命名',
-                        spec: models.HttpRequestSpec.createFrom(
-                            apiConfigToSpec({ ...c.config, name: currentRequest.name })
-                        ),
-                    })
-                );
-                await UpdateRequest(
-                    currentRequest.path,
-                    toWailsHttpSpec({ ...ifaceSource, name: currentRequest.name }),
-                    wailsCases,
-                    activeCaseId
-                );
-                if (requestEditorSurface === 'interface') {
-                    setInterfaceApiConfig(cloneApiConfig({ ...apiConfig, name: currentRequest.name }));
-                }
-            }
-            await UpdateRequestScripts(currentRequest.path, apiConfig.preScripts, apiConfig.postScripts);
-            message.success('请求已保存');
-            setStatus('请求已保存');
-
-            // 刷新项目树以更新接口列表中的方法显示
-            if (activeProject) {
-                const tree = await GetProjectTree(activeProject.id);
-                setProjectTrees(prev => ({ ...prev, [activeProject.id]: tree }));
-            }
-        } catch (error: any) {
-            message.error(`保存失败: ${error?.message || error}`);
+    // Wrapper functions to call useRequest handlers with activeProject.id
+    const saveRequest = () => {
+        if (activeProject) {
+            useReq.handleSaveRequest(activeProject.id);
         }
     };
 
-    const handleDeleteRequest = async (path: string) => {
-        Modal.confirm({
-            title: '删除请求',
-            content: '确定要删除这个请求吗？',
-            onOk: async () => {
-                try {
-                    await DeleteRequest(path);
-                    message.success('请求已删除');
-                    handleCloseRequestTab(requestTabs.find(t => t.path === path)?.id || '');
-                    if (activeProject) {
-                        const tree = await GetProjectTree(activeProject.id);
-                        setProjectTrees(prev => ({ ...prev, [activeProject.id]: tree }));
-                    }
-                } catch (error: any) {
-                    message.error(`删除失败: ${error?.message || error}`);
-                }
-            }
-        });
+    const deleteRequest = (path: string) => {
+        if (activeProject) {
+            const tabId = requestTabs.find(t => t.path === path)?.id;
+            useReq.handleDeleteRequest(path, activeProject.id, tabId);
+        }
     };
 
-    const handleCopyRequest = async (path: string) => {
-        try {
-            await CopyRequest(path);
-            message.success('请求复制成功');
-            if (activeProject) {
-                const tree = await GetProjectTree(activeProject.id);
-                setProjectTrees(prev => ({ ...prev, [activeProject.id]: tree }));
-            }
-        } catch (error: any) {
-            message.error(`复制失败: ${error?.message || error}`);
+    const copyRequest = (path: string) => {
+        if (activeProject) {
+            useReq.handleCopyRequest(path, activeProject.id);
         }
     };
 
@@ -1533,23 +1470,10 @@ function App() {
         }, 0);
     }, [renameModal]);
 
-    const handleDeleteFolder = async (path: string) => {
-        Modal.confirm({
-            title: '删除文件夹',
-            content: '确定要删除这个文件夹吗？',
-            onOk: async () => {
-                try {
-                    await DeleteFolder(path);
-                    message.success('文件夹已删除');
-                    if (activeProject) {
-                        const tree = await GetProjectTree(activeProject.id);
-                        setProjectTrees(prev => ({ ...prev, [activeProject.id]: tree }));
-                    }
-                } catch (error: any) {
-                    message.error(`删除失败: ${error?.message || error}`);
-                }
-            }
-        });
+    const deleteFolder = (path: string) => {
+        if (activeProject) {
+            useReq.handleDeleteFolder(path, activeProject.id);
+        }
     };
 
 
@@ -1672,8 +1596,8 @@ function App() {
                             onAddRequest={(folderPath) => { setSelectedFolder(folderPath || currentTree?.path || ''); setCreateRequestModal(true); }}
                             onAddFolder={(folderPath) => { setSelectedFolder(folderPath || currentTree?.path || ''); setCreateFolderModal(true); }}
                             onRename={openRenameModal}
-                            onDelete={(type, path) => { if (type === 'folder') { handleDeleteFolder(path); } else { handleDeleteRequest(path); } }}
-                            onCopy={(path) => handleCopyRequest(path)}
+                            onDelete={(type, path) => { if (type === 'folder') { deleteFolder(path); } else { deleteRequest(path); } }}
+                            onCopy={(path) => copyRequest(path)}
                             onCaseClick={(casePath) => { const node = getNodeByPath(casePath); if (node) handleCaseTreeClick(node); }}
                             onToggleCasesExpanded={toggleRequestCasesExpanded}
                             onAddCase={openAddCaseModal}
@@ -1764,7 +1688,7 @@ function App() {
                                         onMethodChange={(value) => setApiConfig({ ...apiConfig, method: value })}
                                         onUrlChange={(value) => setApiConfig({ ...apiConfig, url: value })}
                                         onSend={handleExecuteCurl}
-                                        onSave={handleSaveRequest}
+                                        onSave={saveRequest}
                                         onConfigChange={setApiConfig}
                                         onCurlPreviewChange={setCurlPreview}
                                         renderVariableAwareInput={renderVariableAwareInput}

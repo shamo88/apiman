@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef, useEffect } from 'react';
 import { message, Modal } from 'antd';
 import {
     GetRequest,
@@ -237,7 +237,7 @@ export interface UseRequestActions {
     loadRequestContent: (path: string) => Promise<void>;
     handleExecuteCurl: (projectId: string, projectName: string, selectedEnvironmentId: string, environments: Environment[]) => Promise<void>;
     handleSaveRequest: (projectId: string) => Promise<void>;
-    handleDeleteRequest: (path: string, projectId: string) => Promise<void>;
+    handleDeleteRequest: (path: string, projectId: string, tabIdToClose?: string) => Promise<void>;
     handleCopyRequest: (path: string, projectId: string) => Promise<void>;
     openRenameModal: (type: 'request' | 'folder', path: string, currentName: string) => void;
     handleRename: () => Promise<void>;
@@ -251,7 +251,7 @@ export interface UseRequestActions {
     handleDeleteCaseFromTree: (casePath: string, projectId: string) => Promise<void>;
     openCaseRenameFromTree: (casePath: string, currentName: string) => void;
     confirmCaseRenameFromTree: () => Promise<void>;
-    handleCloseRequestTab: () => void;
+    handleCloseRequestTab: (tabIdToClose?: string) => void;
     moveRequestNode: (requestPath: string, targetFolderPath: string, beforeID: string, projectId: string) => Promise<void>;
     moveFolderNode: (folderPath: string, targetFolderPath: string, beforeID: string, projectId: string) => Promise<void>;
     // Workspace state
@@ -311,7 +311,15 @@ const apiConfigFromRequest = (r: CurlRequest, fallbackName: string): ApiConfig =
     };
 };
 
-export function useRequest(): UseRequest {
+export function useRequest(options?: {
+    onTreeRefresh?: (projectId: string, tree: any) => void;
+}): UseRequest {
+    // Tree refresh callback ref
+    const treeRefreshCallbackRef = useRef(options?.onTreeRefresh);
+    useEffect(() => {
+        treeRefreshCallbackRef.current = options?.onTreeRefresh;
+    }, [options?.onTreeRefresh]);
+
     // Use WorkspaceContext for all state
     const {
         // Request tabs
@@ -504,7 +512,10 @@ export function useRequest(): UseRequest {
     }, [currentRequest, requestCases, activeCaseId, apiConfig]);
 
     const refreshProjectTree = useCallback(async (projectId: string) => {
-        await GetProjectTree(projectId);
+        const tree = await GetProjectTree(projectId);
+        if (treeRefreshCallbackRef.current) {
+            treeRefreshCallbackRef.current(projectId, tree);
+        }
     }, []);
 
     const handleCreateFolder = useCallback(async (projectId: string) => {
@@ -520,6 +531,9 @@ export function useRequest(): UseRequest {
             setCreateFolderModal(false);
             setNewFolderName('');
             const tree = await GetProjectTree(projectId);
+            if (treeRefreshCallbackRef.current) {
+                treeRefreshCallbackRef.current(projectId, tree);
+            }
 
             // 清除折叠状态以显示新创建的文件夹
             if (!selectedFolder) {
@@ -549,7 +563,10 @@ export function useRequest(): UseRequest {
             message.success('请求创建成功');
             setCreateRequestModal(false);
             setNewRequestName('');
-            await GetProjectTree(projectId);
+            const tree = await GetProjectTree(projectId);
+            if (treeRefreshCallbackRef.current) {
+                treeRefreshCallbackRef.current(projectId, tree);
+            }
 
             // 清除折叠状态以显示新创建的请求
             if (!selectedFolder) {
@@ -733,14 +750,17 @@ export function useRequest(): UseRequest {
             message.success('请求已保存');
 
             // 刷新项目树以更新接口列表中的方法显示
-            await GetProjectTree(projectId);
+            const tree = await GetProjectTree(projectId);
+            if (treeRefreshCallbackRef.current) {
+                treeRefreshCallbackRef.current(projectId, tree);
+            }
         } catch (error: any) {
             message.error(`保存失败: ${error?.message || error}`);
             throw error;
         }
     }, [currentRequest, apiConfig, requestCases, activeCaseId, requestEditorSurface, interfaceApiConfig, commitActiveCaseIntoList]);
 
-    const handleDeleteRequest = useCallback(async (path: string, projectId: string) => {
+    const handleDeleteRequest = useCallback(async (path: string, projectId: string, tabIdToClose?: string) => {
         Modal.confirm({
             title: '删除请求',
             content: '确定要删除这个请求吗？',
@@ -748,8 +768,11 @@ export function useRequest(): UseRequest {
                 try {
                     await DeleteRequest(path);
                     message.success('请求已删除');
-                    handleCloseRequestTab();
-                    await GetProjectTree(projectId);
+                    handleCloseRequestTab(tabIdToClose);
+                    const tree = await GetProjectTree(projectId);
+                    if (treeRefreshCallbackRef.current) {
+                        treeRefreshCallbackRef.current(projectId, tree);
+                    }
                 } catch (error: any) {
                     message.error(`删除失败: ${error?.message || error}`);
                     throw error;
@@ -762,7 +785,10 @@ export function useRequest(): UseRequest {
         try {
             await CopyRequest(path);
             message.success('请求复制成功');
-            await GetProjectTree(projectId);
+            const tree = await GetProjectTree(projectId);
+            if (treeRefreshCallbackRef.current) {
+                treeRefreshCallbackRef.current(projectId, tree);
+            }
         } catch (error: any) {
             message.error(`复制失败: ${error?.message || error}`);
             throw error;
@@ -826,7 +852,9 @@ export function useRequest(): UseRequest {
                     await DeleteFolder(path);
                     message.success('文件夹已删除');
                     const tree = await GetProjectTree(projectId);
-                    return tree;
+                    if (treeRefreshCallbackRef.current) {
+                        treeRefreshCallbackRef.current(projectId, tree);
+                    }
                 } catch (error: any) {
                     message.error(`删除失败: ${error?.message || error}`);
                     throw error;
@@ -974,10 +1002,11 @@ export function useRequest(): UseRequest {
         }
     }, [caseRenameCasePath, caseRenameInput, currentRequest, refreshProjectTree]);
 
-    const handleCloseRequestTab = useCallback(() => {
+    const handleCloseRequestTab = useCallback((tabIdToClose?: string) => {
+        const targetTabId = tabIdToClose || activeRequestTab;
         setRequestTabs(prev => {
-            const remaining = prev.filter(t => t.id !== activeRequestTab);
-            if (activeRequestTab && prev.length > 0) {
+            const remaining = prev.filter(t => t.id !== targetTabId);
+            if (targetTabId && prev.length > 0) {
                 const newActive = remaining.length > 0 ? remaining[remaining.length - 1].id : '';
                 if (newActive) {
                     setActiveRequestTab(newActive);
@@ -1015,7 +1044,10 @@ export function useRequest(): UseRequest {
                 setCurrentRequest({ ...currentRequest, path: newRequestPath });
             }
 
-            await GetProjectTree(projectId);
+            const tree = await GetProjectTree(projectId);
+            if (treeRefreshCallbackRef.current) {
+                treeRefreshCallbackRef.current(projectId, tree);
+            }
             setCollapsedFolders(prev => {
                 const next = new Set(prev);
                 next.delete(targetFolderPath);
@@ -1054,7 +1086,10 @@ export function useRequest(): UseRequest {
                 }
             }
 
-            await GetProjectTree(projectId);
+            const tree = await GetProjectTree(projectId);
+            if (treeRefreshCallbackRef.current) {
+                treeRefreshCallbackRef.current(projectId, tree);
+            }
             setCollapsedFolders(prev => {
                 const next = new Set(prev);
                 next.delete(targetFolderPath);
