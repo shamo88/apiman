@@ -53,16 +53,18 @@ export const RequestTabsBar: React.FC<RequestTabsBarProps> = ({
                 />
             </div>
             {environments.length > 0 && (
-                <Select
-                    value={selectedEnvironmentId || undefined}
-                    onChange={setSelectedEnvironmentId}
-                    options={[
-                        { label: '无环境', value: '' },
-                        ...environments.map(env => ({ label: env.name, value: env.id })),
-                    ]}
-                    style={{ width: 140, marginLeft: 8 }}
-                    placeholder="选择环境"
-                />
+                <div className="request-tabs-environment-select">
+                    <Select
+                        value={selectedEnvironmentId || undefined}
+                        onChange={setSelectedEnvironmentId}
+                        options={[
+                            { label: '无环境', value: '' },
+                            ...environments.map(env => ({ label: env.name, value: env.id })),
+                        ]}
+                        style={{ width: 100 }}
+                        placeholder="选择环境"
+                    />
+                </div>
             )}
         </div>
     );

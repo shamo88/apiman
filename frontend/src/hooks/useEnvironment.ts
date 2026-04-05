@@ -77,6 +77,11 @@ export function useEnvironment(): UseEnvironment {
         try {
             const envs = await LoadEnvironments(projectId);
             setEnvironments(envs || []);
+            // Check if current selectedEnvironmentId is valid for the new environments list
+            // If not, reset it (user will see "无环境" or auto-select first)
+            if (selectedEnvironmentId && !envs?.some((env: Environment) => env.id === selectedEnvironmentId)) {
+                setSelectedEnvironmentId('');
+            }
         } catch (error: any) {
             console.error('Failed to load environments:', error);
             message.error(`加载环境失败: ${error?.message || error}`);
