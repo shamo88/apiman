@@ -1,0 +1,39 @@
+/* ScriptHelp styles - extracted from App.css */
+.script-help-content {
+    text-align: left;
+}
+
+.script-help-content p {
+    margin-bottom: 10px;
+    line-height: 1.6;
+    text-align: left;
+}
+
+.script-help-content ul {
+    margin: 0 0 12px 18px;
+    line-height: 1.7;
+    text-align: left;
+}
+
+.script-help-content li {
+    margin-bottom: 4px;
+    text-align: left;
+}
+
+.script-help-content pre {
+    margin: 8px 0 14px;
+    background: #f6f8fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    white-space: pre-wrap;
+    text-align: left;
+}
+
+/* Dark theme */
+.theme-dark .script-help-content pre {
+    background: var(--bg-tertiary);
+    border-color: var(--border-subtle);
+}

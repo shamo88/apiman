@@ -1,0 +1,450 @@
+/* Modal styles - extracted from App.css */
+
+/* Ant Design Modal base styles */
+.ant-modal .ant-modal-content {
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+}
+
+.ant-modal .ant-modal-header {
+    background: transparent !important;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.ant-modal .ant-modal-title {
+    color: var(--text-primary) !important;
+    font-weight: 600;
+}
+
+.ant-modal .ant-modal-close {
+    color: var(--text-muted);
+}
+
+.ant-modal .ant-modal-close:hover {
+    color: var(--text-primary);
+}
+
+.ant-modal-footer {
+    border-top: 1px solid var(--border-subtle);
+}
+
+/* Settings Modal */
+.settings-modal.theme-dark.ant-modal {
+    background: var(--bg-secondary) !important;
+}
+
+.settings-modal.theme-dark .ant-modal-content {
+    background: var(--bg-secondary) !important;
+}
+
+.settings-modal.theme-dark .ant-modal-header {
+    background: var(--bg-secondary) !important;
+    border-bottom-color: var(--border-subtle) !important;
+}
+
+.settings-modal.theme-dark .ant-modal-body {
+    background: var(--bg-secondary) !important;
+}
+
+.settings-modal.theme-dark .ant-modal-footer {
+    background: var(--bg-secondary) !important;
+}
+
+.settings-modal.theme-dark .ant-modal-title {
+    color: var(--text-primary) !important;
+}
+
+.settings-modal.theme-dark .ant-modal-close {
+    color: var(--text-secondary) !important;
+}
+
+.settings-modal.theme-dark .ant-modal-close:hover {
+    color: var(--text-primary) !important;
+}
+
+.settings-modal.theme-dark .ant-divider {
+    border-color: var(--border-subtle) !important;
+}
+
+.settings-modal.theme-dark .ant-form-item-label>label {
+    color: var(--text-secondary) !important;
+}
+
+.settings-modal.theme-dark .ant-form-item {
+    color: var(--text-primary) !important;
+}
+
+.settings-modal.theme-dark .ant-input,
+.settings-modal.theme-dark .ant-input-affix-wrapper {
+    background: var(--bg-primary) !important;
+    border-color: var(--border-subtle) !important;
+    color: var(--text-primary) !important;
+}
+
+.settings-modal.theme-dark .ant-input:hover,
+.settings-modal.theme-dark .ant-input-affix-wrapper:hover {
+    border-color: var(--accent-primary) !important;
+}
+
+.settings-modal.theme-dark .ant-input:focus,
+.settings-modal.theme-dark .ant-input-affix-wrapper:focus {
+    border-color: var(--accent-primary) !important;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important;
+}
+
+.settings-modal.theme-dark .ant-input-number-input {
+    color: var(--text-primary) !important;
+}
+
+.settings-modal.theme-dark .ant-input-number-input::placeholder {
+    color: var(--text-muted) !important;
+}
+
+.settings-modal.theme-dark .ant-input-number {
+    background: var(--bg-primary) !important;
+    border-color: var(--border-subtle) !important;
+}
+
+.settings-modal.theme-dark .ant-input-number:hover {
+    border-color: var(--accent-primary) !important;
+}
+
+.settings-modal.theme-dark .ant-input-number-focused {
+    border-color: var(--accent-primary) !important;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important;
+}
+
+.settings-modal.theme-dark .ant-input-number-handler {
+    border-left-color: var(--border-subtle) !important;
+    color: var(--text-secondary) !important;
+}
+
+.settings-modal.theme-dark .ant-input-number-handler:hover {
+    background: var(--bg-hover) !important;
+}
+
+.settings-modal.theme-dark .ant-input-number-handler .ant-input-number-handler-icon {
+    color: var(--text-secondary) !important;
+}
+
+/* Settings page radio left align */
+.settings-modal .ant-radio-group {
+    text-align: left !important;
+}
+
+/* Light theme settings modal form content left align */
+.settings-modal:not(.theme-dark) .ant-form-item .ant-form-item-control-input-content {
+    text-align: left !important;
+}
+
+/* Settings modal forced coverage */
+.settings-modal.theme-dark,
+.settings-modal.theme-dark .ant-modal-content,
+.settings-modal.theme-dark .ant-modal-header,
+.settings-modal.theme-dark .ant-modal-body,
+.settings-modal.theme-dark .ant-modal-footer {
+    background: var(--bg-secondary) !important;
+    color: var(--text-primary);
+}
+
+.settings-modal.theme-dark .ant-modal {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.settings-modal.theme-dark .ant-modal-content {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+.settings-modal.theme-dark .ant-modal-title {
+    color: var(--text-primary) !important;
+}
+
+.settings-modal.theme-dark .ant-modal-close {
+    color: var(--text-secondary);
+}
+
+.settings-modal.theme-dark .ant-modal-close:hover {
+    color: var(--text-primary);
+}
+
+/* Settings modal border override */
+.settings-modal.theme-dark.ant-modal .ant-modal-body {
+    border-top: none;
+    border-bottom: none;
+}
+
+/* Dark theme mask */
+.theme-dark .ant-modal-mask {
+    background: rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Settings modal mask */
+.settings-modal.theme-dark .ant-modal-mask {
+    background: rgba(0, 0, 0, 0.7) !important;
+}
+
+/* Override Ant Design Modal CSS variables */
+.settings-modal.theme-dark .ant-modal-container {
+    --ant-modal-content-bg: #252525 !important;
+    background-color: #252525 !important;
+    background: #252525 !important;
+}
+
+.settings-modal.theme-dark .ant-modal-content {
+    --ant-modal-content-bg: #252525 !important;
+    background-color: #252525 !important;
+    background: #252525 !important;
+}
+
+/* Settings modal form content left align */
+.settings-modal.theme-dark .ant-form-item .ant-form-item-control-input-content {
+    text-align: left !important;
+}
+
+/* Force override Ant Design Modal inner container */
+.settings-modal.theme-dark.ant-modal .ant-modal-container {
+    --ant-modal-content-bg: #252525 !important;
+    background-color: #252525 !important;
+}
+
+.settings-modal.theme-dark.ant-modal .ant-modal-container .ant-modal-content {
+    background-color: #252525 !important;
+    background: #252525 !important;
+}
+
+/* Create Project Modal - Dark theme */
+.create-project-modal.theme-dark.ant-modal .ant-modal-content {
+    background: var(--bg-secondary) !important;
+}
+
+.create-project-modal.theme-dark.ant-modal .ant-modal-container {
+    background: var(--bg-secondary) !important;
+}
+
+.create-project-modal.theme-dark.ant-modal .ant-modal-mask {
+    background: rgba(0, 0, 0, 0.5) !important;
+}
+
+.create-project-modal.theme-dark.ant-modal>.ant-modal-wrap {
+    background: var(--bg-secondary) !important;
+}
+
+.create-project-modal.theme-dark .ant-modal-content {
+    background: var(--bg-secondary) !important;
+}
+
+.create-project-modal.theme-dark .ant-modal-header {
+    background: var(--bg-secondary) !important;
+    border-bottom-color: var(--border-subtle) !important;
+}
+
+.create-project-modal.theme-dark .ant-modal-body {
+    background: var(--bg-secondary) !important;
+}
+
+.create-project-modal.theme-dark .ant-modal-footer {
+    background: var(--bg-secondary) !important;
+}
+
+.create-project-modal.theme-dark .ant-modal-title {
+    color: var(--text-primary) !important;
+}
+
+.create-project-modal.theme-dark .ant-modal-close {
+    color: var(--text-secondary) !important;
+}
+
+.create-project-modal.theme-dark .ant-modal-close:hover {
+    color: var(--text-primary) !important;
+}
+
+.create-project-modal.theme-dark .ant-input {
+    background: var(--bg-primary) !important;
+    border-color: var(--border-subtle) !important;
+    color: var(--text-primary) !important;
+}
+
+.create-project-modal.theme-dark .ant-input::placeholder {
+    color: var(--text-muted) !important;
+}
+
+.create-project-modal.theme-dark .ant-input:hover {
+    border-color: var(--accent-primary) !important;
+}
+
+.create-project-modal.theme-dark .ant-input:focus {
+    border-color: var(--accent-primary) !important;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important;
+}
+
+/* Cookie Modal - Dark theme */
+.cookie-modal.theme-dark.ant-modal .ant-modal-content {
+    background: var(--bg-secondary) !important;
+}
+
+.cookie-modal.theme-dark.ant-modal .ant-modal-container {
+    background: var(--bg-secondary) !important;
+}
+
+.cookie-modal.theme-dark.ant-modal .ant-modal-mask {
+    background: rgba(0, 0, 0, 0.5) !important;
+}
+
+.cookie-modal.theme-dark.ant-modal>.ant-modal-wrap {
+    background: var(--bg-secondary) !important;
+}
+
+.cookie-modal.theme-dark .ant-modal-content {
+    background: var(--bg-secondary) !important;
+}
+
+.cookie-modal.theme-dark .ant-modal-header {
+    background: var(--bg-secondary) !important;
+    border-bottom-color: var(--border-subtle) !important;
+}
+
+.cookie-modal.theme-dark .ant-modal-body {
+    background: var(--bg-secondary) !important;
+}
+
+.cookie-modal.theme-dark .ant-modal-footer {
+    background: var(--bg-secondary) !important;
+}
+
+.cookie-modal.theme-dark .ant-modal-title {
+    color: var(--text-primary) !important;
+}
+
+.cookie-modal.theme-dark .ant-modal-close {
+    color: var(--text-secondary) !important;
+}
+
+.cookie-modal.theme-dark .ant-modal-close:hover {
+    color: var(--text-primary) !important;
+}
+
+.cookie-modal.theme-dark .ant-input,
+.cookie-modal.theme-dark .ant-input-affix-wrapper {
+    background: var(--bg-primary) !important;
+    border-color: var(--border-subtle) !important;
+    color: var(--text-primary) !important;
+}
+
+.cookie-modal.theme-dark .ant-input::placeholder {
+    color: var(--text-muted) !important;
+}
+
+.cookie-modal.theme-dark .ant-input:hover {
+    border-color: var(--accent-primary) !important;
+}
+
+.cookie-modal.theme-dark .ant-input:focus {
+    border-color: var(--accent-primary) !important;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important;
+}
+
+.cookie-modal.theme-dark .ant-divider {
+    border-color: var(--border-subtle) !important;
+}
+
+.cookie-modal.theme-dark .ant-table {
+    background: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+}
+
+.cookie-modal.theme-dark .ant-table-thead>tr>th {
+    background: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-subtle) !important;
+}
+
+.cookie-modal.theme-dark .ant-table-tbody>tr>td {
+    border-color: var(--border-subtle) !important;
+}
+
+.cookie-modal.theme-dark .ant-table-tbody>tr:hover>td {
+    background: var(--bg-hover) !important;
+}
+
+.cookie-modal.theme-dark .ant-table-cell {
+    color: var(--text-primary) !important;
+}
+
+.cookie-modal.theme-dark p {
+    color: var(--text-secondary) !important;
+}
+
+.cookie-modal.theme-dark .ant-btn-text {
+    color: #ff4d4f !important;
+}
+
+.cookie-modal.theme-dark .ant-btn-text:hover {
+    background: rgba(255, 77, 79, 0.1) !important;
+}
+
+/* Dropdown menu styles */
+.ant-dropdown-menu {
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: var(--radius-md) !important;
+    padding: 8px !important;
+}
+
+.ant-dropdown-menu-item {
+    color: var(--text-secondary) !important;
+    border-radius: var(--radius-sm) !important;
+    padding: 10px 12px !important;
+}
+
+.ant-dropdown-menu-item:hover {
+    background: var(--bg-hover) !important;
+    color: var(--text-primary) !important;
+}
+
+.ant-dropdown-menu-item-danger {
+    color: #ef4444 !important;
+}
+
+.ant-dropdown-menu-item-danger:hover {
+    background: rgba(239, 68, 68, 0.1) !important;
+}
+
+/* Dropdown submenu arrow - Dark theme */
+.theme-dark .ant-dropdown-menu-submenu-arrow,
+.theme-dark .ant-dropdown-menu-submenu-arrow::before,
+.theme-dark .ant-dropdown-menu-submenu-arrow::after {
+    color: var(--text-secondary) !important;
+    background: currentColor !important;
+}
+
+/* Confirm Modal - Dark theme */
+.theme-dark .ant-modal-confirm .ant-modal-content {
+    background: var(--bg-secondary);
+}
+
+.theme-dark .ant-modal-confirm .ant-modal-header {
+    background: var(--bg-secondary);
+    border-color: var(--border-subtle);
+}
+
+.theme-dark .ant-modal-confirm .ant-modal-title {
+    color: var(--text-primary);
+}
+
+.theme-dark .ant-modal-confirm .ant-modal-close {
+    color: var(--text-secondary);
+}
+
+.theme-dark .ant-modal-confirm .ant-modal-close:hover {
+    color: var(--text-primary);
+}
+
+.theme-dark .ant-modal-confirm .ant-modal-body {
+    color: var(--text-secondary);
+}
+
+.theme-dark .ant-modal-confirm .ant-modal-footer {
+    border-color: var(--border-subtle);
+}

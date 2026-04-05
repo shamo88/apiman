@@ -1,0 +1,262 @@
+/* VariableInput styles - extracted from App.css */
+.variable-editable-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.variable-editable {
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  outline: none;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.variable-editable[data-multiline="true"] {
+  min-height: 80px;
+}
+
+.variable-editable:empty::before {
+  content: attr(data-placeholder);
+  color: #bfbfbf;
+  pointer-events: none;
+}
+
+.variable-editable-suggestions {
+  background: white;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.variable-editable-suggestion-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.variable-editable-suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.variable-editable-suggestion-item.active {
+  background: #f5f5f5;
+}
+
+.variable-editable-suggestion-item.built-in-generator .suggestion-item-name {
+  color: #1890ff;
+}
+
+.variable-editable-suggestion-item.invalid-variable .suggestion-item-name {
+  color: #ff4d4f;
+}
+
+.suggestion-item-name {
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.suggestion-item-desc {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-top: 2px;
+}
+
+/* Variable inline highlighting */
+.variable-inline-text {
+  color: inherit;
+}
+
+.variable-inline-token {
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+.variable-inline-token.built-in {
+  background: rgba(24, 144, 255, 0.15);
+  color: #1890ff;
+}
+
+.variable-inline-token.active {
+  background: rgba(82, 196, 26, 0.15);
+  color: #52c41a;
+}
+
+.variable-inline-token.missing {
+  background: rgba(255, 77, 79, 0.15);
+  color: #ff4d4f;
+}
+
+/* Dark theme */
+.theme-dark .variable-editable {
+  background: #2a2a2a;
+  border-color: #434343;
+  color: #e8e8e8;
+}
+
+.theme-dark .variable-editable-suggestions {
+  background: #2a2a2a;
+  border-color: #434343;
+}
+
+.theme-dark .variable-editable-suggestion-item.active {
+  background: #3a3a3a;
+}
+
+/* Additional VariableInput styles from App.css */
+
+/* Variable editable wrapper */
+.variable-editable-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.variable-editable {
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 11px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 14px;
+  line-height: 1.5715;
+  outline: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.variable-editable[data-multiline="true"] {
+  white-space: pre-wrap;
+  overflow: auto;
+  text-overflow: initial;
+  min-height: 150px;
+  line-height: 1.5;
+}
+
+.variable-editable:focus {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 2px rgba(5, 145, 255, 0.1);
+}
+
+.variable-editable:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+}
+
+.variable-editable-suggestions {
+  position: absolute;
+  z-index: 1200;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  max-height: 280px;
+  overflow-y: auto;
+  min-width: 240px;
+}
+
+.variable-editable-suggestion-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.variable-editable-suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.variable-editable-suggestion-item:hover {
+  background: var(--bg-hover);
+}
+
+.variable-editable-suggestion-item.active {
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.1) 0%, rgba(79, 70, 229, 0.05) 100%);
+}
+
+.variable-editable-suggestion-item .suggestion-item-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.variable-editable-suggestion-item.built-in-generator .suggestion-item-name {
+  color: #3b82f6;
+}
+
+.variable-editable-suggestion-item.built-in-generator .suggestion-item-name::before {
+  content: '⚡ ';
+  font-size: 10px;
+}
+
+.variable-editable-suggestion-item.invalid-variable .suggestion-item-name {
+  color: #ef4444;
+}
+
+.variable-editable-suggestion-item.invalid-variable .suggestion-item-name::before {
+  content: '✗ ';
+  font-size: 10px;
+}
+
+.variable-editable-suggestion-item .suggestion-item-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  font-family: var(--font-sans);
+}
+
+.variable-inline-text {
+  color: var(--text-primary);
+}
+
+.variable-inline-token {
+  font-weight: 600;
+}
+
+.variable-inline-token.active {
+  color: #389e0d;
+}
+
+.variable-inline-token.built-in {
+  color: #3b82f6;
+}
+
+.variable-inline-token.missing {
+  color: #cf1322;
+}
+
+/* Dark theme - variable editable */
+.theme-dark .variable-editable {
+  background: var(--bg-primary);
+  border-color: var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.theme-dark .variable-editable:hover,
+.theme-dark .variable-editable:focus {
+  border-color: var(--accent-primary);
+}
+
+/* Dark theme - URL input in request bar */
+.theme-dark .api-request-bar .variable-editable-wrapper .ant-input {
+  background: var(--bg-primary) !important;
+  border-color: var(--border-subtle) !important;
+  color: var(--text-primary) !important;
+}
+
+.theme-dark .api-request-bar .variable-editable-wrapper .ant-input:hover {
+  border-color: var(--accent-primary) !important;
+}
+
+.theme-dark .api-request-bar .variable-editable-wrapper .ant-input:focus {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important;
+}

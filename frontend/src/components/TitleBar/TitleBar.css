@@ -1,0 +1,285 @@
+/* TitleBar styles - extracted from App.css */
+.title-bar {
+    height: 40px;
+    background: var(--bg-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border-subtle);
+    --wails-draggable: drag;
+    user-select: none;
+}
+
+.title-bar-left {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    height: 100%;
+    overflow: hidden;
+}
+
+.title-bar-logo-img {
+    height: 24px;
+    width: auto;
+    margin: 0 12px;
+    --wails-draggable: no-drag;
+}
+
+.theme-dark .title-bar-logo-img {
+    filter: brightness(0) invert(1);
+}
+
+.title-bar-tabs-wrap {
+    flex: 1;
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
+    position: relative;
+}
+
+.title-bar-home-tab {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    padding: 4px 24px;
+    margin-top: auto;
+    margin-bottom: 0;
+    border: 1px solid #d9d9d9;
+    border-bottom: 1px solid #f0f0f0;
+    border-radius: 8px 8px 0 0;
+    background: #fafafa;
+    color: rgba(0, 0, 0, 0.88);
+    font-size: 12px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-app-region: no-drag;
+    position: relative;
+    z-index: 1;
+}
+
+.title-bar-home-tab.active {
+    background: #fff;
+    color: #1677ff;
+    border-color: #d9d9d9;
+    border-bottom-color: #fff;
+    z-index: 3;
+}
+
+.title-bar-home-tab .anticon {
+    margin-right: 0 !important;
+}
+
+.title-bar-tabs {
+    flex: 1;
+    overflow: hidden;
+    min-width: 0;
+    margin-left: 4px;
+}
+
+.title-bar-tabs-wrap::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-bottom: 1px solid #f0f0f0;
+    z-index: 0;
+}
+
+.title-bar-tabs .ant-tabs {
+    margin: 0;
+}
+
+.title-bar-tabs .ant-tabs-nav {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+}
+
+.title-bar-tabs .ant-tabs-nav::before {
+    display: none;
+}
+
+.title-bar-tabs .ant-tabs-tab {
+    padding: 4px 24px !important;
+    margin: 0 4px 0 0 !important;
+    height: 32px;
+    line-height: 32px;
+    font-size: 12px !important;
+    border: 1px solid #d9d9d9 !important;
+    border-bottom: 1px solid #f0f0f0 !important;
+    border-radius: 8px 8px 0 0 !important;
+    background: #fafafa !important;
+    color: rgba(0, 0, 0, 0.88) !important;
+    transition: all 0.2s;
+}
+
+.title-bar-tabs .ant-tabs-tab:hover {
+    color: #1677ff !important;
+    background: #fff !important;
+}
+
+.title-bar-tabs .ant-tabs-tab-active {
+    background: #fff !important;
+    color: #1677ff !important;
+    border-color: #d9d9d9 !important;
+    border-bottom-color: #fff !important;
+    z-index: 2;
+}
+
+.title-bar-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+    color: #1677ff !important;
+}
+
+.title-bar-tabs .ant-tabs-tab .anticon {
+    margin-right: 4px;
+}
+
+.title-bar-tabs .ant-tabs-tab-remove {
+    margin-left: 4px;
+}
+
+.title-bar-tabs .ant-tabs-tab-remove .anticon {
+    margin: 0;
+}
+
+.title-bar-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.title-bar-controls {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    -webkit-app-region: no-drag;
+}
+
+.title-bar-button {
+    width: 46px;
+    height: 100%;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease;
+    color: var(--text-secondary);
+}
+
+.title-bar-button:hover {
+    background: var(--bg-hover);
+}
+
+.title-bar-button.close:hover {
+    background: #e81123;
+    color: white;
+}
+
+.title-bar-button:active {
+    background: var(--bg-active);
+}
+
+.title-bar-button.close:active {
+    background: #c42b1c;
+}
+
+.title-bar-button.settings {
+    width: 40px;
+}
+
+.title-bar-button.settings .anticon {
+    font-size: 14px;
+}
+
+.title-bar-button .anticon {
+    font-size: 14px;
+}
+
+.title-bar-button.maximize .anticon {
+    font-size: 12px;
+}
+
+/* Dark theme - TitleBar tabs */
+.theme-dark .title-bar-tabs .ant-tabs-tab {
+    background: var(--bg-tertiary) !important;
+    border-color: var(--border-subtle) !important;
+    color: var(--text-secondary) !important;
+}
+
+.theme-dark .title-bar-tabs .ant-tabs-tab:hover,
+.theme-dark .title-bar-tabs .ant-tabs-tab:active,
+.theme-dark .title-bar-tabs .ant-tabs-tab:focus {
+    background: var(--bg-hover) !important;
+    color: #fafafa !important;
+}
+
+.theme-dark .title-bar-tabs .ant-tabs-tab-active {
+    background: var(--bg-secondary) !important;
+    color: #fafafa !important;
+    border-color: #fafafa !important;
+}
+
+.theme-dark .title-bar-tabs .ant-tabs-tab-active:hover,
+.theme-dark .title-bar-tabs .ant-tabs-tab-active:active,
+.theme-dark .title-bar-tabs .ant-tabs-tab-active:focus {
+    background: var(--bg-secondary) !important;
+    color: #fafafa !important;
+    border-color: #fafafa !important;
+}
+
+.theme-dark .title-bar-tabs .ant-tabs-tab-btn {
+    color: var(--text-secondary) !important;
+}
+
+.theme-dark .title-bar-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+    color: #fafafa !important;
+}
+
+/* Dark theme - Home tab */
+.theme-dark .title-bar-home-tab {
+    background: var(--bg-tertiary);
+    border-color: var(--border-subtle);
+    color: var(--text-secondary);
+}
+
+.theme-dark .title-bar-home-tab:hover {
+    background: var(--bg-hover);
+    color: #fafafa;
+}
+
+.theme-dark .title-bar-home-tab.active {
+    background: var(--bg-secondary);
+    color: #fafafa;
+    border-color: #fafafa;
+}
+
+/* Dark theme - Tab close button */
+.theme-dark .title-bar-tabs .ant-tabs-tab-remove .anticon {
+    color: var(--text-muted);
+}
+
+.theme-dark .title-bar-tabs .ant-tabs-tab-remove:hover .anticon {
+    color: #fafafa;
+}
+
+/* Dark theme - Tab underline */
+.theme-dark .title-bar-tabs-wrap::after {
+    border-bottom-color: var(--border-subtle);
+}
+
+/* Dark theme - Remove browser default tap highlight */
+.theme-dark .title-bar-tabs .ant-tabs-tab {
+    -webkit-tap-highlight-color: transparent;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.theme-dark .title-bar-tabs .ant-tabs-tab:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}
