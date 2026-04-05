@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { message, Modal } from 'antd';
 import { Environment, EnvironmentVariableRow, EnvironmentEditorTab, createEnvironmentVariableRow, ProjectTab } from '../types';
-import { LoadEnvironments, CreateEnvironment, UpdateEnvironment, DeleteEnvironment } from '../../wailsjs/go/main/App';
+import { LoadEnvironments, CreateEnvironment, UpdateEnvironment, DeleteEnvironment, ExportEnvironments, ImportEnvironments } from '../../wailsjs/go/main/App';
 
 export interface UseEnvironmentState {
     environments: Environment[];
@@ -15,6 +15,8 @@ export interface UseEnvironmentState {
     environmentTabs: EnvironmentEditorTab[];
     activeEnvironmentTab: string;
     currentEnvironmentVariables: Record<string, string>;
+    importModalVisible: boolean;
+    compareModalVisible: boolean;
 }
 
 export interface UseEnvironmentActions {
@@ -35,6 +37,13 @@ export interface UseEnvironmentActions {
     // CRUD operations
     saveEnvironment: (projectId: string) => Promise<void>;
     deleteEnvironment: (projectId: string) => Promise<void>;
+    // Import/Export/Compare
+    openImportModal: () => void;
+    closeImportModal: () => void;
+    openCompareModal: () => void;
+    closeCompareModal: () => void;
+    exportEnvironments: (projectId: string) => Promise<void>;
+    importEnvironments: (projectId: string, jsonData: string) => Promise<Environment[]>;
 }
 
 export type UseEnvironment = UseEnvironmentState & UseEnvironmentActions;
@@ -50,6 +59,8 @@ export function useEnvironment(): UseEnvironment {
     const [envSaving, setEnvSaving] = useState(false);
     const [environmentTabs, setEnvironmentTabs] = useState<EnvironmentEditorTab[]>([]);
     const [activeEnvironmentTab, setActiveEnvironmentTab] = useState<string>('');
+    const [importModalVisible, setImportModalVisible] = useState(false);
+    const [compareModalVisible, setCompareModalVisible] = useState(false);
 
     const environmentToRows = useCallback((variables: Record<string, string>): EnvironmentVariableRow[] => {
         const rows = Object.entries(variables || {}).map(([key, value]) => createEnvironmentVariableRow(key, value));
@@ -206,6 +217,63 @@ export function useEnvironment(): UseEnvironment {
         });
     }, [editingEnvironmentId, loadEnvironmentsData, resetEnvironmentEditor]);
 
+    const openImportModal = useCallback(() => {
+        setImportModalVisible(true);
+    }, []);
+
+    const closeImportModal = useCallback(() => {
+        setImportModalVisible(false);
+    }, []);
+
+    const openCompareModal = useCallback(() => {
+        setCompareModalVisible(true);
+    }, []);
+
+    const closeCompareModal = useCallback(() => {
+        setCompareModalVisible(false);
+    }, []);
+
+    const exportEnvironments = useCallback(async (projectId: string) => {
+        if (!projectId) return;
+        try {
+            const jsonData = await ExportEnvironments(projectId);
+            if (!jsonData) {
+                message.info('没有环境可导出');
+                return;
+            }
+            // Create and download the file
+            const blob = new Blob([jsonData], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `environments_${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            message.success('环境导出成功');
+        } catch (err: any) {
+            message.error(`导出失败: ${err?.message || err}`);
+        }
+    }, []);
+
+    const importEnvironments = useCallback(async (projectId: string, jsonData: string): Promise<Environment[]> => {
+        if (!projectId) return [];
+        try {
+            const result = await ImportEnvironments(projectId, jsonData);
+            if (result.length === 0) {
+                message.info('没有需要导入的环境（可能已存在同名环境）');
+            } else {
+                message.success(`成功导入 ${result.length} 个环境`);
+            }
+            await loadEnvironmentsData(projectId);
+            return result;
+        } catch (err: any) {
+            message.error(`导入失败: ${err?.message || err}`);
+            return [];
+        }
+    }, [loadEnvironmentsData]);
+
     // Sync environment tabs when environments change
     useEffect(() => {
         setEnvironmentTabs(prev => prev
@@ -280,6 +348,8 @@ export function useEnvironment(): UseEnvironment {
         environmentTabs,
         activeEnvironmentTab,
         currentEnvironmentVariables,
+        importModalVisible,
+        compareModalVisible,
         // Actions
         loadEnvironmentsData,
         openEnvironmentEditor,
@@ -294,5 +364,11 @@ export function useEnvironment(): UseEnvironment {
         deleteEnvironment,
         setActiveEnvironmentTab,
         setSelectedEnvironmentId,
+        openImportModal,
+        closeImportModal,
+        openCompareModal,
+        closeCompareModal,
+        exportEnvironments,
+        importEnvironments,
     };
 }

@@ -9,11 +9,14 @@ import (
 	"apiman/internal/postman"
 	"apiman/internal/project"
 	"apiman/internal/script"
+	"encoding/json"
 	"net/url"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type Service struct {
@@ -102,6 +105,73 @@ func (s *Service) DeleteEnvironment(projectID string, id string) error {
 		go s.SyncProjectToGit(projectID)
 	}
 	return err
+}
+
+func (s *Service) ExportEnvironments(projectID string) (string, error) {
+	path, err := s.ProjectMgr.ProjectPathByID(projectID)
+	if err != nil {
+		return "", err
+	}
+	envs, err := s.ConfigManager.LoadProjectEnvironments(path)
+	if err != nil {
+		return "", err
+	}
+	data, err := json.MarshalIndent(envs, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func (s *Service) ImportEnvironments(projectID string, jsonData string) ([]models.Environment, error) {
+	path, err := s.ProjectMgr.ProjectPathByID(projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	var importedEnvs []models.Environment
+	if err := json.Unmarshal([]byte(jsonData), &importedEnvs); err != nil {
+		return nil, err
+	}
+
+	// Load existing environments
+	existingEnvs, err := s.ConfigManager.LoadProjectEnvironments(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create a map of existing environment names
+	existingNames := make(map[string]bool)
+	for _, env := range existingEnvs {
+		existingNames[env.Name] = true
+	}
+
+	// Add imported environments with new IDs (skip if name already exists)
+	var newEnvs []models.Environment
+	for _, env := range importedEnvs {
+		if existingNames[env.Name] {
+			continue // Skip duplicate names
+		}
+		newEnv := &models.Environment{
+			ID:        uuid.New().String(),
+			Name:      env.Name,
+			Variables: env.Variables,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		}
+		newEnvs = append(newEnvs, *newEnv)
+	}
+
+	if len(newEnvs) > 0 {
+		if err := s.ConfigManager.AppendProjectEnvironments(path, newEnvs); err != nil {
+			return nil, err
+		}
+		if s.shouldAutoSync() {
+			go s.SyncProjectToGit(projectID)
+		}
+	}
+
+	return newEnvs, nil
 }
 
 func (s *Service) GetGlobalVariables() (map[string]string, error) {

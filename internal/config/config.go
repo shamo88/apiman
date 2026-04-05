@@ -163,6 +163,28 @@ func (c *ConfigManager) CreateProjectEnvironment(projectPath string, name string
 	return env, nil
 }
 
+// AppendProjectEnvironments appends multiple environments to the project's environments.json.
+func (c *ConfigManager) AppendProjectEnvironments(projectPath string, newEnvs []models.Environment) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	envFile := projectEnvironmentsFile(projectPath)
+	data, err := os.ReadFile(envFile)
+	var envs []models.Environment
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+	} else if len(data) > 0 {
+		if err := json.Unmarshal(data, &envs); err != nil {
+			return err
+		}
+	}
+
+	envs = append(envs, newEnvs...)
+	return c.saveProjectEnvironmentsLocked(projectPath, envs)
+}
+
 // UpdateProjectEnvironment updates one environment in the project's file.
 func (c *ConfigManager) UpdateProjectEnvironment(projectPath string, id string, name string, variables map[string]string) error {
 	c.mu.Lock()

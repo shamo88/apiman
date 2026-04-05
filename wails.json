@@ -9,5 +9,8 @@
   "author": {
     "name": "shamo",
     "email": "592334843@qq.com"
+  },
+  "knownTypes": {
+    "time.Time": "string"
   }
 }

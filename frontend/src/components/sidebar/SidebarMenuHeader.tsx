@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button, Dropdown } from 'antd';
-import { PlusOutlined, FolderOutlined, FileOutlined } from '@ant-design/icons';
+import { PlusOutlined, FolderOutlined, FileOutlined, UploadOutlined, DownloadOutlined, SwapOutlined } from '@ant-design/icons';
+import { useProjectContext } from '../../contexts/ProjectContext';
 
 interface SidebarMenuHeaderProps {
     activeMenu: 'apis' | 'environments' | 'scripts';
@@ -9,6 +10,7 @@ interface SidebarMenuHeaderProps {
     onCreateRequest: () => void;
     onCreateEnvironment: () => void;
     onCreateScript: () => void;
+    projectId?: string;
     scriptSaving?: boolean;
 }
 
@@ -19,8 +21,12 @@ export const SidebarMenuHeader: React.FC<SidebarMenuHeaderProps> = ({
     onCreateRequest,
     onCreateEnvironment,
     onCreateScript,
+    projectId,
     scriptSaving = false,
 }) => {
+    const { environment } = useProjectContext();
+    const { openImportModal, openCompareModal, exportEnvironments } = environment;
+
     return (
         <div className="sidebar-header sidebar-menu-header">
             <div className="sidebar-top-menu">
@@ -56,7 +62,19 @@ export const SidebarMenuHeader: React.FC<SidebarMenuHeaderProps> = ({
                     <Button size="small" icon={<PlusOutlined />} />
                 </Dropdown>
             ) : activeMenu === 'environments' ? (
-                <Button size="small" icon={<PlusOutlined />} onClick={onCreateEnvironment} />
+                <Dropdown
+                    menu={{
+                        items: [
+                            { key: 'create', icon: <PlusOutlined />, label: '新建环境', onClick: onCreateEnvironment },
+                            { key: 'import', icon: <UploadOutlined />, label: '导入环境', onClick: openImportModal },
+                            { key: 'export', icon: <DownloadOutlined />, label: '导出环境', onClick: () => exportEnvironments(projectId || '') },
+                            { key: 'compare', icon: <SwapOutlined />, label: '对比环境', onClick: openCompareModal },
+                        ]
+                    }}
+                    trigger={['click']}
+                >
+                    <Button size="small" icon={<PlusOutlined />} />
+                </Dropdown>
             ) : (
                 <Button size="small" icon={<PlusOutlined />} loading={scriptSaving} onClick={onCreateScript} />
             )}

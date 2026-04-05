@@ -68,6 +68,39 @@ body,
     font-size: 11px;
 }
 
+.app-footer .ant-select {
+    height: 20px;
+    font-size: 11px;
+}
+
+.app-footer .ant-select .ant-select-selector {
+    height: 20px !important;
+    padding: 0 8px !important;
+    font-size: 11px;
+}
+
+.app-footer .ant-select .ant-select-selection-item,
+.app-footer .ant-select .ant-select-selection-placeholder {
+    line-height: 18px !important;
+    font-size: 11px;
+}
+
+.app-footer .ant-select .ant-select-arrow {
+    font-size: 10px;
+}
+
+.app-footer-env-label {
+    color: var(--text-secondary);
+    font-size: 11px;
+    margin-right: 6px;
+}
+
+.app-footer-env-selector {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+}
+
 .app-footer .ant-btn {
     border: none !important;
     background: transparent !important;
@@ -2791,6 +2824,32 @@ body,
 .theme-dark .app-footer {
     background: var(--bg-secondary);
     border-top-color: var(--border-subtle);
+}
+
+.theme-dark .app-footer .ant-select .ant-select-selector {
+    background: var(--bg-primary) !important;
+    border-color: var(--border-subtle) !important;
+    color: var(--text-primary) !important;
+}
+
+.theme-dark .app-footer .ant-select:hover .ant-select-selector {
+    border-color: var(--accent-primary) !important;
+}
+
+.theme-dark .app-footer .ant-select .ant-select-selection-item {
+    color: var(--text-primary) !important;
+}
+
+.theme-dark .app-footer .ant-select .ant-select-selection-placeholder {
+    color: var(--text-muted) !important;
+}
+
+.theme-dark .app-footer .ant-select .ant-select-arrow {
+    color: var(--text-secondary) !important;
+}
+
+.theme-dark .app-footer-env-label {
+    color: var(--text-muted);
 }
 
 .theme-dark .title-bar {

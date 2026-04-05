@@ -54,6 +54,8 @@ export function ExecuteHTTPRequestWithScripts(arg1:string,arg2:string,arg3:strin
 
 export function ExecuteHTTPRequestWithScriptsInline(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:models.HttpRequestSpec,arg7:string,arg8:string):Promise<models.CurlResponse>;
 
+export function ExportEnvironments(arg1:string):Promise<string>;
+
 export function ExtractVariables(arg1:string):Promise<Array<string>>;
 
 export function GetConfigDir():Promise<string>;
@@ -69,6 +71,8 @@ export function GetProjectTree(arg1:string):Promise<project.ProjectTree>;
 export function GetProjectsDir():Promise<string>;
 
 export function GetRequest(arg1:string):Promise<models.CurlRequest>;
+
+export function ImportEnvironments(arg1:string,arg2:string):Promise<Array<models.Environment>>;
 
 export function ImportPostmanCollection(arg1:string):Promise<models.Project>;
 

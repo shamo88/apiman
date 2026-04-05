@@ -49,6 +49,14 @@ func (a *App) DeleteEnvironment(projectID string, id string) error {
 	return a.service.DeleteEnvironment(projectID, id)
 }
 
+func (a *App) ExportEnvironments(projectID string) (string, error) {
+	return a.service.ExportEnvironments(projectID)
+}
+
+func (a *App) ImportEnvironments(projectID string, jsonData string) ([]models.Environment, error) {
+	return a.service.ImportEnvironments(projectID, jsonData)
+}
+
 func (a *App) GetGlobalVariables() (map[string]string, error) {
 	return a.service.GetGlobalVariables()
 }

@@ -5,7 +5,7 @@ import { InitProjectsDir, LoadAppConfig, LoadGlobalCookies, RenameProject } from
 import './App.css';
 import { ScriptHelpWindow, TitleBar } from './components/layout';
 import { MCPSettingsModal, HistoryModal, CookieModal, AddCaseModal, RenameCaseModal, RenameModal, CreateGroupModal, RenameProjectModal, RenameGroupModal } from './components/modals';
-import { AppFooter, EmptyState, EnvironmentPanel, HomePage, ProjectSidebar, ScriptPanel } from './components/home';
+import { AppFooter, EmptyState, EnvironmentView, HomePage, ProjectSidebar, ScriptPanel } from './components/home';
 import { RequestTabsBar } from './components/sidebar';
 import { ResponseViewer } from './components/response';
 import { VariableEditableInput, RequestEditor } from './components/request';
@@ -496,33 +496,27 @@ function App() {
 
                             {sidebarMenu === 'environments' ? (
                                 <div className="request-panel">
-                                    {environmentTabs.length > 0 ? (
-                                        <>
-                                            <Tabs
-                                                activeKey={activeEnvironmentTab}
-                                                onChange={(key) => setActiveEnvironmentTab(key)}
-                                                type="editable-card"
-                                                hideAdd
-                                                onEdit={(targetKey, action) => {
-                                                    if (action === 'remove') {
-                                                        closeEnvironmentTab(targetKey as string);
-                                                    }
-                                                }}
-                                                items={environmentTabs.map(tab => ({
-                                                    key: tab.key,
-                                                    label: tab.title,
-                                                }))}
-                                                size="small"
-                                                style={{ marginBottom: 12 }}
-                                                animated={(animationEnabled || forceListAnimation)}
-                                            />
-                                            <EnvironmentPanel
-                                                projectId={activeProject?.id || ''}
-                                            />
-                                        </>
-                                    ) : (
-                                        <Empty description="请先在左侧选择环境，或点击新建" />
-                                    )}
+                                    <Tabs
+                                        activeKey={activeEnvironmentTab}
+                                        onChange={(key) => setActiveEnvironmentTab(key)}
+                                        type="editable-card"
+                                        hideAdd
+                                        onEdit={(targetKey, action) => {
+                                            if (action === 'remove') {
+                                                closeEnvironmentTab(targetKey as string);
+                                            }
+                                        }}
+                                        items={environmentTabs.map(tab => ({
+                                            key: tab.key,
+                                            label: tab.title,
+                                        }))}
+                                        size="small"
+                                        style={{ marginBottom: 12 }}
+                                        animated={(animationEnabled || forceListAnimation)}
+                                    />
+                                    <EnvironmentView
+                                        projectId={activeProject?.id || ''}
+                                    />
                                 </div>
                             ) : sidebarMenu === 'scripts' ? (
                                 <div className="request-panel">

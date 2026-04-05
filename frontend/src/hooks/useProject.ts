@@ -28,6 +28,9 @@ export interface UseProjectReturn {
     updateVariable: (id: string, field: 'key' | 'value', value: string) => void;
     saveEnvironment: (projectId: string) => Promise<void>;
     deleteEnvironment: (projectId: string) => Promise<void>;
+    openImportModal: () => void;
+    openCompareModal: () => void;
+    exportEnvironments: (projectId: string) => Promise<void>;
 
     // Scripts (from context)
     projectScripts: ProjectScript[];
@@ -138,6 +141,9 @@ export function useProject(projectId: string | undefined): UseProjectReturn {
         updateVariable: environment.updateVariable,
         saveEnvironment: environment.saveEnvironment,
         deleteEnvironment: environment.deleteEnvironment,
+        openImportModal: environment.openImportModal,
+        openCompareModal: environment.openCompareModal,
+        exportEnvironments: environment.exportEnvironments,
 
         // Scripts (from context)
         projectScripts: script.projectScripts,

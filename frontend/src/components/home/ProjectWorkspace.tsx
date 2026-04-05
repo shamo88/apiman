@@ -68,6 +68,7 @@ export const ProjectSidebar: React.FC<ProjectSidebarProps> = ({
                 onCreateRequest={handleOpenCreateRequest}
                 onCreateEnvironment={onCreateEnvironment}
                 onCreateScript={onCreateScript}
+                projectId={projectId}
                 scriptSaving={project.scriptSaving}
             />
 

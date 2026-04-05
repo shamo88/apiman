@@ -102,6 +102,10 @@ export function ExecuteHTTPRequestWithScriptsInline(arg1, arg2, arg3, arg4, arg5
   return window['go']['main']['App']['ExecuteHTTPRequestWithScriptsInline'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 }
 
+export function ExportEnvironments(arg1) {
+  return window['go']['main']['App']['ExportEnvironments'](arg1);
+}
+
 export function ExtractVariables(arg1) {
   return window['go']['main']['App']['ExtractVariables'](arg1);
 }
@@ -132,6 +136,10 @@ export function GetProjectsDir() {
 
 export function GetRequest(arg1) {
   return window['go']['main']['App']['GetRequest'](arg1);
+}
+
+export function ImportEnvironments(arg1, arg2) {
+  return window['go']['main']['App']['ImportEnvironments'](arg1, arg2);
 }
 
 export function ImportPostmanCollection(arg1) {

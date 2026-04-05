@@ -2,6 +2,7 @@ export { AppFooter } from './AppFooter';
 export { EmptyState } from './EmptyState';
 export { EnvironmentVarEditor } from './EnvironmentVarRow';
 export { EnvironmentPanel } from './EnvironmentPanel';
+export { EnvironmentView } from './EnvironmentView';
 export { HomePage } from './HomePage';
 export { ProjectSidebar } from './ProjectWorkspace';
 export { ProjectSearchBar } from './ProjectSearchBar';
