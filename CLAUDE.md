@@ -243,3 +243,9 @@ internal/mcp/
 请求路径格式为 `request|project-id|request-id`，用例路径格式为 `requestCase|project-id|request-id|case-id`。
 
 详细技术方案见 [docs/mcp-server-design.md](docs/mcp-server-design.md)。
+
+
+
+# 代码规范：
+### 严格遵守单一职责
+### 模块化编程，每段代码都应该归属各自的模块
