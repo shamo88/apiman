@@ -6,21 +6,29 @@ import { SearchOutlined, ImportOutlined, FolderOutlined, PlusOutlined } from '@a
 interface ProjectSearchBarProps {
     searchKeyword: string;
     onSearchChange: (keyword: string) => void;
-    onImport: () => void;
+    onImport: (file: File) => void;
     onCreateGroup: () => void;
     onCreateProject: () => void;
-    uploadProps: UploadProps;
-    importing: boolean;
 }
 
 export const ProjectSearchBar: React.FC<ProjectSearchBarProps> = ({
     searchKeyword,
     onSearchChange,
+    onImport,
     onCreateGroup,
     onCreateProject,
-    uploadProps,
-    importing,
 }) => {
+    const uploadProps: UploadProps = {
+        name: 'file',
+        multiple: false,
+        accept: '.json',
+        showUploadList: false,
+        beforeUpload: (file) => {
+            onImport(file);
+            return false;
+        },
+    };
+
     return (
         <div className="home-header">
             <h2>我的项目</h2>
@@ -34,7 +42,7 @@ export const ProjectSearchBar: React.FC<ProjectSearchBarProps> = ({
                     style={{ width: 260 }}
                 />
                 <Upload {...uploadProps}>
-                    <Button icon={<ImportOutlined />} loading={importing}>
+                    <Button icon={<ImportOutlined />}>
                         导入 Postman
                     </Button>
                 </Upload>

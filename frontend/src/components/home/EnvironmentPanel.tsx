@@ -2,15 +2,16 @@ import React from 'react';
 import { Button, Input, Space } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { EnvironmentVarEditor } from './EnvironmentVarRow';
-import { useEnvironment } from '../../hooks/useEnvironment';
+import { useProjectContext } from '../../contexts/ProjectContext';
 
 interface EnvironmentPanelProps {
-    projectId: string;
+    projectId: string | undefined;
 }
 
 export const EnvironmentPanel: React.FC<EnvironmentPanelProps> = ({
     projectId,
 }) => {
+    const { environment } = useProjectContext();
     const {
         environmentFormName,
         environmentFormVariables,
@@ -23,14 +24,18 @@ export const EnvironmentPanel: React.FC<EnvironmentPanelProps> = ({
         resetEnvironmentEditor,
         saveEnvironment,
         deleteEnvironment,
-    } = useEnvironment();
+    } = environment;
 
     const handleSave = () => {
-        saveEnvironment(projectId);
+        if (projectId) {
+            saveEnvironment(projectId);
+        }
     };
 
     const handleDelete = () => {
-        deleteEnvironment(projectId);
+        if (projectId) {
+            deleteEnvironment(projectId);
+        }
     };
 
     return (

@@ -1,16 +1,17 @@
 import React from 'react';
-import { Button, Input, Space, Tooltip, message } from 'antd';
+import { Button, Input, Space, Tooltip, message, Empty } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import { ScriptEditor } from '../request/ScriptEditor';
-import { useScriptContext } from '../../contexts/ScriptContext';
+import { useProjectContext } from '../../contexts/ProjectContext';
 
 interface ScriptPanelProps {
-    projectId: string;
+    projectId: string | undefined;
 }
 
 export const ScriptPanel: React.FC<ScriptPanelProps> = ({
     projectId,
 }) => {
+    const { script } = useProjectContext();
     const {
         scriptFormName,
         scriptFormDescription,
@@ -22,8 +23,8 @@ export const ScriptPanel: React.FC<ScriptPanelProps> = ({
         updateScriptContent,
         saveScript,
         deleteScript,
-        toggleScriptHelp,
-    } = useScriptContext();
+        setScriptHelpVisible,
+    } = script;
 
     const handleSave = () => {
         if (!projectId) {
@@ -40,6 +41,14 @@ export const ScriptPanel: React.FC<ScriptPanelProps> = ({
         }
         deleteScript(projectId, [], [], () => {});
     };
+
+    if (!editingScriptId) {
+        return (
+            <div className="environment-panel script-panel">
+                <Empty description="请先在左侧选择脚本，或点击新建" />
+            </div>
+        );
+    }
 
     return (
         <div className="environment-panel script-panel">
@@ -64,12 +73,10 @@ export const ScriptPanel: React.FC<ScriptPanelProps> = ({
                         <Button
                             type="text"
                             icon={<QuestionCircleOutlined />}
-                            onClick={toggleScriptHelp}
+                            onClick={() => setScriptHelpVisible(true)}
                         />
                     </Tooltip>
-                    {editingScriptId && (
-                        <Button danger onClick={handleDelete}>删除</Button>
-                    )}
+                    <Button danger onClick={handleDelete}>删除</Button>
                     <Button type="primary" loading={scriptSaving} onClick={handleSave}>保存脚本</Button>
                 </Space>
             </div>

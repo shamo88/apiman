@@ -1,89 +1,59 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Card, Col, Dropdown, Empty, Row, Select, Spin, message } from 'antd';
 import {
-    ApiOutlined, CloseOutlined, CopyOutlined, DownOutlined, EditOutlined, FolderOutlined,
-    HomeOutlined, MoreOutlined, ProjectOutlined, RightOutlined
+    CloseOutlined, CopyOutlined, DownOutlined, EditOutlined, FolderOutlined,
+    MoreOutlined, ProjectOutlined, RightOutlined
 } from '@ant-design/icons';
 import type { Project } from '../../types';
 import { ProjectSearchBar } from './ProjectSearchBar';
 import { EmptyState } from './EmptyState';
+import { useProjects } from '../../hooks/useProjects';
+import { useProjectContext } from '../../contexts/ProjectContext';
+import { DEFAULT_PROJECT_GROUP } from '../../types';
+import { CreateProjectModal, CreateGroupModal } from '../modals';
 
 interface GroupedProject {
     groupName: string;
     projects: Project[];
 }
 
-interface HomePageProps {
-    projects: Project[];
-    loading: boolean;
-    searchKeyword: string;
-    projectGroups: string[];
-    projectGroupAssignments: Record<string, string>;
-    collapsedProjectGroups: Set<string>;
-    draggingProjectId: string | null;
-    projectDropTargetGroup: string | null;
-    groupSortDropTarget: string | null;
-    draggingGroupName: string | null;
-    createGroupModal: boolean;
-    createProjectModal: boolean;
-    uploadProps: any;
-    importing: boolean;
-    DEFAULT_PROJECT_GROUP: string;
-    onSearchChange: (keyword: string) => void;
-    onCreateGroup: () => void;
-    onCreateProject: () => void;
-    onAssignProjectGroup: (projectId: string, groupName: string) => void;
-    onToggleGroupCollapse: (groupName: string) => void;
-    onGroupDragStart: (groupName: string, e: React.DragEvent) => void;
-    onGroupDragOver: (groupName: string, e: React.DragEvent) => void;
-    onGroupDrop: (groupName: string, e: React.DragEvent) => void;
-    onDragEnd: () => void;
-    onOpenProject: (project: Project) => void;
-    onDeleteProject: (projectId: string, e?: React.MouseEvent) => void;
-    onRenameProject: (project: Project, e?: React.MouseEvent) => void;
-    onCreateGroupWithName: (name: string) => void;
-    onDeleteGroup: (groupName: string) => void;
-    onOpenRenameGroupModal: (groupName: string) => void;
-    onSetDraggingProjectId: (id: string | null) => void;
-    onSetProjectDropTargetGroup: (group: string | null) => void;
-}
+export const HomePage: React.FC = () => {
+    const { openProject } = useProjectContext();
+    const {
+        projects,
+        loading,
+        projectGroups,
+        projectGroupAssignments,
+        collapsedProjectGroups,
+        draggingProjectId,
+        projectDropTargetGroup,
+        groupSortDropTarget,
+        handleAssignProjectGroup,
+        toggleProjectGroupCollapse,
+        handleGroupDragStart,
+        handleGroupDragOver,
+        handleGroupDrop,
+        handleDeleteProject,
+        openRenameProjectModal,
+        createGroupWithName,
+        handleDeleteProjectGroup,
+        openRenameProjectGroupModal,
+        handleImportPostman,
+        setProjectSearchKeyword,
+        projectSearchKeyword,
+        createProjectModal,
+        createGroupModal,
+        setCreateGroupModal,
+        setCreateProjectModal,
+        createProjectWithName,
+        setDraggingProjectId,
+        setProjectDropTargetGroup,
+        setDraggingGroupName,
+        setGroupSortDropTarget,
+    } = useProjects();
 
-export const HomePage: React.FC<HomePageProps> = ({
-    projects,
-    loading,
-    searchKeyword,
-    projectGroups,
-    projectGroupAssignments,
-    collapsedProjectGroups,
-    draggingProjectId,
-    projectDropTargetGroup,
-    groupSortDropTarget,
-    draggingGroupName,
-    createGroupModal,
-    createProjectModal,
-    uploadProps,
-    importing,
-    DEFAULT_PROJECT_GROUP,
-    onSearchChange,
-    onCreateGroup,
-    onCreateProject,
-    onAssignProjectGroup,
-    onToggleGroupCollapse,
-    onGroupDragStart,
-    onGroupDragOver,
-    onGroupDrop,
-    onDragEnd,
-    onOpenProject,
-    onDeleteProject,
-    onRenameProject,
-    onCreateGroupWithName,
-    onDeleteGroup,
-    onOpenRenameGroupModal,
-    onSetDraggingProjectId,
-    onSetProjectDropTargetGroup,
-}) => {
     // Group projects
-    const groupedProjects: GroupedProject[] = React.useMemo(() => {
+    const groupedProjects: GroupedProject[] = useMemo(() => {
         const bucket: Record<string, Project[]> = {};
         const orderedGroups = [...projectGroups, DEFAULT_PROJECT_GROUP];
 
@@ -101,12 +71,12 @@ export const HomePage: React.FC<HomePageProps> = ({
                 groupName,
                 projects: bucket[groupName] || [],
             }));
-    }, [projects, projectGroups, projectGroupAssignments, DEFAULT_PROJECT_GROUP]);
+    }, [projects, projectGroups, projectGroupAssignments]);
 
     // Filter by search keyword
-    const filteredProjects = React.useMemo(() => {
-        if (!searchKeyword) return groupedProjects;
-        const keyword = searchKeyword.toLowerCase();
+    const filteredProjects = useMemo(() => {
+        if (!projectSearchKeyword) return groupedProjects;
+        const keyword = projectSearchKeyword.toLowerCase();
         return groupedProjects
             .map(group => ({
                 ...group,
@@ -115,18 +85,21 @@ export const HomePage: React.FC<HomePageProps> = ({
                 ),
             }))
             .filter(group => group.projects.length > 0 || group.groupName.toLowerCase().includes(keyword));
-    }, [groupedProjects, searchKeyword]);
+    }, [groupedProjects, projectSearchKeyword]);
+
+    const handleDragEnd = () => {
+        setDraggingGroupName(null);
+        setGroupSortDropTarget(null);
+    };
 
     return (
         <div className="home-page">
             <ProjectSearchBar
-                searchKeyword={searchKeyword}
-                onSearchChange={onSearchChange}
-                onCreateGroup={onCreateGroup}
-                onCreateProject={onCreateProject}
-                uploadProps={uploadProps}
-                importing={importing}
-                onImport={() => {}}
+                searchKeyword={projectSearchKeyword}
+                onSearchChange={setProjectSearchKeyword}
+                onImport={handleImportPostman}
+                onCreateGroup={() => setCreateGroupModal(true)}
+                onCreateProject={() => setCreateProjectModal(true)}
             />
 
             {loading && <Spin style={{ display: 'block', margin: '40px auto' }} />}
@@ -154,18 +127,18 @@ export const HomePage: React.FC<HomePageProps> = ({
                             onDrop={(e) => {
                                 e.preventDefault();
                                 if (!draggingProjectId) return;
-                                onAssignProjectGroup(draggingProjectId, group.groupName);
+                                handleAssignProjectGroup(draggingProjectId, group.groupName);
                                 message.success(`已移动到分组：${group.groupName}`);
                             }}
                         >
                             <div
                                 className={`project-group-header${groupSortDropTarget === group.groupName ? ' sort-drop-target' : ''}`}
                                 draggable={group.groupName !== DEFAULT_PROJECT_GROUP}
-                                onDragStart={(e) => onGroupDragStart(group.groupName, e)}
-                                onDragOver={(e) => onGroupDragOver(group.groupName, e)}
-                                onDrop={(e) => onGroupDrop(group.groupName, e)}
-                                onDragEnd={onDragEnd}
-                                onClick={() => onToggleGroupCollapse(group.groupName)}
+                                onDragStart={(e) => handleGroupDragStart(group.groupName, e)}
+                                onDragOver={(e) => handleGroupDragOver(group.groupName, e)}
+                                onDrop={(e) => handleGroupDrop(group.groupName, e)}
+                                onDragEnd={handleDragEnd}
+                                onClick={() => toggleProjectGroupCollapse(group.groupName)}
                             >
                                 <div className="project-group-header-left">
                                     <span className="project-group-toggle-icon">
@@ -184,7 +157,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                                                     icon: <EditOutlined />,
                                                     label: '重命名分组',
                                                     onClick: () => {
-                                                        onOpenRenameGroupModal(group.groupName);
+                                                        openRenameProjectGroupModal(group.groupName);
                                                     },
                                                 },
                                                 {
@@ -193,7 +166,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                                                     label: '删除分组',
                                                     danger: true,
                                                     onClick: () => {
-                                                        onDeleteGroup(group.groupName);
+                                                        handleDeleteProjectGroup(group.groupName);
                                                     },
                                                 },
                                             ],
@@ -221,14 +194,14 @@ export const HomePage: React.FC<HomePageProps> = ({
                                                         className="project-card"
                                                         onDragStart={(e) => {
                                                             e.stopPropagation();
-                                                            onSetDraggingProjectId(project.id);
+                                                            setDraggingProjectId(project.id);
                                                             e.dataTransfer.effectAllowed = 'move';
                                                         }}
                                                         onDragEnd={() => {
-                                                            onSetDraggingProjectId(null);
-                                                            onSetProjectDropTargetGroup(null);
+                                                            setDraggingProjectId(null);
+                                                            setProjectDropTargetGroup(null);
                                                         }}
-                                                        onClick={() => onOpenProject(project)}
+                                                        onClick={() => openProject(project)}
                                                     >
                                                         <Dropdown
                                                             trigger={['click']}
@@ -240,7 +213,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                                                                         label: '重命名',
                                                                         onClick: ({ domEvent }) => {
                                                                             domEvent.stopPropagation();
-                                                                            onRenameProject(project);
+                                                                            openRenameProjectModal(project);
                                                                         }
                                                                     },
                                                                     {
@@ -250,7 +223,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                                                                         danger: true,
                                                                         onClick: ({ domEvent }) => {
                                                                             domEvent.stopPropagation();
-                                                                            onDeleteProject(project.id);
+                                                                            handleDeleteProject(project.id);
                                                                         }
                                                                     },
                                                                 ]
@@ -270,7 +243,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                                                             <Select
                                                                 size="small"
                                                                 value={projectGroupAssignments[project.id] || DEFAULT_PROJECT_GROUP}
-                                                                onChange={(value) => onAssignProjectGroup(project.id, value)}
+                                                                onChange={(value) => handleAssignProjectGroup(project.id, value)}
                                                                 options={[
                                                                     { label: DEFAULT_PROJECT_GROUP, value: DEFAULT_PROJECT_GROUP },
                                                                     ...projectGroups.map(groupName => ({ label: groupName, value: groupName })),
@@ -294,6 +267,18 @@ export const HomePage: React.FC<HomePageProps> = ({
                     ))}
                 </div>
             )}
+
+            <CreateProjectModal
+                visible={createProjectModal}
+                onClose={() => setCreateProjectModal(false)}
+                onConfirm={createProjectWithName}
+            />
+
+            <CreateGroupModal
+                visible={createGroupModal}
+                onClose={() => setCreateGroupModal(false)}
+                onConfirm={createGroupWithName}
+            />
         </div>
     );
 };

@@ -1,82 +1,69 @@
 import React from 'react';
 import { Tabs, Select } from 'antd';
-
-interface RequestTab {
-    id: string;
-    title: string;
-    path: string;
-}
-
-interface Environment {
-    id: string;
-    name: string;
-}
+import { useRequest } from '../../hooks/useRequest';
+import { useProject } from '../../hooks/useProject';
 
 interface RequestTabsBarProps {
-    requestTabs: RequestTab[];
-    activeRequestTab: string;
-    selectedEnvironmentId: string;
-    environments: Environment[];
-    animationEnabled: boolean;
-    onTabChange: (key: string) => void;
-    onTabClose: (targetKey: string) => void;
-    onEnvironmentChange: (envId: string) => void;
-    loadRequestContent: (path: string) => void;
+    projectId: string | undefined;
 }
 
 export const RequestTabsBar: React.FC<RequestTabsBarProps> = ({
-    requestTabs,
-    activeRequestTab,
-    selectedEnvironmentId,
-    environments,
-    animationEnabled,
-    onTabChange,
-    onTabClose,
-    onEnvironmentChange,
-    loadRequestContent,
+    projectId,
 }) => {
+    const useReq = useRequest({});
+    const project = useProject(projectId);
+
+    const { requestTabs, activeRequestTab } = useReq;
+    const { environments, selectedEnvironmentId, setSelectedEnvironmentId } = project;
+
     if (requestTabs.length === 0) {
         return null;
     }
+
+    const handleTabChange = (key: string) => {
+        useReq.setActiveRequestTab(key);
+        const tab = requestTabs.find(t => t.id === key);
+        if (tab) {
+            useReq.loadRequestContent(tab.path);
+        }
+    };
+
+    const handleTabClose = (targetKey: string) => {
+        useReq.handleCloseRequestTab(targetKey);
+    };
 
     return (
         <div className="request-tabs-row">
             <div className="request-tabs-scroll-wrap">
                 <Tabs
                     activeKey={activeRequestTab}
-                    onChange={(key) => {
-                        onTabChange(key);
-                        const tab = requestTabs.find(t => t.id === key);
-                        if (tab) loadRequestContent(tab.path);
-                    }}
+                    onChange={handleTabChange}
                     type="editable-card"
                     hideAdd
                     onEdit={(targetKey, action) => {
                         if (action === 'remove') {
-                            onTabClose(targetKey as string);
+                            handleTabClose(targetKey as string);
                         }
                     }}
                     items={requestTabs.map(tab => ({
                         key: tab.id,
                         label: tab.title,
                     }))}
-                    size="small"
-                    style={{ marginBottom: 0 }}
-                    animated={animationEnabled}
+                    animated={false}
                 />
             </div>
-            <div className="request-tabs-environment-select">
+            {environments.length > 0 && (
                 <Select
-                    size="small"
-                    value={selectedEnvironmentId || '__none__'}
-                    onChange={(value) => onEnvironmentChange(value === '__none__' ? '' : value)}
+                    value={selectedEnvironmentId || undefined}
+                    onChange={setSelectedEnvironmentId}
                     options={[
-                        { label: '不使用环境', value: '__none__' },
-                        ...environments.map(env => ({ label: env.name, value: env.id }))
+                        { label: '无环境', value: '' },
+                        ...environments.map(env => ({ label: env.name, value: env.id })),
                     ]}
-                    style={{ width: 133 }}
+                    style={{ width: 140, marginLeft: 8 }}
+                    placeholder="选择环境"
                 />
-            </div>
+            )}
         </div>
     );
 };

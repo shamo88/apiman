@@ -42,12 +42,6 @@ export interface WorkspaceState {
     addCaseTargetPath: string;
     addCaseNameInput: string;
 
-    // Create modals
-    createFolderModal: boolean;
-    newFolderName: string;
-    createRequestModal: boolean;
-    newRequestName: string;
-
     // Rename modal
     renameModal: boolean;
     renameType: 'request' | 'folder';
@@ -118,12 +112,6 @@ export interface WorkspaceActions {
     setAddCaseModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     setAddCaseTargetPath: React.Dispatch<React.SetStateAction<string>>;
     setAddCaseNameInput: React.Dispatch<React.SetStateAction<string>>;
-
-    // Create modals
-    setCreateFolderModal: React.Dispatch<React.SetStateAction<boolean>>;
-    setNewFolderName: React.Dispatch<React.SetStateAction<string>>;
-    setCreateRequestModal: React.Dispatch<React.SetStateAction<boolean>>;
-    setNewRequestName: React.Dispatch<React.SetStateAction<string>>;
 
     // Rename modal
     setRenameModal: React.Dispatch<React.SetStateAction<boolean>>;
@@ -245,12 +233,6 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
     const [addCaseModalOpen, setAddCaseModalOpen] = useState(false);
     const [addCaseTargetPath, setAddCaseTargetPath] = useState('');
     const [addCaseNameInput, setAddCaseNameInput] = useState('');
-
-    // Create modals
-    const [createFolderModal, setCreateFolderModal] = useState(false);
-    const [newFolderName, setNewFolderName] = useState('');
-    const [createRequestModal, setCreateRequestModal] = useState(false);
-    const [newRequestName, setNewRequestName] = useState('');
 
     // Rename modal
     const [renameModal, setRenameModal] = useState(false);
@@ -384,16 +366,6 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
         setAddCaseTargetPath,
         addCaseNameInput,
         setAddCaseNameInput,
-
-        // Create modals
-        createFolderModal,
-        setCreateFolderModal,
-        newFolderName,
-        setNewFolderName,
-        createRequestModal,
-        setCreateRequestModal,
-        newRequestName,
-        setNewRequestName,
 
         // Rename modal
         renameModal,

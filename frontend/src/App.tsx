@@ -1,23 +1,16 @@
 import { HomeOutlined } from '@ant-design/icons';
-import type { UploadProps } from 'antd';
 import { Empty, InputRef, message, Tabs } from 'antd';
 import React, { useEffect, useState } from 'react';
-import { CreateProject, InitProjectsDir, LoadAppConfig, LoadGlobalCookies, RenameProject } from '../wailsjs/go/main/App';
+import { InitProjectsDir, LoadAppConfig, LoadGlobalCookies, RenameProject } from '../wailsjs/go/main/App';
 import './App.css';
 import { ScriptHelpWindow, TitleBar } from './components/layout';
-import { MCPSettingsModal, HistoryModal, CookieModal, AddCaseModal, RenameCaseModal, CreateFolderModal, CreateRequestModal, RenameModal, CreateProjectModal, CreateGroupModal, RenameProjectModal, RenameGroupModal } from './components/modals';
+import { MCPSettingsModal, HistoryModal, CookieModal, AddCaseModal, RenameCaseModal, RenameModal, CreateGroupModal, RenameProjectModal, RenameGroupModal } from './components/modals';
 import { AppFooter, EmptyState, EnvironmentPanel, HomePage, ProjectSidebar, ScriptPanel } from './components/home';
 import { RequestTabsBar } from './components/sidebar';
 import { ResponseViewer } from './components/response';
 import { VariableEditableInput, RequestEditor } from './components/request';
 import { buildCurlCommand, parseCurlToApiConfig } from './utils/curlUtils';
 import {
-    findTreeNode,
-    getChildrenByFolderPath,
-    getParentFolderPath,
-    checkDropAppendIntoFolder,
-    checkDropOrdered,
-    getDropHintMessage,
     replacePathPrefix,
 } from './utils/treeUtils';
 import {
@@ -28,25 +21,14 @@ import {
     DEFAULT_PROJECT_GROUP,
 } from './types';
 import { useScriptContext } from './contexts/ScriptContext';
+import { ProjectProvider } from './contexts/ProjectContext';
 import { useEnvironment } from './hooks/useEnvironment';
 import { useMCP } from './hooks/useMCP';
 import { useProjects } from './hooks/useProjects';
 import { useRequest } from './hooks/useRequest';
 
-// ProjectTree interface - uses string type to match Wails generated model
-interface ProjectTree {
-    id: string;
-    name: string;
-    type: string;
-    method?: string;
-    url?: string;
-    children?: ProjectTree[];
-    path?: string;
-}
-
 function App() {
     const [status, setStatus] = useState('初始化中...');
-    const [createProjectModal, setCreateProjectModal] = useState(false);
     const [cookieModalVisible, setCookieModalVisible] = useState(false);
     const [cookieInput, setCookieInput] = useState('');
     const [globalCookies, setGlobalCookies] = useState<any[]>([]);
@@ -131,10 +113,6 @@ function App() {
         addCaseModalOpen,
         addCaseTargetPath,
         addCaseNameInput,
-        createFolderModal,
-        newFolderName,
-        createRequestModal,
-        newRequestName,
         renameModal,
         renameType,
         renamePath,
@@ -174,10 +152,6 @@ function App() {
         setAddCaseModalOpen,
         setAddCaseTargetPath,
         setAddCaseNameInput,
-        setCreateFolderModal,
-        setNewFolderName,
-        setCreateRequestModal,
-        setNewRequestName,
         setRenameModal,
         setRenameType,
         setRenamePath,
@@ -285,12 +259,6 @@ function App() {
 
     // Derived value: current active project
     const activeProject = projectTabs.find(t => t.id === activeTab)?.project;
-
-    const clearDragState = () => {
-        useReq.setDraggingNode(null);
-        useReq.setDropTargetFolderPath(null);
-        useReq.setInvalidDropHint(null);
-    };
 
     // Re-export workspace state functions from useRequest
     const resetWorkspaceState = useReq.resetWorkspaceState;
@@ -422,28 +390,6 @@ function App() {
         setCurlPreview(buildCurlCommand(apiConfig));
     }, [apiConfig.method, apiConfig.url, apiConfig.headers, apiConfig.params, apiConfig.body, apiConfig.bodyType, apiConfig.formData, apiConfig.urlencoded]);
 
-    const uploadProps: UploadProps = {
-        name: 'file',
-        multiple: false,
-        accept: '.json',
-        showUploadList: false,
-        beforeUpload: (file) => {
-            useProjs.handleImportPostman(file);
-            return false;
-        },
-    };
-
-    const createProjectWithName = async (name: string) => {
-        try {
-            await CreateProject(name);
-            message.success('项目创建成功');
-            loadProjects();
-        } catch (error: any) {
-            console.error('Failed to create project:', error);
-            message.error(`创建失败: ${error?.message || error}`);
-        }
-    };
-
     const openRenameProjectModal = (project: Project, e?: React.MouseEvent) => {
         e?.stopPropagation();
         setRenameProjectId(project.id);
@@ -465,11 +411,6 @@ function App() {
         }
     };
 
-    // Tree utility wrappers that pass currentTree
-    const getNodeByPath = (path: string): ProjectTree | null => {
-        return findTreeNode(currentTree, path);
-    };
-
     // Environment action wrappers - convert () => void interface for EnvironmentPanel
     const handleCreateEnvironment = () => {
         useEnv.openCreateEnvironmentTab(projectTabs, activeTab);
@@ -486,8 +427,6 @@ function App() {
         }, 0);
     }, [renameModal]);
 
-
-    const currentTree = activeProject ? projectTrees[activeProject.id] : null;
     const tabItems = [
         {
             key: 'home',
@@ -506,153 +445,52 @@ function App() {
     ];
 
     return (
-        <div className={`app-container ${appTheme === 'dark' ? 'theme-dark' : ''}`}>
-            <TitleBar
-                activeTab={activeTab}
-                onListAnimationChange={setListAnimationEnabled}
-                onThemeChange={(theme) => {
-                    localStorage.setItem('apiman-theme', theme);
-                    setAppTheme(theme as 'light' | 'dark');
-                }}
-                theme={appTheme}
-                onSettingsSave={loadProjects}
-                onTabChange={(key) => {
-                    switchProjectTab(key);
-                }}
-                onTabEdit={(targetKey, action) => {
-                    if (action === 'remove' && targetKey !== 'home') {
-                        handleCloseProjectTab(targetKey as string);
-                    }
-                }}
-                tabItems={tabItems}
-            />
+        <ProjectProvider
+            onOpenProject={handleOpenProject}
+            environment={useEnv}
+            script={useScriptContext()}
+        >
+            <div className={`app-container ${appTheme === 'dark' ? 'theme-dark' : ''}`}>
+                <TitleBar
+                    activeTab={activeTab}
+                    onListAnimationChange={setListAnimationEnabled}
+                    onThemeChange={(theme) => {
+                        localStorage.setItem('apiman-theme', theme);
+                        setAppTheme(theme as 'light' | 'dark');
+                    }}
+                    theme={appTheme}
+                    onSettingsSave={loadProjects}
+                    onTabChange={(key) => {
+                        switchProjectTab(key);
+                    }}
+                    onTabEdit={(targetKey, action) => {
+                        if (action === 'remove' && targetKey !== 'home') {
+                            handleCloseProjectTab(targetKey as string);
+                        }
+                    }}
+                    tabItems={tabItems}
+                />
 
-            <div className="app-content">
-                {activeTab === 'home' ? (
-                    <HomePage
-                        projects={projects as any}
-                        loading={loading}
-                        searchKeyword={projectSearchKeyword}
-                        projectGroups={projectGroups}
-                        projectGroupAssignments={projectGroupAssignments}
-                        collapsedProjectGroups={collapsedProjectGroups}
-                        draggingProjectId={draggingProjectId}
-                        projectDropTargetGroup={projectDropTargetGroup}
-                        groupSortDropTarget={groupSortDropTarget}
-                        draggingGroupName={draggingGroupName}
-                        createGroupModal={createGroupModal}
-                        createProjectModal={createProjectModal}
-                        uploadProps={uploadProps}
-                        importing={importing}
-                        DEFAULT_PROJECT_GROUP={DEFAULT_PROJECT_GROUP}
-                        onSearchChange={setProjectSearchKeyword}
-                        onCreateGroup={() => setCreateGroupModal(true)}
-                        onCreateProject={() => setCreateProjectModal(true)}
-                        onAssignProjectGroup={handleAssignProjectGroup}
-                        onToggleGroupCollapse={toggleProjectGroupCollapse}
-                        onGroupDragStart={handleGroupDragStart}
-                        onGroupDragOver={handleGroupDragOver}
-                        onGroupDrop={handleGroupDrop}
-                        onDragEnd={() => {
-                            setDraggingGroupName(null);
-                            setGroupSortDropTarget(null);
-                        }}
-                        onOpenProject={handleOpenProject}
-                        onDeleteProject={useProjs.handleDeleteProject}
-                        onRenameProject={(project) => openRenameProjectModal(project)}
-                        onCreateGroupWithName={createGroupWithName}
-                        onDeleteGroup={handleDeleteProjectGroup}
-                        onOpenRenameGroupModal={openRenameProjectGroupModal}
-                        onSetDraggingProjectId={setDraggingProjectId}
-                        onSetProjectDropTargetGroup={setProjectDropTargetGroup}
-                    />
-                ) : (
+                <div className="app-content">
+                    {activeTab === 'home' ? (
+                        <HomePage />
+                    ) : (
                     <div className="project-workspace">
                         <ProjectSidebar
+                            projectId={activeProject?.id}
                             sidebarMenu={sidebarMenu}
-                            currentTree={currentTree as any}
-                            treeLoading={loading}
-                            expandedKeys={expandedKeys}
-                            collapsedFolders={collapsedFolders}
-                            expandedRequestPaths={expandedRequestPaths}
-                            sidebarHighlightedCasePath={sidebarHighlightedCasePath}
-                            searchKeyword={searchKeyword}
-                            filterMethod={filterMethod}
-                            environments={environments}
-                            projectScripts={projectScripts}
-                            editingEnvironmentId={editingEnvironmentId}
-                            editingScriptId={editingScriptId}
-                            envLoading={envLoading}
-                            scriptsLoading={scriptsLoading}
-                            scriptSaving={scriptSaving}
-                            draggingNode={draggingNode}
-                            dropTargetFolderPath={dropTargetFolderPath}
-                            movedHighlightPath={movedHighlightPath}
-                            animationEnabled={animationEnabled}
-                            forceListAnimation={forceListAnimation}
-                            currentRequestPath={currentRequest?.path}
                             onSidebarMenuChange={setSidebarMenu}
-                            onCreateFolder={() => setCreateFolderModal(true)}
-                            onCreateRequest={() => setCreateRequestModal(true)}
                             onCreateEnvironment={handleCreateEnvironment}
                             onCreateScript={() => { if (activeProject) { createScript(activeProject.id); setSidebarMenu('scripts'); } }}
-                            onEnvironmentSelect={(env) => openEnvironmentEditor(env)}
-                            onScriptSelect={(script) => selectScript(script)}
-                            onSearchChange={(v) => { setSearchKeyword(v); setSearchVersion(p => p + 1); }}
-                            onMethodChange={setFilterMethod}
-                            onToggleExpand={(key) => { setExpandedKeys(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]); }}
-                            onFolderCollapse={useReq.toggleFolderCollapse}
-                            onItemClick={(key, node) => useReq.handleTreeItemClick(node)}
-                            onAddRequest={(folderPath) => { setSelectedFolder(folderPath || currentTree?.path || ''); setCreateRequestModal(true); }}
-                            onAddFolder={(folderPath) => { setSelectedFolder(folderPath || currentTree?.path || ''); setCreateFolderModal(true); }}
-                            onRename={useReq.openRenameModal}
-                            onDelete={(type, path) => { if (type === 'folder') { activeProject && useReq.handleDeleteFolder(path, activeProject.id); } else { activeProject && useReq.handleDeleteRequest(path, activeProject.id, requestTabs.find(t => t.path === path)?.id); } }}
-                            onCopy={(path) => { if (activeProject) { useReq.handleCopyRequest(path, activeProject.id); } }}
-                            onCaseClick={(casePath) => { const node = getNodeByPath(casePath); if (node) useReq.handleCaseTreeClick(node); }}
-                            onToggleCasesExpanded={useReq.toggleRequestCasesExpanded}
-                            onAddCase={useReq.openAddCaseModal}
-                            onDeleteCase={(casePath) => { if (activeProject) { useReq.handleDeleteCaseFromTree(casePath, activeProject.id); } }}
-                            onDuplicateCase={(casePath) => { if (activeProject) { useReq.handleDuplicateCaseFromTree(casePath, activeProject.id); } }}
-                            onRenameCase={useReq.openCaseRenameFromTree}
-                            onClearDragState={clearDragState}
-                            onSetDraggingNode={setDraggingNode}
-                            onSetDropTargetFolderPath={setDropTargetFolderPath}
-                            onSetInvalidDropHint={setInvalidDropHint}
-                            onCheckDropAppendIntoFolder={(dragNode, targetFolderPath) => checkDropAppendIntoFolder(currentTree, dragNode, targetFolderPath)}
-                            onCheckDropOrdered={(dragNode, parentContainerPath, beforeID) => checkDropOrdered(currentTree, dragNode, parentContainerPath, beforeID)}
-                            onGetDropHintMessage={getDropHintMessage}
-                            onMoveRequestNode={async (requestPath, targetFolderPath, beforeID = '') => {
-                                if (!activeProject) return;
-                                try {
-                                    await useReq.moveRequestNode(requestPath, targetFolderPath, beforeID ?? '', activeProject.id);
-                                } catch (error: any) {
-                                    message.error(`移动失败: ${error?.message || error}`);
-                                }
-                            }}
-                            onMoveFolderNode={async (folderPath, targetFolderPath, beforeID = '') => {
-                                if (!activeProject) return;
-                                try {
-                                    await useReq.moveFolderNode(folderPath, targetFolderPath, beforeID ?? '', activeProject.id);
-                                } catch (error: any) {
-                                    message.error(`移动失败: ${error?.message || error}`);
-                                }
-                            }}
-                            onGetParentFolderPath={(path) => getParentFolderPath(currentTree, path)}
-                            onGetChildrenByFolderPath={(folderPath) => getChildrenByFolderPath(currentTree, folderPath)}
+                            currentRequestPath={currentRequest?.path}
+                            animationEnabled={animationEnabled}
+                            forceListAnimation={forceListAnimation}
                         />
 
                         <div className="project-main">
                             {sidebarMenu === 'apis' && requestTabs.length > 0 && (
                                 <RequestTabsBar
-                                    requestTabs={requestTabs}
-                                    activeRequestTab={activeRequestTab}
-                                    selectedEnvironmentId={selectedEnvironmentId}
-                                    environments={environments}
-                                    animationEnabled={animationEnabled || forceListAnimation}
-                                    onTabChange={setActiveRequestTab}
-                                    onTabClose={useReq.handleCloseRequestTab}
-                                    onEnvironmentChange={setSelectedEnvironmentId}
-                                    loadRequestContent={useReq.loadRequestContent}
+                                    projectId={activeProject?.id}
                                 />
                             )}
 
@@ -688,13 +526,9 @@ function App() {
                                 </div>
                             ) : sidebarMenu === 'scripts' ? (
                                 <div className="request-panel">
-                                    {editingScriptId ? (
-                                        <ScriptPanel
-                                            projectId={activeProject?.id || ''}
-                                        />
-                                    ) : (
-                                        <Empty description="请先在左侧选择脚本，或点击新建" />
-                                    )}
+                                    <ScriptPanel
+                                        projectId={activeProject?.id}
+                                    />
                                 </div>
                             ) : currentRequest ? (
                                 <div className="request-response-container">
@@ -753,13 +587,6 @@ function App() {
                 </div>
             )}
 
-            <CreateProjectModal
-                visible={createProjectModal}
-                onClose={() => setCreateProjectModal(false)}
-                onConfirm={createProjectWithName}
-                appTheme={appTheme}
-            />
-
             <CreateGroupModal
                 visible={createGroupModal}
                 onClose={() => setCreateGroupModal(false)}
@@ -786,18 +613,6 @@ function App() {
                 }}
                 onConfirm={renameGroupWithName}
                 initialValue={renameGroupValue}
-            />
-
-            <CreateFolderModal
-                visible={createFolderModal}
-                onClose={() => { setCreateFolderModal(false); setNewFolderName(''); }}
-                onConfirm={() => { if (activeProject) { return useReq.handleCreateFolder(activeProject.id); } return Promise.resolve(); }}
-            />
-
-            <CreateRequestModal
-                visible={createRequestModal}
-                onClose={() => { setCreateRequestModal(false); setNewRequestName(''); }}
-                onConfirm={() => { if (activeProject) { return useReq.handleCreateRequest(activeProject.id); } return Promise.resolve(); }}
             />
 
             <RenameModal
@@ -869,7 +684,8 @@ function App() {
                 onOpenMCP={() => setMCpModalVisible(true)}
                 onOpenHistory={() => setHistoryModalVisible(true)}
             />
-        </div>
+            </div>
+        </ProjectProvider>
     );
 }
 

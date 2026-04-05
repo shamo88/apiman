@@ -148,11 +148,6 @@ export interface UseRequestState {
     addCaseModalOpen: boolean;
     addCaseTargetPath: string;
     addCaseNameInput: string;
-    // Create modals
-    createFolderModal: boolean;
-    newFolderName: string;
-    createRequestModal: boolean;
-    newRequestName: string;
     // Rename modal
     renameModal: boolean;
     renameType: 'request' | 'folder';
@@ -204,11 +199,6 @@ export interface UseRequestActions {
     setAddCaseModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     setAddCaseTargetPath: React.Dispatch<React.SetStateAction<string>>;
     setAddCaseNameInput: React.Dispatch<React.SetStateAction<string>>;
-    // Create modal actions
-    setCreateFolderModal: React.Dispatch<React.SetStateAction<boolean>>;
-    setNewFolderName: React.Dispatch<React.SetStateAction<string>>;
-    setCreateRequestModal: React.Dispatch<React.SetStateAction<boolean>>;
-    setNewRequestName: React.Dispatch<React.SetStateAction<string>>;
     // Rename modal actions
     setRenameModal: React.Dispatch<React.SetStateAction<boolean>>;
     setRenameType: React.Dispatch<React.SetStateAction<'request' | 'folder'>>;
@@ -231,8 +221,8 @@ export interface UseRequestActions {
     setSearchVersion: React.Dispatch<React.SetStateAction<number>>;
     setForceListAnimation: React.Dispatch<React.SetStateAction<boolean>>;
     // Request operations
-    handleCreateFolder: (projectId: string) => Promise<void>;
-    handleCreateRequest: (projectId: string) => Promise<void>;
+    handleCreateFolder: (projectId: string, name: string) => Promise<void>;
+    handleCreateRequest: (projectId: string, name: string) => Promise<void>;
     handleTreeItemClick: (treeNode: ProjectTree) => Promise<void>;
     loadRequestContent: (path: string) => Promise<void>;
     handleExecuteCurl: (projectId: string, projectName: string, selectedEnvironmentId: string, environments: Environment[]) => Promise<void>;
@@ -389,16 +379,6 @@ export function useRequest(options?: {
         addCaseNameInput,
         setAddCaseNameInput,
 
-        // Create modals
-        createFolderModal,
-        setCreateFolderModal,
-        newFolderName,
-        setNewFolderName,
-        createRequestModal,
-        setCreateRequestModal,
-        newRequestName,
-        setNewRequestName,
-
         // Rename modal
         renameModal,
         setRenameModal,
@@ -523,18 +503,16 @@ export function useRequest(options?: {
         }
     }, []);
 
-    const handleCreateFolder = useCallback(async (projectId: string) => {
-        if (!newFolderName.trim()) {
+    const handleCreateFolder = useCallback(async (projectId: string, name: string) => {
+        if (!name.trim()) {
             message.warning('请输入文件夹名称');
             return;
         }
 
         const parentPath = selectedFolder || '';
         try {
-            await CreateFolder(projectId, parentPath, newFolderName);
+            await CreateFolder(projectId, parentPath, name);
             message.success('文件夹创建成功');
-            setCreateFolderModal(false);
-            setNewFolderName('');
             const tree = await GetProjectTree(projectId);
             if (treeRefreshCallbackRef.current) {
                 treeRefreshCallbackRef.current(projectId, tree);
@@ -554,20 +532,18 @@ export function useRequest(options?: {
             message.error(`创建失败: ${error?.message || error}`);
             throw error;
         }
-    }, [newFolderName, selectedFolder]);
+    }, [selectedFolder]);
 
-    const handleCreateRequest = useCallback(async (projectId: string) => {
-        if (!newRequestName.trim()) {
+    const handleCreateRequest = useCallback(async (projectId: string, name: string) => {
+        if (!name.trim()) {
             message.warning('请输入请求名称');
             return;
         }
 
         const parentPath = selectedFolder || '';
         try {
-            await CreateRequest(projectId, parentPath, newRequestName, toWailsHttpSpec(createDefaultApiConfig()));
+            await CreateRequest(projectId, parentPath, name, toWailsHttpSpec(createDefaultApiConfig()));
             message.success('请求创建成功');
-            setCreateRequestModal(false);
-            setNewRequestName('');
             const tree = await GetProjectTree(projectId);
             if (treeRefreshCallbackRef.current) {
                 treeRefreshCallbackRef.current(projectId, tree);
@@ -587,7 +563,7 @@ export function useRequest(options?: {
             message.error(`创建失败: ${error?.message || error}`);
             throw error;
         }
-    }, [newRequestName, selectedFolder]);
+    }, [selectedFolder]);
 
     const handleTreeItemClick = useCallback(async (treeNode: ProjectTree) => {
         if (treeNode.type === 'request' && treeNode.path) {
@@ -1157,10 +1133,6 @@ export function useRequest(options?: {
         addCaseModalOpen,
         addCaseTargetPath,
         addCaseNameInput,
-        createFolderModal,
-        newFolderName,
-        createRequestModal,
-        newRequestName,
         renameModal,
         renameType,
         renamePath,
@@ -1207,10 +1179,6 @@ export function useRequest(options?: {
         setAddCaseModalOpen,
         setAddCaseTargetPath,
         setAddCaseNameInput,
-        setCreateFolderModal,
-        setNewFolderName,
-        setCreateRequestModal,
-        setNewRequestName,
         setRenameModal,
         setRenameType,
         setRenamePath,

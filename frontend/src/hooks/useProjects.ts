@@ -634,11 +634,34 @@ export function useProjects(options: UseProjectsOptions = {}): UseProjectsReturn
     if (existingTab) {
       switchProjectTab(existingTab.id);
     } else {
+      // Fetch tree FIRST before updating UI
+      setLoading(true);
+      let tree: any;
+      try {
+        tree = await GetProjectTree(project.id);
+      } catch (error: any) {
+        console.error('Failed to load project tree:', error);
+        setLoading(false);
+        return;
+      }
+
       const newTab: ProjectTab = {
         id: project.id,
         title: project.name,
         project: project,
       };
+
+      // Store tree in state BEFORE updating UI that causes re-render
+      setProjectTrees(prev => ({ ...prev, [project.id]: tree }));
+      const folderKeys = collectFolderKeys(tree);
+      setCollapsedFolders(prev => {
+        const next = new Set(prev);
+        folderKeys.forEach((key) => next.add(key));
+        return next;
+      });
+      setExpandedKeys([project.id]);
+
+      // Now update UI
       if (activeTab !== 'home') {
         const currentState = captureCurrentWorkspaceState();
         setProjectWorkspaceStates(prev => ({ ...prev, [activeTab]: currentState }));
@@ -648,24 +671,8 @@ export function useProjects(options: UseProjectsOptions = {}): UseProjectsReturn
       setActiveTab(newTab.id);
       resetWorkspaceState();
       triggerOpenTabAnimation();
-
-      setLoading(true);
-      try {
-        const tree = await GetProjectTree(project.id);
-        setProjectTrees(prev => ({ ...prev, [project.id]: tree }));
-        const folderKeys = collectFolderKeys(tree);
-        setCollapsedFolders(prev => {
-          const next = new Set(prev);
-          folderKeys.forEach((key) => next.add(key));
-          return next;
-        });
-        setExpandedKeys([project.id]);
-        options.onProjectOpen?.(project);
-      } catch (error: any) {
-        console.error('Failed to load project tree:', error);
-      } finally {
-        setLoading(false);
-      }
+      options.onProjectOpen?.(project);
+      setLoading(false);
     }
   }, [projectTabs, activeTab, switchProjectTab, captureCurrentWorkspaceState, triggerOpenTabAnimation, collectFolderKeys, options]);
 
