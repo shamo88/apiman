@@ -6,13 +6,28 @@
 
 ## 1. 响应展示增强
 
-**当前状态**：只支持 JSON 格式化
+**当前状态**：✅ 已完成
 
-**优化方向**：
-- 自动检测响应类型并格式化（XML/JSON/HTML/纯文本）
-- 增加「原始视图」与「格式化视图」切换
-- 响应头折叠展示（当前全部平铺）
-- 图片/PDF 等二进制响应预览
+**已完成功能**：
+- ✅ 自动检测响应类型并格式化（JSON/XML/HTML/Text/Binary）
+- ✅ 同一视图内 Raw/Formatted 切换（移除独立的 JsonView tab）
+- ✅ 响应头分组折叠展示（Important/General/Other）
+- ✅ 二进制响应 base64 编码（支持图片/PDF 等二进制预览）
+- ✅ 响应头复制功能
+
+**新增文件**：
+- `frontend/src/utils/responseUtils.ts` - 响应类型检测工具
+- `frontend/src/components/response/BinaryPreview.tsx` - 二进制预览组件（集成在 ResponseBodyViewer 中）
+
+**修改文件**：
+- `frontend/src/components/response/ResponseBodyViewer.tsx` - 重构支持 Raw/Formatted 切换
+- `frontend/src/components/response/ResponseViewer.tsx` - 移除独立 JsonView tab
+- `frontend/src/components/response/ResponseHeaders.tsx` - 分组折叠
+- `frontend/src/types/index.ts` - 修复 CurlResponse 类型
+- `internal/models/models.go` - 添加 BodyBase64/IsBinary 字段
+- `internal/curl/curl.go` - 二进制检测和 base64 编码
+- `internal/curl/exec_http.go` - 二进制检测和 base64 编码
+- `frontend/src/App.css` - 新增样式
 
 ---
 
@@ -293,4 +308,4 @@ frontend/src/components/
 
 ---
 
-*最后更新：2026-04-05*
+*最后更新：2026-04-06*

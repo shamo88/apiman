@@ -80,14 +80,27 @@ export interface ProjectScript {
     updated_at?: string;
 }
 
+export interface ResponseCookie {
+    name: string;
+    value: string;
+    domain: string;
+    path: string;
+    expires: string;
+    http_only: boolean;
+    secure: boolean;
+}
+
 export interface CurlResponse {
     status_code: number;
-    headers: Record<string, string>;
+    headers: Record<string, string[]>;
     body: string;
+    body_base64?: string;
+    is_binary?: boolean;
     duration: number;
     error?: string;
     script_logs?: string[];
     tests?: TestResult[];
+    cookies?: ResponseCookie[];
 }
 
 export interface TestResult {

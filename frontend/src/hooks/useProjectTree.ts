@@ -54,6 +54,7 @@ export interface UseProjectTreeReturn {
     toggleRequestCasesExpanded: (requestPath: string) => void;
     moveRequestNode: (requestPath: string, targetFolderPath: string, beforeID?: string) => Promise<void>;
     moveFolderNode: (folderPath: string, targetFolderPath: string, beforeID?: string) => Promise<void>;
+    refreshTree: () => Promise<void>;
 
     // Tree helpers
     getNodeByPath: (path: string) => ProjectTree | null;
@@ -98,7 +99,11 @@ export function useProjectTree(projectId: string | undefined): UseProjectTreeRet
     const [movedHighlightPath, setMovedHighlightPath] = useState<string | null>(null);
 
     // Use request hook for operations (binds projectId)
-    const req = useRequest();
+    const req = useRequest({
+        onTreeRefresh: (projectId, tree) => {
+            setTree(tree);
+        },
+    });
 
     // Tree helpers
     const getNodeByPath = useCallback((path: string): ProjectTree | null => {
@@ -212,8 +217,16 @@ export function useProjectTree(projectId: string | undefined): UseProjectTreeRet
     }, [req]);
 
     const toggleRequestCasesExpandedFn = useCallback((requestPath: string) => {
-        req.toggleRequestCasesExpanded(requestPath);
-    }, [req]);
+        setExpandedRequestPaths((prev) => {
+            const next = new Set(prev);
+            if (next.has(requestPath)) {
+                next.delete(requestPath);
+            } else {
+                next.add(requestPath);
+            }
+            return next;
+        });
+    }, []);
 
     const moveRequestNodeFn = useCallback(async (requestPath: string, targetFolderPath: string, beforeID: string = '') => {
         if (!projectId) return;
@@ -232,6 +245,17 @@ export function useProjectTree(projectId: string | undefined): UseProjectTreeRet
             message.error(`移动失败: ${error?.message || error}`);
         }
     }, [req, projectId]);
+
+    // Refresh tree - fetches tree data and updates state
+    const refreshTreeFn = useCallback(async () => {
+        if (!projectId) return;
+        try {
+            const newTree = await GetProjectTree(projectId);
+            setTree(newTree);
+        } catch (error: any) {
+            console.error('Failed to refresh tree:', error);
+        }
+    }, [projectId]);
 
     return {
         // Tree data
@@ -275,6 +299,7 @@ export function useProjectTree(projectId: string | undefined): UseProjectTreeRet
         toggleRequestCasesExpanded: toggleRequestCasesExpandedFn,
         moveRequestNode: moveRequestNodeFn,
         moveFolderNode: moveFolderNodeFn,
+        refreshTree: refreshTreeFn,
 
         // Tree helpers
         getNodeByPath,

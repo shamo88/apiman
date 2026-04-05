@@ -157,14 +157,16 @@ type ResponseCookie struct {
 }
 
 type CurlResponse struct {
-	StatusCode int               `json:"status_code"`
-	Headers    map[string][]string `json:"headers"`
-	Body       string            `json:"body"`
-	Duration   int64             `json:"duration"`
-	Error      string            `json:"error"`
-	ScriptLogs []string          `json:"script_logs,omitempty"`
-	Tests      []TestResult      `json:"tests,omitempty"`
-	Cookies    []ResponseCookie  `json:"cookies,omitempty"`
+	StatusCode  int               `json:"status_code"`
+	Headers     map[string][]string `json:"headers"`
+	Body        string            `json:"body"`
+	BodyBase64  string            `json:"body_base64,omitempty"`
+	IsBinary    bool              `json:"is_binary"`
+	Duration    int64             `json:"duration"`
+	Error       string            `json:"error"`
+	ScriptLogs  []string          `json:"script_logs,omitempty"`
+	Tests       []TestResult      `json:"tests,omitempty"`
+	Cookies     []ResponseCookie  `json:"cookies,omitempty"`
 }
 
 type TestResult struct {

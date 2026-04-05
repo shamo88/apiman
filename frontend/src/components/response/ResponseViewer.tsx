@@ -27,6 +27,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
 }) => {
     const [responseBodyHeight, setResponseBodyHeight] = useState(300);
     const [scriptResultsHeight, setScriptResultsHeight] = useState(200);
+    const [bodyViewMode, setBodyViewMode] = useState<'raw' | 'formatted'>('formatted');
 
     useEffect(() => {
         const calculateHeights = () => {
@@ -45,6 +46,11 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
         window.addEventListener('resize', calculateHeights);
         return () => window.removeEventListener('resize', calculateHeights);
     }, [response]);
+
+    // 切换请求时重置视图模式
+    useEffect(() => {
+        setBodyViewMode('formatted');
+    }, [response?.body]);
 
     if (!response) return null;
 
@@ -71,6 +77,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
             <ResponseStatus statusCode={response.status_code} duration={response.duration} />
             <Tabs
                 defaultActiveKey="body"
+                activeKey="body"
                 items={[
                     {
                         key: 'body',
@@ -78,10 +85,15 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
                         children: (
                             <ResponseBodyViewer
                                 body={response.body}
+                                headers={response.headers}
                                 error={response.error}
+                                formattedResponse={formattedResponse}
                                 height={responseBodyHeight}
                                 appTheme={appTheme}
-                                viewMode="body"
+                                viewMode={bodyViewMode}
+                                onViewModeChange={setBodyViewMode}
+                                bodyBase64={response.body_base64}
+                                isBinary={response.is_binary}
                             />
                         ),
                     },
@@ -90,19 +102,6 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
                         label: 'Header',
                         children: (
                             <ResponseHeaders headers={response.headers} height={responseBodyHeight} />
-                        ),
-                    },
-                    {
-                        key: 'formatted',
-                        label: 'JsonView',
-                        children: (
-                            <ResponseBodyViewer
-                                body={response.body}
-                                formattedResponse={formattedResponse}
-                                height={responseBodyHeight}
-                                appTheme={appTheme}
-                                viewMode="json"
-                            />
                         ),
                     },
                     {

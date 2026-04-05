@@ -4441,3 +4441,327 @@ html:not(.theme-dark) .ant-select-dropdown .ant-select-item-option-selected .ant
 .mcp-model .mcp-form .ant-form-item-additional .ant-form-item-extra {
     text-align: left !important;
 }
+
+/* ========================================
+   Response Body Viewer - 响应体查看器增强
+   ======================================== */
+
+.response-body-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Raw/Formatted 切换按钮 */
+.view-mode-toggle {
+    display: flex;
+    background: var(--bg-primary);
+    border-radius: var(--radius-sm);
+    padding: 2px;
+    gap: 2px;
+}
+
+.view-mode-toggle .mode-btn {
+    padding: 4px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+}
+
+.view-mode-toggle .mode-btn:hover {
+    color: var(--text-primary);
+}
+
+.view-mode-toggle .mode-btn.active {
+    background: var(--accent-primary);
+    color: white;
+}
+
+/* 响应类型标签 */
+.response-type-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+    font-family: var(--font-mono);
+}
+
+.response-type-badge.type-json {
+    background: rgba(97, 175, 254, 0.15);
+    color: #61affe;
+}
+
+.response-type-badge.type-xml {
+    background: rgba(255, 165, 0, 0.15);
+    color: #fca130;
+}
+
+.response-type-badge.type-html {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.response-type-badge.type-text {
+    background: rgba(156, 163, 175, 0.15);
+    color: #9ca3af;
+}
+
+.response-type-badge.type-binary {
+    background: rgba(139, 92, 246, 0.15);
+    color: #8b5cf6;
+}
+
+/* 二进制响应占位 */
+.binary-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 200px;
+    gap: 12px;
+    color: var(--text-secondary);
+}
+
+.binary-icon {
+    font-size: 48px;
+    opacity: 0.6;
+}
+
+.binary-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.binary-info {
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+}
+
+.binary-hint {
+    font-size: 13px;
+    color: var(--text-muted);
+    text-align: center;
+    max-width: 300px;
+}
+
+/* HTML 内容高亮 */
+.response-content.html-content {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.response-content.html-content .html-tag {
+    color: #e06c75;
+}
+
+.response-content.html-content .html-attr {
+    color: #d19a66;
+}
+
+.response-content.html-content .html-value {
+    color: #98c379;
+}
+
+/* ========================================
+   Response Headers - 响应头分组折叠
+   ======================================== */
+
+.response-headers-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-tertiary);
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.summary-categories {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.category-tag {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.category-tag.clickable:hover {
+    opacity: 0.8;
+}
+
+.copy-all-tag {
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.response-headers-content {
+    padding: 8px 0;
+}
+
+.header-group {
+    margin-bottom: 8px;
+}
+
+.header-group-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s ease;
+}
+
+.header-group-title:hover {
+    background: var(--bg-hover);
+}
+
+.header-group-title .group-label {
+    font-weight: 500;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.header-group-title .group-count {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.header-group-content {
+    padding-left: 24px;
+}
+
+.response-header-item {
+    display: flex;
+    align-items: flex-start;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    border-bottom: 1px solid var(--border-subtle);
+    transition: background 0.15s ease;
+}
+
+.response-header-item:last-child {
+    border-bottom: none;
+}
+
+.response-header-item:hover {
+    background: var(--bg-hover);
+}
+
+.response-header-item .header-key {
+    min-width: 180px;
+    max-width: 180px;
+    color: var(--accent-primary);
+    font-weight: 500;
+    word-break: break-word;
+    flex-shrink: 0;
+}
+
+.response-header-item .header-value {
+    flex: 1;
+    color: var(--text-secondary);
+    word-break: break-all;
+    margin-right: 8px;
+}
+
+.response-header-item .copy-icon {
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px 4px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.response-header-item:hover .copy-icon {
+    opacity: 1;
+}
+
+.response-header-item .copy-icon:hover {
+    color: var(--accent-primary);
+}
+
+/* Set-Cookie 特殊样式 */
+.header-group-cookies {
+    margin-top: 8px;
+}
+
+.header-group-cookies .header-group-title {
+    color: #f59e0b;
+}
+
+.response-header-item.cookie-item .header-key {
+    color: #f59e0b;
+}
+
+.response-header-item .set-cookie-value {
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+}
+
+/* 深色主题适配 */
+.theme-dark .response-body-toolbar,
+.theme-dark .response-headers-summary {
+    background: var(--bg-primary);
+    border-color: var(--border-subtle);
+}
+
+.theme-dark .view-mode-toggle {
+    background: var(--bg-tertiary);
+}
+
+.theme-dark .category-tag.clickable:hover {
+    background: var(--bg-hover);
+}
+
+.theme-dark .header-group-title:hover,
+.theme-dark .response-header-item:hover {
+    background: var(--bg-hover);
+}
+
+.theme-dark .response-type-badge.type-json {
+    background: rgba(97, 175, 254, 0.2);
+}
+
+.theme-dark .response-type-badge.type-xml {
+    background: rgba(255, 165, 0, 0.2);
+}
+
+.theme-dark .response-type-badge.type-html {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+.theme-dark .response-type-badge.type-binary {
+    background: rgba(139, 92, 246, 0.2);
+}

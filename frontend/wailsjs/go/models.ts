@@ -354,6 +354,8 @@ export namespace models {
 	    status_code: number;
 	    headers: Record<string, Array<string>>;
 	    body: string;
+	    body_base64?: string;
+	    is_binary: boolean;
 	    duration: number;
 	    error: string;
 	    script_logs?: string[];
@@ -369,6 +371,8 @@ export namespace models {
 	        this.status_code = source["status_code"];
 	        this.headers = source["headers"];
 	        this.body = source["body"];
+	        this.body_base64 = source["body_base64"];
+	        this.is_binary = source["is_binary"];
 	        this.duration = source["duration"];
 	        this.error = source["error"];
 	        this.script_logs = source["script_logs"];

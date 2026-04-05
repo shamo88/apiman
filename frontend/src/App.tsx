@@ -485,6 +485,7 @@ function App() {
                             currentRequestPath={currentRequest?.path}
                             animationEnabled={animationEnabled}
                             forceListAnimation={forceListAnimation}
+                            externalTree={activeProject ? projectTrees[activeProject.id] : undefined}
                         />
 
                         <div className="project-main">

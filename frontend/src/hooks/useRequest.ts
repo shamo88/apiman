@@ -904,6 +904,9 @@ export function useRequest(options?: {
             return;
         }
         const targetPath = addCaseTargetPath;
+        // 从 targetPath (request|projectId|requestId) 提取 projectId
+        const parts = targetPath.split('|');
+        const projectIdForRefresh = parts.length >= 2 ? parts[1] : '';
         try {
             await AddRequestCase(targetPath, trimmedName);
             message.success('已新增用例');
@@ -911,7 +914,9 @@ export function useRequest(options?: {
             setAddCaseTargetPath('');
             setAddCaseNameInput('');
             setExpandedRequestPaths((prev) => new Set(prev).add(targetPath));
-            await refreshProjectTree(targetPath);
+            if (projectIdForRefresh) {
+                await refreshProjectTree(projectIdForRefresh);
+            }
             if (currentRequest?.path === targetPath) {
                 const r = await GetRequest(targetPath);
                 const aid = (r as CurlRequest).active_case_id;

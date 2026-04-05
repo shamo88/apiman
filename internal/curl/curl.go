@@ -4,6 +4,7 @@ import (
 	"apiman/internal/models"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"math/rand"
@@ -108,7 +109,6 @@ func (c *CurlExecutor) ExecuteWithProxy(curlCommand string, proxyOpts *ProxyOpti
 	duration := time.Since(startTime).Milliseconds()
 
 	bodyBytes, _ := io.ReadAll(resp.Body)
-	bodyStr := string(bodyBytes)
 
 	headers := make(map[string][]string)
 	for key, values := range resp.Header {
@@ -117,12 +117,51 @@ func (c *CurlExecutor) ExecuteWithProxy(curlCommand string, proxyOpts *ProxyOpti
 		}
 	}
 
-	return &models.CurlResponse{
+	// 检测 Content-Type 判断是否为二进制
+	contentType := resp.Header.Get("Content-Type")
+	isBinary := !isTextContentType(contentType)
+
+	response := &models.CurlResponse{
 		StatusCode: resp.StatusCode,
 		Headers:    headers,
-		Body:       bodyStr,
 		Duration:   duration,
-	}, nil
+		IsBinary:   isBinary,
+	}
+
+	if isBinary {
+		// 二进制响应使用 base64 编码
+		response.BodyBase64 = base64.StdEncoding.EncodeToString(bodyBytes)
+		// body 字段保留空或简短说明
+		response.Body = fmt.Sprintf("[Binary response: %d bytes, Content-Type: %s]", len(bodyBytes), contentType)
+	} else {
+		// 文本响应直接使用
+		response.Body = string(bodyBytes)
+	}
+
+	return response, nil
+}
+
+// isTextContentType 检测 Content-Type 是否为文本类型
+func isTextContentType(contentType string) bool {
+	if contentType == "" {
+		return false
+	}
+	contentType = strings.ToLower(contentType)
+	textTypes := []string{
+		"text/",
+		"application/json",
+		"application/xml",
+		"application/javascript",
+		"application/xhtml+xml",
+		"application/ld+json",
+		"application/soap+xml",
+	}
+	for _, t := range textTypes {
+		if strings.Contains(contentType, t) {
+			return true
+		}
+	}
+	return false
 }
 
 func buildTransportWithProxy(proxyOpts *ProxyOptions) *http.Transport {

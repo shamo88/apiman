@@ -3,6 +3,7 @@ package curl
 import (
 	"apiman/internal/models"
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -117,7 +118,6 @@ func (c *CurlExecutor) ExecuteHTTPRequestWithProxy(spec *models.HttpRequestSpec,
 
 	duration := time.Since(startTime).Milliseconds()
 	bodyBytes, _ := io.ReadAll(resp.Body)
-	bodyStr := string(bodyBytes)
 
 	headers := make(map[string][]string)
 	for key, values := range resp.Header {
@@ -140,13 +140,29 @@ func (c *CurlExecutor) ExecuteHTTPRequestWithProxy(spec *models.HttpRequestSpec,
 		})
 	}
 
-	return &models.CurlResponse{
+	// 检测 Content-Type 判断是否为二进制
+	contentType := resp.Header.Get("Content-Type")
+	isBinary := !isTextContentType(contentType)
+
+	response := &models.CurlResponse{
 		StatusCode: resp.StatusCode,
 		Headers:    headers,
-		Body:       bodyStr,
 		Duration:   duration,
 		Cookies:    cookies,
-	}, nil
+		IsBinary:   isBinary,
+	}
+
+	if isBinary {
+		// 二进制响应使用 base64 编码
+		response.BodyBase64 = base64.StdEncoding.EncodeToString(bodyBytes)
+		// body 字段保留简短说明
+		response.Body = fmt.Sprintf("[Binary response: %d bytes, Content-Type: %s]", len(bodyBytes), contentType)
+	} else {
+		// 文本响应直接使用
+		response.Body = string(bodyBytes)
+	}
+
+	return response, nil
 }
 
 func appendQueryParams(base string, params []models.RequestKeyVal) string {

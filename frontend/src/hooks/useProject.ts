@@ -102,13 +102,10 @@ export function useProject(projectId: string | undefined): UseProjectReturn {
         await script.deleteScript(projId, a, b, c);
     }, [script.deleteScript]);
 
-    // Refresh tree - just triggers a re-fetch by updating projectId dependency
-    // The actual fetching is handled by useProjectTree's internal useEffect
+    // Refresh tree - fetches tree data and updates state
     const refreshTree = useCallback(async () => {
-        if (projectId) {
-            await GetProjectTree(projectId);
-        }
-    }, [projectId]);
+        await treeHook.refreshTree();
+    }, [treeHook]);
 
     // Load environments and scripts when projectId changes
     useEffect(() => {

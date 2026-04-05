@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { SidebarMenuHeader, ApiTree, ApiListFilters, SidebarList } from '../sidebar';
 import { useProject } from '../../hooks/useProject';
 import { CreateFolderModal, CreateRequestModal } from '../modals';
@@ -13,6 +13,8 @@ interface ProjectSidebarProps {
     currentRequestPath?: string;
     animationEnabled: boolean;
     forceListAnimation: boolean;
+    /** External tree data, if provided, takes precedence over internal tree */
+    externalTree?: any;
 }
 
 export const ProjectSidebar: React.FC<ProjectSidebarProps> = ({
@@ -24,6 +26,7 @@ export const ProjectSidebar: React.FC<ProjectSidebarProps> = ({
     currentRequestPath,
     animationEnabled,
     forceListAnimation,
+    externalTree,
 }) => {
     // Search/filter state - managed locally in sidebar
     const [searchKeyword, setSearchKeyword] = useState('');
@@ -38,6 +41,9 @@ export const ProjectSidebar: React.FC<ProjectSidebarProps> = ({
 
     // Project hook - provides environments, scripts, tree data
     const project = useProject(projectId);
+
+    // Use external tree if provided, otherwise use internal tree
+    const tree = useMemo(() => externalTree || project.tree, [externalTree, project.tree]);
 
     // Request operations
     const { handleCreateFolder, handleCreateRequest } = useRequest({
@@ -81,7 +87,7 @@ export const ProjectSidebar: React.FC<ProjectSidebarProps> = ({
                         onMethodChange={setFilterMethod}
                     />
                     <ApiTree
-                        tree={project.tree}
+                        tree={tree}
                         loading={project.loading}
                         expandedKeys={project.expandedKeys}
                         selectedKeys={[]}
