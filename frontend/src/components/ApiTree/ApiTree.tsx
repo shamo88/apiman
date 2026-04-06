@@ -1,6 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { Button, Dropdown, Input, Empty } from 'antd';
-import { PlusOutlined, SearchOutlined, FolderOutlined, RightOutlined, DownOutlined, MoreOutlined } from '@ant-design/icons';
+import React, { useCallback } from 'react';
+import { Empty } from 'antd';
 import { ProjectTree } from '../../store';
 import { getMethodColor, formatSidebarMethodLabel } from '../../constants/httpMethods';
 import { ApiTreeItem } from './ApiTreeItem';
@@ -11,6 +10,7 @@ interface ApiTreeProps {
   tree: ProjectTree | null;
   collapsedFolders: Set<string>;
   expandedRequestPaths: Set<string>;
+  activeRequestPath: string;
   sidebarHighlightedCasePath: string;
   movedHighlightPath: string | null;
   onToggleFolder: (folderPath: string) => void;
@@ -37,6 +37,7 @@ export const ApiTree: React.FC<ApiTreeProps> = ({
   tree,
   collapsedFolders,
   expandedRequestPaths,
+  activeRequestPath,
   sidebarHighlightedCasePath,
   movedHighlightPath,
   onToggleFolder,
@@ -58,8 +59,6 @@ export const ApiTree: React.FC<ApiTreeProps> = ({
   filterMethod,
   onFilterMethodChange,
 }) => {
-  const [localSearch, setLocalSearch] = useState(searchKeyword);
-
   const filterTreeNodes = useCallback((node: ProjectTree | null, keyword: string, method: string): ProjectTree | null => {
     if (!node) return null;
     const normalizedKeyword = keyword.trim().toLowerCase();
@@ -130,10 +129,9 @@ export const ApiTree: React.FC<ApiTreeProps> = ({
     if (child.type === 'request') {
       return (
         <ApiTreeItem
-          key={child.path || child.id}
           request={child}
           isExpanded={child.path ? expandedRequestPaths.has(child.path) : false}
-          isActive={false}
+          isActive={child.path === activeRequestPath}
           sidebarHighlightedCasePath={sidebarHighlightedCasePath}
           movedHighlightPath={movedHighlightPath}
           onToggleCases={() => child.path && onToggleRequestCases(child.path)}
@@ -151,10 +149,10 @@ export const ApiTree: React.FC<ApiTreeProps> = ({
     }
     return (
       <FolderNode
-        key={child.path || child.id}
         folder={child}
         isCollapsed={child.path ? collapsedFolders.has(child.path) : false}
         expandedRequestPaths={expandedRequestPaths}
+        activeRequestPath={activeRequestPath}
         sidebarHighlightedCasePath={sidebarHighlightedCasePath}
         movedHighlightPath={movedHighlightPath}
         onToggleFolder={() => child.path && onToggleFolder(child.path)}
@@ -176,18 +174,12 @@ export const ApiTree: React.FC<ApiTreeProps> = ({
 
   return (
     <div className="api-tree">
-      <div className="api-tree-toolbar">
-        <Input
-          placeholder="搜索接口"
-          prefix={<SearchOutlined />}
-          value={searchKeyword}
-          onChange={(e) => onSearchChange(e.target.value)}
-          style={{ width: 180 }}
-          size="small"
-        />
-      </div>
       <div className="api-tree-content">
-        {rootChildren.map(renderChild)}
+        {rootChildren.map((child) => (
+          <div key={child.path || child.id} className="api-root-sibling">
+            {renderChild(child)}
+          </div>
+        ))}
       </div>
     </div>
   );

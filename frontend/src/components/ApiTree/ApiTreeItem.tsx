@@ -13,7 +13,7 @@ interface ApiTreeItemProps {
   movedHighlightPath: string | null;
   onToggleCases: () => void;
   onClick: () => void;
-  onAddCase: () => void;
+  onAddCase: (requestPath: string) => void;
   onCopy: () => void;
   onRename: () => void;
   onDelete: () => void;
@@ -86,7 +86,7 @@ export const ApiTreeItem: React.FC<ApiTreeItemProps> = ({
                 key: 'add-case',
                 icon: <PlusOutlined />,
                 label: '新增用例',
-                onClick: (e) => { e.domEvent.stopPropagation(); onAddCase(); },
+                onClick: (e) => { e.domEvent.stopPropagation(); onAddCase(request.path || ''); },
               },
               { type: 'divider' as const },
               {

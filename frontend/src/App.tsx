@@ -6,7 +6,7 @@ import { ProjectWorkspace } from './components/ProjectWorkspace';
 import { ScriptHelpWindow } from './components/ScriptHelp';
 import { MCPSettingsModal } from './components/MCPSettings';
 import { AppFooter } from './components/AppFooter';
-import { CookieModal, HistoryModal } from './components/modals';
+import { CookieModal, HistoryModal, CreateRequestModal, CreateFolderModal, RenameModal } from './components/modals';
 
 import {
   useProjectStore,
@@ -70,6 +70,12 @@ const App: React.FC = () => {
       <CookieModal />
 
       <HistoryModal />
+
+      <CreateRequestModal />
+
+      <CreateFolderModal />
+
+      <RenameModal />
     </div>
   );
 };

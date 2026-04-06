@@ -6,6 +6,7 @@ interface UIStore {
   createProjectModal: boolean;
   createFolderModal: boolean;
   createRequestModal: boolean;
+  createParentPath: string;
   renameModal: boolean;
   renameType: 'request' | 'folder';
   renamePath: string;
@@ -49,9 +50,9 @@ interface UIStore {
   // Actions
   openCreateProjectModal: () => void;
   closeCreateProjectModal: () => void;
-  openCreateFolderModal: () => void;
+  openCreateFolderModal: (parentPath?: string) => void;
   closeCreateFolderModal: () => void;
-  openCreateRequestModal: () => void;
+  openCreateRequestModal: (parentPath?: string) => void;
   closeCreateRequestModal: () => void;
   openRenameModal: (type: 'request' | 'folder', path: string, currentValue: string) => void;
   closeRenameModal: () => void;
@@ -94,6 +95,7 @@ export const useUIStore = create<UIStore>()(
       createProjectModal: false,
       createFolderModal: false,
       createRequestModal: false,
+      createParentPath: '',
       renameModal: false,
       renameType: 'request',
       renamePath: '',
@@ -137,10 +139,10 @@ export const useUIStore = create<UIStore>()(
       // Actions
       openCreateProjectModal: () => set({ createProjectModal: true }),
       closeCreateProjectModal: () => set({ createProjectModal: false }),
-      openCreateFolderModal: () => set({ createFolderModal: true }),
-      closeCreateFolderModal: () => set({ createFolderModal: false }),
-      openCreateRequestModal: () => set({ createRequestModal: true }),
-      closeCreateRequestModal: () => set({ createRequestModal: false }),
+      openCreateFolderModal: (parentPath = '') => set({ createFolderModal: true, createParentPath: parentPath }),
+      closeCreateFolderModal: () => set({ createFolderModal: false, createParentPath: '' }),
+      openCreateRequestModal: (parentPath = '') => set({ createRequestModal: true, createParentPath: parentPath }),
+      closeCreateRequestModal: () => set({ createRequestModal: false, createParentPath: '' }),
       openRenameModal: (type, path, currentValue) => set({ renameModal: true, renameType: type, renamePath: path, renameValue: currentValue }),
       closeRenameModal: () => set({ renameModal: false, renamePath: '', renameValue: '' }),
       setDraggingNode: (node) => set({ draggingNode: node }),
