@@ -1,8 +1,8 @@
 # Apiman 前端优化方案
 
-> **实施状态**: ✅ 完成 - 架构重构完成，TypeScript 编译通过
+> **实施状态**: ✅ 主要重构完成 - App.tsx 从 5127 行减少到 ~830 行
 > **完成时间**: 2026-04-06
-> **重构进度**: 100%
+> **重构进度**: 85%
 > **构建状态**: 前端构建成功 (npm run build)
 
 ---
@@ -27,15 +27,23 @@
 | 第十一阶段：Modal 组件 | ✅ 完成 | 2026-04-06 | CreateProjectModal, CreateFolderModal, CreateRequestModal, RenameModal |
 | 第十二阶段：Store 完善 | ✅ 完成 | 2026-04-06 | 所有 6 个 Store 已实现 |
 | 第十三阶段：业务 Hooks | ✅ 完成 | 2026-04-06 | useProjects, useEnvironments, useScripts, useHistory, useMCP, useRequest |
-| 第十四阶段：App.tsx 整合 | ✅ 完成 | 2026-04-06 | 新架构 App.tsx 已创建 |
+| 第十四阶段：App.tsx 重构 | ✅ 完成 | 2026-04-06 | App.tsx 从 5127 行减少到 ~830 行，使用 hooks 和 stores |
 | 第十五阶段：TypeScript 错误修复 | ✅ 完成 | 2026-04-06 | 修复所有 TypeScript 编译错误 |
 | 第十六阶段：构建验证 | ✅ 完成 | 2026-04-06 | 前端构建成功 |
 
-### ⏳ 待完成阶段
+### ⏳ 待完善阶段
 
 | 阶段 | 状态 | 说明 |
 |------|------|------|
-| (无) | - | 所有阶段已完成 |
+| 功能测试验证 | ⏳ 待开始 | 完整功能测试和 bug 修复 |
+| 组件功能完善 | ⏳ 可选 | ProjectWorkspace 等组件可根据实际使用进一步优化 |
+
+### 📊 重构成果
+
+- **App.tsx**: 5127 行 → ~830 行 (减少 **84%**)
+- **代码结构**: 单一巨大组件 → 单一职责组件 + hooks + stores
+- **TypeScript**: 编译通过，无错误
+- **构建**: 成功
 
 ### 📁 当前目录结构
 

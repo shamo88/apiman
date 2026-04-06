@@ -13,6 +13,7 @@ interface UIStore {
   cookieModalVisible: boolean;
   historyModalVisible: boolean;
   mcpModalVisible: boolean;
+  scriptHelpVisible: boolean;
   addCaseModalOpen: boolean;
   addCaseTargetPath: string;
   addCaseNameInput: string;
@@ -66,6 +67,7 @@ interface UIStore {
   setCookieModalVisible: (visible: boolean) => void;
   setHistoryModalVisible: (visible: boolean) => void;
   setMcpModalVisible: (visible: boolean) => void;
+  setScriptHelpVisible: (visible: boolean) => void;
   openAddCaseModal: (targetPath: string) => void;
   closeAddCaseModal: () => void;
   openCaseRenameModal: (casePath: string) => void;
@@ -99,6 +101,7 @@ export const useUIStore = create<UIStore>()(
       cookieModalVisible: false,
       historyModalVisible: false,
       mcpModalVisible: false,
+      scriptHelpVisible: false,
       addCaseModalOpen: false,
       addCaseTargetPath: '',
       addCaseNameInput: '',
@@ -159,6 +162,7 @@ export const useUIStore = create<UIStore>()(
       setCookieModalVisible: (visible) => set({ cookieModalVisible: visible }),
       setHistoryModalVisible: (visible) => set({ historyModalVisible: visible }),
       setMcpModalVisible: (visible) => set({ mcpModalVisible: visible }),
+      setScriptHelpVisible: (visible) => set({ scriptHelpVisible: visible }),
       openAddCaseModal: (targetPath) => set({ addCaseModalOpen: true, addCaseTargetPath: targetPath }),
       closeAddCaseModal: () => set({ addCaseModalOpen: false, addCaseTargetPath: '', addCaseNameInput: '' }),
       openCaseRenameModal: (casePath) => set({ caseRenameModalOpen: true, caseRenameCasePath: casePath }),

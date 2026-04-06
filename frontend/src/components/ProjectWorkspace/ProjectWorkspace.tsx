@@ -1,77 +1,76 @@
-import React from 'react';
-import { Tabs, Button } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Button } from 'antd';
 import { ApiOutlined, EnvironmentOutlined, FileTextOutlined } from '@ant-design/icons';
 import { ApiTree } from '../ApiTree';
 import { RequestEditor } from '../RequestEditor';
 import { ResponsePanel } from '../ResponsePanel';
-import { ApiConfig, ProjectWorkspaceState, ProjectTree as ProjectTreeType, ProjectScript, Environment } from '../../store';
 import { CurlResponse } from '../../types';
+import { useWorkspace, useWorkspaceHandlers, useEnvironments, useScripts } from '../../hooks';
+import { useUIStore, useWorkspaceStore } from '../../store';
 import './ProjectWorkspace.css';
 
 interface ProjectWorkspaceProps {
-  workspaceState: ProjectWorkspaceState;
-  projectTree: ProjectTreeType | null;
-  environments: Environment[];
-  projectScripts: ProjectScript[];
-  onUpdateWorkspace: (updates: Partial<ProjectWorkspaceState>) => void;
-  onToggleFolder: (folderPath: string) => void;
-  onToggleRequestCases: (requestPath: string) => void;
-  onRequestClick: (request: ProjectTreeType) => void;
-  onCaseClick: (caseItem: ProjectTreeType) => void;
-  onAddRequest: (folderPath: string) => void;
-  onAddFolder: (folderPath: string) => void;
-  onRename: (type: 'request' | 'folder', path: string, currentName: string) => void;
-  onDeleteRequest: (path: string) => void;
-  onDeleteFolder: (path: string) => void;
-  onCopyRequest: (path: string) => void;
-  onAddCase: (requestPath: string) => void;
-  onDuplicateCase: (casePath: string) => void;
-  onRenameCase: (casePath: string, currentName: string) => void;
-  onDeleteCase: (casePath: string) => void;
-  onExecute: () => void;
-  onSaveRequest: () => void;
-  searchKeyword: string;
-  filterMethod: string;
-  onSearchChange: (keyword: string) => void;
-  onFilterMethodChange: (method: string) => void;
-  sidebarMenu: 'apis' | 'environments' | 'scripts';
-  onSidebarMenuChange: (menu: 'apis' | 'environments' | 'scripts') => void;
+  projectId: string;
 }
 
-export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
-  workspaceState,
-  projectTree,
-  environments,
-  projectScripts,
-  onUpdateWorkspace,
-  onToggleFolder,
-  onToggleRequestCases,
-  onRequestClick,
-  onCaseClick,
-  onAddRequest,
-  onAddFolder,
-  onRename,
-  onDeleteRequest,
-  onDeleteFolder,
-  onCopyRequest,
-  onAddCase,
-  onDuplicateCase,
-  onRenameCase,
-  onDeleteCase,
-  onExecute,
-  onSaveRequest,
-  searchKeyword,
-  filterMethod,
-  onSearchChange,
-  onFilterMethodChange,
-  sidebarMenu,
-  onSidebarMenuChange,
-}) => {
-  const selectedEnvironment = environments.find((e) => e.id === workspaceState.selectedEnvironmentId);
-  const environmentVariables = selectedEnvironment?.variables || {};
+export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId }) => {
+  const uiStore = useUIStore();
+  const workspaceStore = useWorkspaceStore();
+  const [sidebarMenu, setSidebarMenu] = useState<'apis' | 'environments' | 'scripts'>('apis');
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [filterMethod, setFilterMethod] = useState('ALL');
 
-  const scriptLogs = workspaceState.response?.script_logs || [];
-  const testResults = workspaceState.response?.tests || [];
+  const { workspace, projectTree } = useWorkspace(projectId);
+  const {
+    handleTreeItemClick,
+    handleCaseClick,
+    handleExecuteRequest,
+    handleSaveRequest,
+    handleDeleteRequest,
+    handleCopyRequest,
+    handleRename,
+    handleDeleteFolder,
+    handleDuplicateCase,
+    handleRenameCase,
+    handleDeleteCase,
+    handleRequestTabChange,
+    handleCloseRequestTab,
+    handleCreateFolder,
+    handleToggleFolder,
+    handleToggleRequestCases,
+  } = useWorkspaceHandlers(projectId);
+
+  const { environments, loadEnvironments } = useEnvironments();
+  const { scripts, loadScripts } = useScripts();
+
+  // Load data when projectId changes
+  useEffect(() => {
+    if (projectId) {
+      loadEnvironments(projectId);
+      loadScripts(projectId);
+    }
+  }, [projectId, loadEnvironments, loadScripts]);
+
+  const selectedEnvironment = environments.find((e) => e.id === workspace.selectedEnvironmentId);
+  const environmentVariables = selectedEnvironment?.variables || {};
+  const scriptLogs = workspace.response?.script_logs || [];
+  const testResults = workspace.response?.tests || [];
+
+  const handleUpdateWorkspace = (updates: any) => {
+    workspaceStore.setWorkspaceState(projectId, updates);
+  };
+
+  const handleAddRequest = (folderPath: string) => {
+    uiStore.openCreateRequestModal();
+  };
+
+  const handleAddFolder = (folderPath: string) => {
+    uiStore.openCreateFolderModal();
+  };
+
+  const handleAddCase = (requestPath: string) => {
+    uiStore.openAddCaseModal(requestPath);
+  };
 
   return (
     <div className="project-workspace">
@@ -80,21 +79,21 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
           <Button
             type={sidebarMenu === 'apis' ? 'primary' : 'text'}
             icon={<ApiOutlined />}
-            onClick={() => onSidebarMenuChange('apis')}
+            onClick={() => setSidebarMenu('apis')}
           >
             接口
           </Button>
           <Button
             type={sidebarMenu === 'environments' ? 'primary' : 'text'}
             icon={<EnvironmentOutlined />}
-            onClick={() => onSidebarMenuChange('environments')}
+            onClick={() => setSidebarMenu('environments')}
           >
             环境
           </Button>
           <Button
             type={sidebarMenu === 'scripts' ? 'primary' : 'text'}
             icon={<FileTextOutlined />}
-            onClick={() => onSidebarMenuChange('scripts')}
+            onClick={() => setSidebarMenu('scripts')}
           >
             脚本
           </Button>
@@ -105,27 +104,27 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
             <ApiTree
               tree={projectTree}
               collapsedFolders={new Set()}
-              expandedRequestPaths={workspaceState.expandedRequestPaths || new Set()}
-              sidebarHighlightedCasePath={workspaceState.sidebarHighlightedCasePath}
+              expandedRequestPaths={workspace.expandedRequestPaths || new Set()}
+              sidebarHighlightedCasePath={workspace.sidebarHighlightedCasePath}
               movedHighlightPath={null}
-              onToggleFolder={onToggleFolder}
-              onToggleRequestCases={onToggleRequestCases}
-              onRequestClick={onRequestClick}
-              onCaseClick={onCaseClick}
-              onAddRequest={onAddRequest}
-              onAddFolder={onAddFolder}
-              onRename={onRename}
-              onDeleteRequest={onDeleteRequest}
-              onDeleteFolder={onDeleteFolder}
-              onCopyRequest={onCopyRequest}
-              onAddCase={onAddCase}
-              onDuplicateCase={onDuplicateCase}
-              onRenameCase={onRenameCase}
-              onDeleteCase={onDeleteCase}
+              onToggleFolder={handleToggleFolder}
+              onToggleRequestCases={handleToggleRequestCases}
+              onRequestClick={handleTreeItemClick}
+              onCaseClick={handleCaseClick}
+              onAddRequest={handleAddRequest}
+              onAddFolder={handleAddFolder}
+              onRename={handleRename}
+              onDeleteRequest={handleDeleteRequest}
+              onDeleteFolder={handleDeleteFolder}
+              onCopyRequest={handleCopyRequest}
+              onAddCase={handleAddCase}
+              onDuplicateCase={handleDuplicateCase}
+              onRenameCase={handleRenameCase}
+              onDeleteCase={handleDeleteCase}
               searchKeyword={searchKeyword}
-              onSearchChange={onSearchChange}
+              onSearchChange={setSearchKeyword}
               filterMethod={filterMethod}
-              onFilterMethodChange={onFilterMethodChange}
+              onFilterMethodChange={setFilterMethod}
             />
           )}
 
@@ -133,9 +132,9 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
             <div className="environments-panel">
               <div className="env-selector">
                 <select
-                  value={workspaceState.selectedEnvironmentId}
+                  value={workspace.selectedEnvironmentId}
                   onChange={(e) =>
-                    onUpdateWorkspace({ selectedEnvironmentId: e.target.value })
+                    handleUpdateWorkspace({ selectedEnvironmentId: e.target.value })
                   }
                   className="env-select"
                 >
@@ -164,10 +163,10 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
           {sidebarMenu === 'scripts' && (
             <div className="scripts-panel">
               <h4>项目脚本</h4>
-              {projectScripts.length === 0 ? (
+              {scripts.length === 0 ? (
                 <div className="empty-hint">暂无脚本</div>
               ) : (
-                projectScripts.map((script) => (
+                scripts.map((script) => (
                   <div key={script.id} className="script-item">
                     <span className="script-name">{script.name}</span>
                   </div>
@@ -181,18 +180,18 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
       <div className="workspace-main">
         <div className="workspace-request">
           <RequestEditor
-            apiConfig={workspaceState.apiConfig}
-            onApiConfigChange={(config) => onUpdateWorkspace({ apiConfig: config })}
+            apiConfig={workspace.apiConfig}
+            onApiConfigChange={(config) => handleUpdateWorkspace({ apiConfig: config })}
             executing={false}
-            onExecute={onExecute}
-            onSave={onSaveRequest}
+            onExecute={handleExecuteRequest}
+            onSave={handleSaveRequest}
             environmentVariables={environmentVariables}
-            projectScripts={projectScripts.map((s) => ({ id: s.id, name: s.name }))}
+            projectScripts={scripts.map((s) => ({ id: s.id, name: s.name }))}
           />
         </div>
         <div className="workspace-response">
           <ResponsePanel
-            response={workspaceState.response as CurlResponse | null}
+            response={workspace.response as CurlResponse | null}
             formattedResponse=""
             scriptLogs={scriptLogs}
             testResults={testResults}

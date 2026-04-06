@@ -6,7 +6,8 @@ import { ProxySettings } from './ProxySettings';
 import { GitSyncSettings } from './GitSyncSettings';
 import { AboutSettings } from './AboutSettings';
 import { config as wailsConfig } from '../../../wailsjs/go/models';
-import { LoadAppConfig, SaveAppConfig, DisableGitSync, EnableGitSync, InitProjectsDir } from '../../../wailsjs/go/main/App';
+import { LoadAppConfig, SaveAppConfig, DisableGitSync, EnableGitSync, InitProjectsDir, ListProjects } from '../../../wailsjs/go/main/App';
+import { useUIStore, useProjectStore } from '../../store';
 
 export interface GeneralSettingsProps {
   form: ReturnType<typeof Form.useForm>[0];
@@ -17,11 +18,7 @@ export interface GeneralSettingsProps {
 
 interface SettingsModalProps {
   visible: boolean;
-  theme?: string;
   onClose: () => void;
-  onSettingsSave?: () => void;
-  onListAnimationChange?: (enabled: boolean) => void;
-  onThemeChange?: (theme: string) => void;
 }
 
 const parsePort = (value: unknown): number | undefined => {
@@ -39,16 +36,23 @@ const parsePort = (value: unknown): number | undefined => {
   return intPort;
 };
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({
-  visible,
-  theme = 'light',
-  onClose,
-  onSettingsSave,
-  onListAnimationChange,
-  onThemeChange,
-}) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }) => {
+  const uiStore = useUIStore();
+  const projectStore = useProjectStore();
   const [activeSettingsTab, setActiveSettingsTab] = useState('general');
   const [form] = Form.useForm();
+
+  const theme = uiStore.appTheme;
+
+  const handleGitSyncChange = async (enabled: boolean) => {
+    const { ListProjects } = await import('../../../wailsjs/go/main/App');
+    try {
+      const list = await ListProjects();
+      projectStore.setProjects(list || []);
+    } catch (error) {
+      console.error('Failed to reload projects after Git Sync change:', error);
+    }
+  };
 
   const settingsMenuItems = [
     { key: 'general', label: '通用', icon: <SettingOutlined /> },
@@ -120,11 +124,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         await DisableGitSync();
       }
 
+      // Handle Git Sync state change
+      if (wasGitSyncEnabled !== newGitSyncEnabled) {
+        handleGitSyncChange(newGitSyncEnabled);
+      }
+
+      // Update app state directly
+      uiStore.setAnimationEnabled(configToSave.ui.enableListAnimation);
+      uiStore.setAppTheme(configToSave.ui.theme as 'light' | 'dark');
+
       await InitProjectsDir();
 
-      onListAnimationChange?.(configToSave.ui.enableListAnimation);
-      onThemeChange?.(configToSave.ui.theme);
-      onSettingsSave?.();
       onClose();
     } catch (error) {
       console.error('Failed to save config:', error);

@@ -57,7 +57,7 @@ interface WorkspaceStore {
   switchProjectTab: (projectId: string, targetTab: string, skipSaveCurrent?: boolean) => void;
 }
 
-const createEmptyWorkspaceState = (): WorkspaceState => ({
+export const createEmptyWorkspaceState = (): WorkspaceState => ({
   requestTabs: [],
   activeRequestTab: '',
   currentRequest: null,

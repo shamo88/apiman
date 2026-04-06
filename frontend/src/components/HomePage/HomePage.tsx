@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Button, Card, Empty, Input, message, Modal, Spin, Tooltip } from 'antd';
-import { PlusOutlined, SearchOutlined, FolderOutlined, DeleteOutlined, EditOutlined, MoreOutlined, HomeOutlined } from '@ant-design/icons';
+import React, { useState, useEffect, DragEvent } from 'react';
+import { Button, Card, Empty, Input, message, Modal, Spin, Tooltip, Select, Dropdown, Upload, Menu } from 'antd';
+import type { UploadProps, MenuProps } from 'antd';
+import { PlusOutlined, SearchOutlined, FolderOutlined, DeleteOutlined, EditOutlined, HomeOutlined, ImportOutlined, EllipsisOutlined } from '@ant-design/icons';
 import { useProjectStore, Project } from '../../store';
 import { useUIStore } from '../../store/useUIStore';
-import { CreateProject, DeleteProject, RenameProject, LoadProjectGroupsState, SaveProjectGroupsState } from '../../../wailsjs/go/main/App';
+import { CreateProject, DeleteProject, RenameProject, LoadProjectGroupsState, SaveProjectGroupsState, ListProjects, ImportPostmanCollection } from '../../../wailsjs/go/main/App';
 import './HomePage.css';
 
 interface HomePageProps {
@@ -26,22 +27,54 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
     setProjectSearchKeyword,
     projectSearchKeyword,
     setProjectGroupsLoaded,
+    setLoading: setStoreLoading,
   } = useProjectStore();
 
   const { openCreateProjectModal, closeCreateProjectModal, createProjectModal } = useUIStore();
   const [newProjectName, setNewProjectName] = useState('');
   const [createGroupModal, setCreateGroupModal] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [localLoading, setLocalLoading] = useState(false);
   const [renameModal, setRenameModal] = useState(false);
   const [renameProject, setRenameProject] = useState<{ id: string; name: string } | null>(null);
   const [renameGroupModal, setRenameGroupModal] = useState(false);
   const [renameGroupValue, setRenameGroupValue] = useState('');
   const [editingGroupName, setEditingGroupName] = useState('');
+  const [draggedProjectId, setDraggedProjectId] = useState<string | null>(null);
+  const [dragOverGroup, setDragOverGroup] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+
+  const handleImportPostman: UploadProps['beforeUpload'] = async (file) => {
+    setImporting(true);
+    try {
+      const text = await file.text();
+      await ImportPostmanCollection(text);
+      message.success('导入成功');
+      window.location.reload();
+    } catch (error: any) {
+      message.error(`导入失败: ${error?.message || error}`);
+    } finally {
+      setImporting(false);
+    }
+    return false;
+  };
 
   useEffect(() => {
+    loadProjects();
     loadProjectGroups();
   }, []);
+
+  const loadProjects = async () => {
+    setStoreLoading(true);
+    try {
+      const list = await ListProjects();
+      setProjects(list || []);
+    } catch (error) {
+      console.error('Failed to load projects:', error);
+    } finally {
+      setStoreLoading(false);
+    }
+  };
 
   const loadProjectGroups = async () => {
     try {
@@ -59,7 +92,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
       message.warning('请输入项目名称');
       return;
     }
-    setLoading(true);
+    setLocalLoading(true);
     try {
       await CreateProject(name);
       message.success('项目已创建');
@@ -70,7 +103,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
     } catch (error: any) {
       message.error(`创建失败: ${error?.message || error}`);
     } finally {
-      setLoading(false);
+      setLocalLoading(false);
     }
   };
 
@@ -178,6 +211,68 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
     setRenameGroupModal(true);
   };
 
+  const handleDragStart = (e: DragEvent, projectId: string) => {
+    setDraggedProjectId(projectId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: DragEvent, groupName: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverGroup(groupName);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverGroup(null);
+  };
+
+  const handleDrop = async (e: DragEvent, groupName: string) => {
+    e.preventDefault();
+    setDragOverGroup(null);
+    if (draggedProjectId) {
+      try {
+        const state = await LoadProjectGroupsState();
+        if (groupName === 'ungrouped') {
+          delete state.assignments[draggedProjectId];
+          removeProjectFromGroup(draggedProjectId);
+          message.success('已移至未分组');
+        } else {
+          state.assignments = { ...state.assignments, [draggedProjectId]: groupName };
+          assignProjectGroup(draggedProjectId, groupName);
+          message.success(`已移动到分组「${groupName}」`);
+        }
+        await SaveProjectGroupsState(state);
+      } catch (error: any) {
+        message.error(`移动失败: ${error?.message || error}`);
+      }
+    }
+    setDraggedProjectId(null);
+  };
+
+  const handleRemoveFromGroup = async (projectId: string) => {
+    try {
+      const state = await LoadProjectGroupsState();
+      delete state.assignments[projectId];
+      await SaveProjectGroupsState(state);
+      removeProjectFromGroup(projectId);
+      message.success('已从分组中移除');
+    } catch (error: any) {
+      message.error(`移除失败: ${error?.message || error}`);
+    }
+  };
+
+  const handleAssignGroup = async (projectId: string, groupName: string) => {
+    try {
+      const state = await LoadProjectGroupsState();
+      state.assignments = { ...state.assignments, [projectId]: groupName };
+      await SaveProjectGroupsState(state);
+      assignProjectGroup(projectId, groupName);
+      message.success(`已添加到分组「${groupName}」`);
+    } catch (error: any) {
+      message.error(`添加失败: ${error?.message || error}`);
+    }
+  };
+
   const filteredProjects = projects.filter((p) =>
     p.name.toLowerCase().includes(projectSearchKeyword.toLowerCase())
   );
@@ -189,53 +284,82 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
   const groupedProjects = (groupName: string) =>
     filteredProjects.filter((p) => projectGroupAssignments[p.id] === groupName);
 
-  const renderProjectCard = (project: Project) => (
-    <Card
-      key={project.id}
-      className="project-card"
-      size="small"
-      onClick={() => onProjectOpen(project)}
-    >
-      <div className="project-card-content">
-        <div className="project-card-icon">
-          <FolderOutlined />
-        </div>
-        <div className="project-card-info">
-          <div className="project-card-name">{project.name}</div>
-        </div>
-        <div className="project-card-actions">
-          <Tooltip title="重命名">
-            <Button
-              type="text"
+  const renderProjectCard = (project: Project) => {
+    const currentGroup = projectGroupAssignments[project.id];
+    const groupOptions = projectGroups.map(g => ({ label: g, value: g }));
+
+    const actionMenu: MenuProps['items'] = [
+      {
+        key: 'rename',
+        label: '重命名',
+        icon: <EditOutlined />,
+        onClick: (e) => {
+          e.domEvent.stopPropagation();
+          setRenameProject({ id: project.id, name: project.name });
+          setRenameModal(true);
+        },
+      },
+      {
+        key: 'delete',
+        label: '删除',
+        icon: <DeleteOutlined />,
+        danger: true,
+        onClick: (e) => {
+          e.domEvent.stopPropagation();
+          handleDeleteProject(project.id);
+        },
+      },
+    ];
+
+    return (
+      <Card
+        key={project.id}
+        className="project-card"
+        size="small"
+        draggable
+        onClick={() => onProjectOpen(project)}
+        onDragStart={(e) => handleDragStart(e, project.id)}
+      >
+        <div className="project-card-content">
+          <div className="project-card-header">
+            <div className="project-card-icon">
+              <FolderOutlined />
+            </div>
+            <div className="project-card-info">
+              <div className="project-card-name">{project.name}</div>
+            </div>
+            <div className="project-card-actions" onClick={(e) => e.stopPropagation()}>
+              <Dropdown menu={{ items: actionMenu }} trigger={['click']} placement="bottomRight">
+                <Button
+                  type="text"
+                  size="small"
+                  className="action-btn"
+                  icon={<EllipsisOutlined />}
+                />
+              </Dropdown>
+            </div>
+          </div>
+          <div className="project-card-group" onClick={(e) => e.stopPropagation()}>
+            <Select
               size="small"
-              icon={<EditOutlined />}
-              onClick={(e) => {
-                e.stopPropagation();
-                setRenameProject({ id: project.id, name: project.name });
-                setRenameModal(true);
-              }}
+              placeholder="选择分组"
+              value={currentGroup}
+              options={groupOptions}
+              onChange={(value) => handleAssignGroup(project.id, value)}
+              style={{ width: '100%' }}
+              allowClear
+              onClear={() => handleRemoveFromGroup(project.id)}
             />
-          </Tooltip>
-          <Tooltip title="删除">
-            <Button
-              type="text"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDeleteProject(project.id);
-              }}
-            />
-          </Tooltip>
+          </div>
         </div>
-      </div>
-    </Card>
-  );
+      </Card>
+    );
+  };
 
   const renderGroup = (groupName: string) => {
     const isCollapsed = collapsedProjectGroups.has(groupName);
     const projectsInGroup = groupedProjects(groupName);
+    const isDragOver = dragOverGroup === groupName;
 
     return (
       <div key={groupName} className="project-group">
@@ -265,7 +389,17 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
           </div>
         </div>
         {!isCollapsed && (
-          <div className="project-group-content">
+          <div
+            className={`project-group-content ${isDragOver ? 'drag-over' : ''}`}
+            onDragOver={(e) => handleDragOver(e, groupName)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, groupName)}
+          >
+            {projectsInGroup.length === 0 ? (
+              <div className="project-group-empty-drop-zone">
+                拖动项目到此处
+              </div>
+            ) : ""}
             {projectsInGroup.map(renderProjectCard)}
           </div>
         )}
@@ -288,10 +422,16 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
             onChange={(e) => setProjectSearchKeyword(e.target.value)}
             style={{ width: 200, marginRight: 12 }}
           />
+          <Upload accept=".json" showUploadList={false} beforeUpload={handleImportPostman}>
+            <Button icon={<ImportOutlined />} loading={importing}>
+              导入 Postman
+            </Button>
+          </Upload>
           <Button
             type="primary"
             icon={<PlusOutlined />}
             onClick={() => openCreateProjectModal()}
+            style={{ marginLeft: 8 }}
           >
             新建项目
           </Button>
@@ -317,13 +457,32 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
             {projectGroups.map(renderGroup)}
             {ungroupedProjects.length > 0 && (
               <div className="project-group">
-                <div className="project-group-header">
+                <div
+                  className="project-group-header"
+                  onClick={() => toggleProjectGroupCollapse('ungrouped')}
+                >
+                  <span className={`group-toggle ${collapsedProjectGroups.has('ungrouped') ? 'collapsed' : ''}`}>
+                    {collapsedProjectGroups.has('ungrouped') ? '▶' : '▼'}
+                  </span>
                   <span className="group-name">未分组</span>
                   <span className="group-count">({ungroupedProjects.length})</span>
                 </div>
-                <div className="project-group-content">
-                  {ungroupedProjects.map(renderProjectCard)}
-                </div>
+                {!collapsedProjectGroups.has('ungrouped') && (
+                  <div
+                    className={`project-group-content ${dragOverGroup === 'ungrouped' ? 'drag-over' : ''}`}
+                    onDragOver={(e) => handleDragOver(e, 'ungrouped')}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, 'ungrouped')}
+                  >
+                    {ungroupedProjects.length === 0 ? (
+                      <div className="project-group-empty-drop-zone">
+                        拖动项目到此处
+                      </div>
+                    ) : (
+                      ungroupedProjects.map(renderProjectCard)
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </>
@@ -336,7 +495,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
         open={createProjectModal}
         onCancel={closeCreateProjectModal}
         onOk={handleCreateProject}
-        confirmLoading={loading}
+        confirmLoading={localLoading}
       >
         <Input
           placeholder="项目名称"

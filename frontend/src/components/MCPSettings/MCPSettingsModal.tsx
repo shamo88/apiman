@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Form, Input, Select, Switch, Button, Space, message } from 'antd';
 import { ApiOutlined, CopyOutlined } from '@ant-design/icons';
+import { useProjectStore, useUIStore } from '../../store';
+import { useMCP, useEnvironments } from '../../hooks';
 
 export interface MCPConfig {
     enabled: boolean;
@@ -20,31 +22,19 @@ export interface Environment {
     name: string;
 }
 
-interface MCPSettingsModalProps {
-    visible: boolean;
-    onClose: () => void;
-    projects: Project[];
-    mcpConfig: MCPConfig;
-    onSave: (config: MCPConfig) => Promise<void>;
-    currentStatus: 'stopped' | 'running' | 'error';
-    appTheme?: string;
-    environments: Environment[];
-    onLoadEnvironments: (projectId: string) => Promise<void>;
-}
+export const MCPSettingsModal: React.FC = () => {
+    const projectStore = useProjectStore();
+    const uiStore = useUIStore();
+    const { mcpConfig, mcpStatus, saveMCPConfig } = useMCP();
+    const { environments, loadEnvironments } = useEnvironments();
 
-export const MCPSettingsModal: React.FC<MCPSettingsModalProps> = ({
-    visible,
-    onClose,
-    projects,
-    mcpConfig,
-    onSave,
-    currentStatus,
-    appTheme = 'light',
-    environments,
-    onLoadEnvironments,
-}) => {
+    const visible = uiStore.mcpModalVisible;
+    const appTheme = uiStore.appTheme;
+
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
+
+    const projects = projectStore.projects;
 
     const generateRandomKey = () => {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -85,9 +75,9 @@ export const MCPSettingsModal: React.FC<MCPSettingsModalProps> = ({
                 api_key: values.api_key,
             };
 
-            await onSave(config);
+            await saveMCPConfig(config);
             message.success('配置已保存');
-            onClose();
+            uiStore.setMcpModalVisible(false);
         } catch (error) {
             console.error('Validation failed:', error);
             message.error('保存失败');
@@ -113,27 +103,31 @@ export const MCPSettingsModal: React.FC<MCPSettingsModalProps> = ({
                 api_key: mcpConfig.api_key || '',
             });
             if (mcpConfig.project_id) {
-                onLoadEnvironments(mcpConfig.project_id);
+                loadEnvironments(mcpConfig.project_id);
             }
         }
     }, [visible, mcpConfig, projects]);
 
     const handleProjectChange = (projectId: string) => {
         form.setFieldValue('environment_id', '');
-        onLoadEnvironments(projectId);
+        loadEnvironments(projectId);
+    };
+
+    const handleClose = () => {
+        uiStore.setMcpModalVisible(false);
     };
 
     return (
         <Modal
             title="MCP Server 设置"
             open={visible}
-            onCancel={onClose}
+            onCancel={handleClose}
             footer={
                 <Space>
                     <Button type="primary" onClick={handleSave} loading={loading}>
                         保存
                     </Button>
-                    <Button onClick={onClose}>取消</Button>
+                    <Button onClick={handleClose}>取消</Button>
                 </Space>
             }
             width={520}
@@ -225,7 +219,7 @@ export const MCPSettingsModal: React.FC<MCPSettingsModalProps> = ({
                     />
                 </Form.Item>
 
-                {currentStatus === 'running' && (
+                {mcpStatus === 'running' && (
                     <div className="mcp-status-running">
                         <ApiOutlined /> MCP Server 运行中
                     </div>

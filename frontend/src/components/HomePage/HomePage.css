@@ -93,169 +93,215 @@
   padding-left: 20px;
 }
 
-.project-card {
-  cursor: pointer;
-  transition: box-shadow 0.2s, border-color 0.2s;
-}
-
-.project-card:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
-}
-
-.project-card-content {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.project-card-icon {
-  font-size: 24px;
-  color: var(--primary-color, #1890ff);
-}
-
-.project-card-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.project-card-name {
-  font-weight: 500;
-  color: var(--text-primary, #333);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.project-card-actions {
-  display: flex;
-  gap: 4px;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.project-card:hover .project-card-actions {
-  opacity: 1;
-}
-
-/* Animation styles */
-.ant-row {
-  animation: fadeInUp 0.6s ease;
-}
-
-.ant-col {
-  animation: fadeInUp 0.6s ease;
-  animation-fill-mode: both;
-}
-
-.ant-col:nth-child(1) {
-  animation-delay: 0.1s;
-}
-
-.ant-col:nth-child(2) {
-  animation-delay: 0.15s;
-}
-
-.ant-col:nth-child(3) {
-  animation-delay: 0.2s;
-}
-
-.ant-col:nth-child(4) {
-  animation-delay: 0.25s;
-}
-
-.ant-col:nth-child(5) {
-  animation-delay: 0.3s;
-}
-
-.ant-col:nth-child(6) {
-  animation-delay: 0.35s;
-}
-
-/* Project card additional styles */
+/* Project card styles */
 .project-card {
   background: var(--bg-card) !important;
   border: 1px solid var(--border-subtle) !important;
-  border-radius: var(--radius-lg) !important;
-  padding: 24px !important;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 16px !important;
+  padding: 0 !important;
+  transition: all 0.25s ease;
   cursor: pointer;
   height: 100%;
-  box-shadow: var(--shadow-card);
   position: relative;
+  overflow: hidden;
+}
+
+.project-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary-color, #6366f1) !important;
+  box-shadow: 0 8px 30px rgba(99, 102, 241, 0.12);
 }
 
 .project-card[draggable="true"] {
   cursor: grab;
 }
 
-.project-card:hover {
-  transform: translateY(-8px) scale(1.02);
-  border-color: var(--border-accent) !important;
-  box-shadow: 0 8px 32px rgba(79, 70, 229, 0.15);
+.project-card:active {
+  cursor: grabbing;
 }
 
 .project-card .ant-card-body {
   padding: 0;
+  height: 100%;
 }
 
-.project-card .ant-card-meta {
-  margin: 0;
+.project-card-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
-.project-card .ant-card-meta-title {
-  font-size: 16px !important;
-  font-weight: 600 !important;
-  color: var(--text-primary) !important;
-  margin-bottom: 8px !important;
+.project-card-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
-.project-card .ant-card-meta-description {
-  font-size: 13px !important;
-  color: var(--text-muted) !important;
+.project-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 16px 12px;
 }
 
-.project-card .ant-card-actions {
-  margin-top: 20px !important;
-  background: transparent !important;
-  border-top: none !important;
-}
-
-.project-card .ant-card-actions li {
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-.project-card .ant-card-actions li button {
-  color: var(--text-muted) !important;
-  font-size: 14px !important;
-  transition: color 0.2s;
-}
-
-.project-card .ant-card-actions li button:hover {
-  color: #ef4444 !important;
-}
-
-.project-card-menu-btn {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  display: inline-flex;
+.project-card-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--primary-color, #6366f1) 0%, #8b5cf6 100%);
+  display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  z-index: 2;
+  font-size: 18px;
+  color: white;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
 }
 
-.project-card-menu-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+.project-card-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.project-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #1f2937);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+}
+
+.project-card-desc {
+  font-size: 12px;
+  color: var(--text-muted, #9ca3af);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-card-group {
+  padding: 0 16px 16px;
+}
+
+.project-card-group .ant-select {
+  width: 100%;
+}
+
+.project-card-group .ant-select-selector {
+  border-radius: 10px !important;
+  border: 1px solid var(--border-subtle) !important;
+  background: var(--bg-tertiary, #f8f9fa) !important;
+  padding: 6px 12px !important;
+  height: auto !important;
+  transition: all 0.2s ease;
+}
+
+.project-card-group .ant-select:hover .ant-select-selector {
+  border-color: var(--primary-color, #6366f1) !important;
+}
+
+.project-card-group .ant-select-focused .ant-select-selector {
+  border-color: var(--primary-color, #6366f1) !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important;
+}
+
+.project-card-actions {
+  flex-shrink: 0;
+}
+
+.project-card-actions .ant-btn.action-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: transparent !important;
+  border: none !important;
+  color: var(--text-muted, #9ca3af) !important;
+}
+
+.project-card-actions .ant-btn.action-btn:hover {
+  background: var(--bg-hover, #f3f4f6) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Animation */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.project-card {
+  animation: fadeInUp 0.35s ease backwards;
+}
+
+.project-card:nth-child(1) {
+  animation-delay: 0.03s;
+}
+
+.project-card:nth-child(2) {
+  animation-delay: 0.06s;
+}
+
+.project-card:nth-child(3) {
+  animation-delay: 0.09s;
+}
+
+.project-card:nth-child(4) {
+  animation-delay: 0.12s;
+}
+
+.project-card:nth-child(5) {
+  animation-delay: 0.15s;
+}
+
+.project-card:nth-child(6) {
+  animation-delay: 0.18s;
+}
+
+/* Dark theme */
+.theme-dark .project-card {
+  background: var(--bg-secondary, #1f2937) !important;
+}
+
+.theme-dark .project-card-header {}
+
+.theme-dark .project-card-name {
+  color: var(--text-primary, #f3f4f6);
+}
+
+.theme-dark .project-card-desc {
+  color: var(--text-muted, #9ca3af);
+}
+
+.theme-dark .project-card-group .ant-select-selector {
+  background: var(--bg-tertiary, #374151) !important;
+  border-color: var(--border-subtle, #4b5563) !important;
+}
+
+.theme-dark .project-card-actions .ant-btn {
+  background: var(--bg-secondary, #1f2937) !important;
+  border-color: var(--border-subtle, #4b5563) !important;
+  color: var(--text-secondary, #9ca3af) !important;
+}
+
+.theme-dark .project-card-actions .ant-btn:hover {
+  background: var(--bg-hover, #374151) !important;
 }
 
 .project-group-select-row {
@@ -397,14 +443,13 @@
 }
 
 .project-group-empty-drop-zone {
-  margin: 12px 20px 20px;
-  padding: 18px 14px;
-  border: 1px dashed var(--border-subtle);
-  border-radius: var(--radius-sm);
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text-muted);
-  font-size: 12px;
-  text-align: center;
-  background: rgba(124, 131, 163, 0.05);
+  font-size: 14px;
+  margin: 20px 0 20px;
 }
 
 /* Empty state */
@@ -490,6 +535,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -500,6 +546,7 @@
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -540,6 +587,7 @@
     opacity: 0;
     transform: translateX(-8px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);

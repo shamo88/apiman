@@ -1,9 +1,5 @@
 import React, { useEffect } from 'react';
-
-interface ScriptHelpWindowProps {
-    visible: boolean;
-    onClose: () => void;
-}
+import { useUIStore } from '../../store';
 
 const CONTENT = `<!DOCTYPE html>
 <html>
@@ -246,7 +242,11 @@ if (match) {
 
 let win: Window | null = null;
 
-export const ScriptHelpWindow: React.FC<ScriptHelpWindowProps> = ({ visible, onClose }) => {
+export const ScriptHelpWindow: React.FC = () => {
+    const uiStore = useUIStore();
+    const visible = uiStore.scriptHelpVisible;
+    const onClose = () => uiStore.setScriptHelpVisible(false);
+
     useEffect(() => {
         if (visible) {
             if (win && !win.closed) {

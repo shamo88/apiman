@@ -3,32 +3,16 @@ import { AppstoreOutlined, CloseOutlined, MinusOutlined, SettingOutlined } from 
 import { Tabs } from 'antd';
 import { Quit, WindowMinimise, WindowToggleMaximise } from '../../../wailsjs/runtime/runtime';
 import { SettingsModal } from './SettingsModal';
-import { LoadAppConfig } from '../../../wailsjs/go/main/App';
+import { useProjectStore, useUIStore, useWorkspaceStore } from '../../store';
 
-interface TitleBarProps {
-  title?: string;
-  activeTab?: string;
-  onTabChange?: (key: string) => void;
-  onTabEdit?: (targetKey: React.MouseEvent | React.KeyboardEvent | string, action: 'add' | 'remove') => void;
-  tabItems?: any[];
-  onListAnimationChange?: (enabled: boolean) => void;
-  onThemeChange?: (theme: string) => void;
-  theme?: string;
-  onSettingsSave?: () => void;
-}
+export const TitleBar: React.FC = () => {
+  const projectStore = useProjectStore();
+  const uiStore = useUIStore();
 
-export const TitleBar: React.FC<TitleBarProps> = ({
-  title = 'Apiman',
-  activeTab,
-  onTabChange,
-  onTabEdit,
-  tabItems,
-  onListAnimationChange,
-  onThemeChange,
-  theme = 'light',
-  onSettingsSave,
-}) => {
   const [settingsVisible, setSettingsVisible] = useState(false);
+
+  const activeTab = projectStore.activeTab;
+  const projectTabs = projectStore.projectTabs;
 
   const handleMinimize = async () => {
     try {
@@ -54,18 +38,38 @@ export const TitleBar: React.FC<TitleBarProps> = ({
     }
   };
 
-  const handleOpenSettings = async () => {
-    try {
-      const config = await LoadAppConfig();
-      // Settings modal will load its own form data
-      setSettingsVisible(true);
-    } catch (error) {
-      console.error('Failed to load config:', error);
+  const handleOpenSettings = () => {
+    setSettingsVisible(true);
+  };
+
+  const handleTabChange = (key: string) => {
+    if (key === '__home__') {
+      switchProjectTab('home');
+    } else {
+      switchProjectTab(key);
     }
   };
 
-  const homeTabItem = tabItems?.find((item: any) => item?.key === 'home');
-  const projectTabItems = (tabItems || []).filter((item: any) => item?.key !== 'home');
+  const handleTabEdit = (targetKey: React.MouseEvent | React.KeyboardEvent | string, action: 'add' | 'remove') => {
+    if (action === 'remove' && targetKey !== 'home') {
+      projectStore.closeProjectTab(targetKey as string);
+    }
+  };
+
+  const switchProjectTab = (tabId: string) => {
+    if (projectStore.activeTab !== 'home' && tabId !== 'home') {
+      const workspaceStore = useWorkspaceStore.getState();
+      const currentWorkspace = workspaceStore.getActiveWorkspace();
+      workspaceStore.setWorkspaceState(projectStore.activeTab, currentWorkspace);
+    }
+    projectStore.setActiveTab(tabId);
+    if (tabId !== 'home') {
+      useWorkspaceStore.getState().setActiveProjectId(tabId);
+    }
+  };
+
+  const homeTabItem = { key: 'home', label: '主页', closable: false };
+  const projectTabItems = projectTabs.map(tab => ({ key: tab.id, label: tab.title }));
   const projectTabsActiveKey = activeTab === 'home' ? '__home__' : activeTab;
 
   return (
@@ -78,29 +82,25 @@ export const TitleBar: React.FC<TitleBarProps> = ({
             className="title-bar-logo-img"
           />
 
-          {tabItems && onTabChange && (
-            <div className="title-bar-tabs-wrap">
-              {homeTabItem && (
-                <div
-                  className={`title-bar-home-tab${activeTab === 'home' ? ' active' : ''}`}
-                  onClick={() => onTabChange('home')}
-                  style={{ '--wails-draggable': 'no-drag' } as React.CSSProperties}
-                >
-                  {homeTabItem.label}
-                </div>
-              )}
-              <Tabs
-                activeKey={projectTabsActiveKey}
-                onChange={onTabChange}
-                type="editable-card"
-                hideAdd
-                onEdit={onTabEdit}
-                items={projectTabItems}
-                size="small"
-                className="title-bar-tabs"
-              />
+          <div className="title-bar-tabs-wrap">
+            <div
+              className={`title-bar-home-tab${activeTab === 'home' ? ' active' : ''}`}
+              onClick={() => handleTabChange('home')}
+              style={{ '--wails-draggable': 'no-drag' } as React.CSSProperties}
+            >
+              主页
             </div>
-          )}
+            <Tabs
+              activeKey={projectTabsActiveKey}
+              onChange={handleTabChange}
+              type="editable-card"
+              hideAdd
+              onEdit={handleTabEdit}
+              items={projectTabItems}
+              size="small"
+              className="title-bar-tabs"
+            />
+          </div>
         </div>
 
         <div className="title-bar-controls">
@@ -141,11 +141,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 
       <SettingsModal
         visible={settingsVisible}
-        theme={theme}
         onClose={() => setSettingsVisible(false)}
-        onSettingsSave={onSettingsSave}
-        onListAnimationChange={onListAnimationChange}
-        onThemeChange={onThemeChange}
       />
     </>
   );
