@@ -67,6 +67,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
     handleCaseClick,
     handleExecuteRequest,
     handleSaveRequest,
+    handleSaveCase,
     handleDeleteRequest,
     handleCopyRequest,
     handleRename,
@@ -557,7 +558,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
                   onApiConfigChange={(config) => handleUpdateWorkspace({ apiConfig: config })}
                   executing={executing}
                   onExecute={handleExecuteRequest}
-                  onSave={handleSaveRequest}
+                  onSave={workspace.requestEditorSurface === 'case' ? handleSaveCase : handleSaveRequest}
                   environmentVariables={environmentVariables}
                   projectScripts={scripts.map((s) => ({ id: s.id, name: s.name }))}
                 />

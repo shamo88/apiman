@@ -61,15 +61,24 @@ export const useWorkspaceHandlers = (projectId: string) => {
 
     try {
       const request = await GetRequest(treeNode.path);
+      // Use request path as tab ID to avoid creating duplicate tabs for the same request
       const tab = {
-        id: `request-${Date.now()}`,
+        id: treeNode.path,
         title: request.name || treeNode.name,
         path: treeNode.path,
       };
       workspaceStore.openRequestTab(projectId, tab);
       workspaceStore.setCurrentRequest(projectId, request as CurlRequest);
+      // Clear case selection when clicking on a request
+      workspaceStore.setSidebarHighlightedCasePath(projectId, '');
 
       const cfg = apiConfigFromRequest(request as CurlRequest, request.name || '');
+      // When switching to interface, preserve current editor state
+      // and load interface from server
+      workspaceStore.setWorkspaceState(projectId, {
+        interfaceApiConfig: { ...workspace.apiConfig },
+        requestEditorSurface: 'interface',
+      });
       workspaceStore.setApiConfig(projectId, {
         ...cfg,
         preScripts: request.pre_scripts || [],
@@ -79,7 +88,7 @@ export const useWorkspaceHandlers = (projectId: string) => {
       console.error('Failed to load request:', error);
       message.error('加载请求失败');
     }
-  }, [projectId, workspaceStore]);
+  }, [projectId, workspaceStore, workspace.apiConfig]);
 
   const handleCaseClick = useCallback(async (caseNode: ProjectTree) => {
     if (!caseNode.path) return;
@@ -94,23 +103,43 @@ export const useWorkspaceHandlers = (projectId: string) => {
 
       const reqCases = request.cases as models.HttpRequestCase[] | undefined;
       if (reqCases && reqCases.length > 0) {
-        const rows = reqCases.map(c => ({
-          id: c.id,
-          name: c.name,
-          config: apiConfigFromHttpSpec(c.spec, c.name),
-        }));
-        const ifaceCfg = apiConfigFromHttpSpec(
-          request.interface_spec || models.HttpRequestSpec.createFrom({}),
-          request.name || ''
-        );
-        workspaceStore.setWorkspaceState(projectId, {
-          requestCases: rows,
-          activeCaseId: caseId,
-          interfaceApiConfig: ifaceCfg,
-        });
-        const activeCase = rows.find(r => r.id === caseId);
-        if (activeCase) {
-          workspaceStore.setApiConfig(projectId, { ...activeCase.config, name: request.name || '' });
+        // Check if requestCases already exists for this request - if so, preserve it (switching within same request)
+        const existingCases = workspace.requestCases;
+        const isSameRequest = existingCases.length > 0 &&
+          existingCases[0].config.name === request.name;
+
+        if (isSameRequest) {
+          // Switching cases within same request - only update activeCaseId and apiConfig
+          const activeCase = reqCases.find(c => c.id === caseId);
+          if (activeCase) {
+            const caseConfig = apiConfigFromHttpSpec(activeCase.spec, activeCase.name);
+            // Preserve current apiConfig (may contain unsaved interface changes)
+            workspaceStore.setWorkspaceState(projectId, {
+              activeCaseId: caseId,
+              interfaceApiConfig: { ...workspace.apiConfig },
+            });
+            workspaceStore.setApiConfig(projectId, { ...caseConfig, name: request.name || '' });
+          }
+        } else {
+          // First time loading cases for this request - load from server and preserve interface
+          const rows = reqCases.map(c => ({
+            id: c.id,
+            name: c.name,
+            config: apiConfigFromHttpSpec(c.spec, c.name),
+          }));
+          const ifaceCfg = apiConfigFromHttpSpec(
+            request.interface_spec || models.HttpRequestSpec.createFrom({}),
+            request.name || ''
+          );
+          workspaceStore.setWorkspaceState(projectId, {
+            requestCases: rows,
+            activeCaseId: caseId,
+            interfaceApiConfig: ifaceCfg,
+          });
+          const activeCase = rows.find(r => r.id === caseId);
+          if (activeCase) {
+            workspaceStore.setApiConfig(projectId, { ...activeCase.config, name: request.name || '' });
+          }
         }
         workspaceStore.setRequestEditorSurface(projectId, 'case');
       }
@@ -118,7 +147,7 @@ export const useWorkspaceHandlers = (projectId: string) => {
       console.error('Failed to load case:', error);
       message.error('加载用例失败');
     }
-  }, [projectId, workspaceStore]);
+  }, [projectId, workspaceStore, workspace.apiConfig, workspace.requestCases]);
 
   const handleExecuteRequest = useCallback(async () => {
     if (!project) return;
@@ -141,11 +170,35 @@ export const useWorkspaceHandlers = (projectId: string) => {
   const handleSaveRequest = useCallback(async () => {
     if (!project || !workspace.currentRequest?.path) return;
     try {
+      // Preserve existing cases by passing current requestCases
       await saveRequest(
         project.id,
         workspace.currentRequest.path,
         workspace.apiConfig,
         workspace.requestCases.map(c => ({ id: c.id, name: c.name, config: c.config })),
+        workspace.activeCaseId
+      );
+    } catch (error) {
+      // Error handled in hook
+    }
+  }, [project, workspace, saveRequest]);
+
+  // Save only the active case, preserving interface and other cases
+  const handleSaveCase = useCallback(async () => {
+    if (!project || !workspace.currentRequest?.path || !workspace.activeCaseId) return;
+    try {
+      // Replace only the active case in the cases array
+      const updatedCases = workspace.requestCases.map(c =>
+        c.id === workspace.activeCaseId
+          ? { id: c.id, name: c.name, config: workspace.apiConfig }
+          : c
+      );
+      // Use interfaceApiConfig for the interface spec to preserve original interface
+      await saveRequest(
+        project.id,
+        workspace.currentRequest.path,
+        workspace.interfaceApiConfig,
+        updatedCases.map(c => ({ id: c.id, name: c.name, config: c.config })),
         workspace.activeCaseId
       );
     } catch (error) {
@@ -304,6 +357,7 @@ export const useWorkspaceHandlers = (projectId: string) => {
     handleCaseClick,
     handleExecuteRequest,
     handleSaveRequest,
+    handleSaveCase,
     handleDeleteRequest,
     handleCopyRequest,
     handleRename,

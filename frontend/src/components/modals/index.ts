@@ -4,3 +4,4 @@ export { CreateRequestModal } from './CreateRequestModal';
 export { RenameModal } from './RenameModal';
 export { CookieModal } from './CookieModal';
 export { HistoryModal } from './HistoryModal';
+export { AddCaseModal } from './AddCaseModal';

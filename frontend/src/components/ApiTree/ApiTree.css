@@ -308,6 +308,8 @@
 
 .api-case-item.active {
   background: var(--bg-active);
+  color: var(--text-primary);
+  border-left: 2px solid var(--accent-primary);
 }
 
 .api-case-item.moved-highlight {

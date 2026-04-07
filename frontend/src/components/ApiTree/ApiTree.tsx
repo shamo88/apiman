@@ -127,11 +127,16 @@ export const ApiTree: React.FC<ApiTreeProps> = ({
 
   const renderChild = (child: ProjectTree) => {
     if (child.type === 'request') {
+      // Only suppress request active state if the selected case BELONGS to this request
+      const caseChildren = (child.children || []).filter((c): c is ProjectTree => c.type === 'case');
+      const selectedCaseBelongsToThisRequest = caseChildren.some(c => c.path === sidebarHighlightedCasePath);
+      const isActive = child.path === activeRequestPath && !selectedCaseBelongsToThisRequest;
+
       return (
         <ApiTreeItem
           request={child}
           isExpanded={child.path ? expandedRequestPaths.has(child.path) : false}
-          isActive={child.path === activeRequestPath}
+          isActive={isActive}
           sidebarHighlightedCasePath={sidebarHighlightedCasePath}
           movedHighlightPath={movedHighlightPath}
           onToggleCases={() => child.path && onToggleRequestCases(child.path)}

@@ -53,6 +53,12 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
   const orderedKids = folderChildren.filter((child: ProjectTree) => child.type === 'folder' || child.type === 'request');
   const totalCount = folderChildren.length;
 
+  // Helper to check if the selected case BELONGS to a specific request
+  const selectedCaseBelongsToRequest = (request: ProjectTree): boolean => {
+    const caseChildren = (request.children || []).filter((c): c is ProjectTree => c.type === 'case');
+    return caseChildren.some(c => c.path === sidebarHighlightedCasePath);
+  };
+
   return (
     <div className="api-folder">
       <div
@@ -112,7 +118,7 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
                 key={child.path || child.id}
                 request={child}
                 isExpanded={child.path ? expandedRequestPaths.has(child.path) : false}
-                isActive={child.path === activeRequestPath}
+                isActive={child.path === activeRequestPath && !selectedCaseBelongsToRequest(child)}
                 sidebarHighlightedCasePath={sidebarHighlightedCasePath}
                 movedHighlightPath={movedHighlightPath}
                 onToggleCases={() => child.path && onToggleRequestCases(child.path)}
