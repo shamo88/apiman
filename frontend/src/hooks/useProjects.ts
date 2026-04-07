@@ -218,7 +218,7 @@ export function useProjects() {
 
   const duplicateCase = useCallback(async (projectId: string, requestId: string, caseId: string) => {
     try {
-      await DuplicateRequestCase(requestId, caseId);
+      await DuplicateRequestCase(`request|${projectId}|${requestId}`, caseId);
       await loadProjectTree(projectId);
       message.success('用例已复制');
     } catch (error: any) {
@@ -229,7 +229,7 @@ export function useProjects() {
 
   const deleteCase = useCallback(async (projectId: string, requestId: string, caseId: string) => {
     try {
-      await DeleteRequestCase(requestId, caseId);
+      await DeleteRequestCase(`request|${projectId}|${requestId}`, caseId);
       await loadProjectTree(projectId);
       message.success('用例已删除');
     } catch (error: any) {
@@ -240,7 +240,7 @@ export function useProjects() {
 
   const renameCase = useCallback(async (projectId: string, requestId: string, caseId: string, name: string) => {
     try {
-      await RenameRequestCase(requestId, caseId, name);
+      await RenameRequestCase(`request|${projectId}|${requestId}`, caseId, name);
       await loadProjectTree(projectId);
       message.success('用例已重命名');
     } catch (error: any) {

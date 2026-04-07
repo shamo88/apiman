@@ -18,6 +18,7 @@ interface FolderNodeProps {
   onCaseClick: (c: ProjectTree) => void;
   onAddRequest: (parentPath: string) => void;
   onAddFolder: (parentPath: string) => void;
+  onRename: (type: 'request' | 'folder', path: string, currentName: string) => void;
   onRenameFolder: (path: string, currentName: string) => void;
   onDeleteFolder: (path: string) => void;
   onCopyRequest: (path: string) => void;
@@ -40,6 +41,7 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
   onCaseClick,
   onAddRequest,
   onAddFolder,
+  onRename,
   onRenameFolder,
   onDeleteFolder,
   onCopyRequest,
@@ -125,7 +127,7 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
                 onClick={() => onRequestClick(child)}
                 onAddCase={() => child.path && onAddCase(child.path)}
                 onCopy={() => child.path && onCopyRequest(child.path)}
-                onRename={() => child.path && onRenameCase(child.path, child.name)}
+                onRename={() => child.path && onRename('request', child.path, child.name)}
                 onDelete={() => child.path && onDeleteCase(child.path)}
                 onCaseClick={onCaseClick}
                 onDuplicateCase={onDuplicateCase}
@@ -147,6 +149,7 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
                 onCaseClick={onCaseClick}
                 onAddRequest={onAddRequest}
                 onAddFolder={onAddFolder}
+                onRename={onRename}
                 onRenameFolder={onRenameFolder}
                 onDeleteFolder={onDeleteFolder}
                 onCopyRequest={onCopyRequest}

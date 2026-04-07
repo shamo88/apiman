@@ -21,6 +21,7 @@ interface UIStore {
   caseRenameModalOpen: boolean;
   caseRenameCasePath: string;
   caseRenameInput: string;
+  renamingCaseId: string | null;
   createGroupModal: boolean;
   newGroupName: string;
   renameProjectModal: boolean;
@@ -110,6 +111,7 @@ export const useUIStore = create<UIStore>()(
       caseRenameModalOpen: false,
       caseRenameCasePath: '',
       caseRenameInput: '',
+      renamingCaseId: null,
       createGroupModal: false,
       newGroupName: '',
       renameProjectModal: false,
@@ -167,8 +169,8 @@ export const useUIStore = create<UIStore>()(
       setScriptHelpVisible: (visible) => set({ scriptHelpVisible: visible }),
       openAddCaseModal: (targetPath) => set({ addCaseModalOpen: true, addCaseTargetPath: targetPath }),
       closeAddCaseModal: () => set({ addCaseModalOpen: false, addCaseTargetPath: '', addCaseNameInput: '' }),
-      openCaseRenameModal: (casePath) => set({ caseRenameModalOpen: true, caseRenameCasePath: casePath }),
-      closeCaseRenameModal: () => set({ caseRenameModalOpen: false, caseRenameCasePath: '', caseRenameInput: '' }),
+      openCaseRenameModal: (casePath) => set({ caseRenameModalOpen: true, caseRenameCasePath: casePath, renamingCaseId: casePath }),
+      closeCaseRenameModal: () => set({ caseRenameModalOpen: false, caseRenameCasePath: '', caseRenameInput: '', renamingCaseId: null }),
       openCreateGroupModal: () => set({ createGroupModal: true }),
       closeCreateGroupModal: () => set({ createGroupModal: false, newGroupName: '' }),
       openRenameProjectModal: (id, currentValue) => set({ renameProjectModal: true, renameProjectId: id, renameProjectValue: currentValue }),

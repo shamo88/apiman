@@ -166,6 +166,7 @@ export const ApiTree: React.FC<ApiTreeProps> = ({
         onCaseClick={onCaseClick}
         onAddRequest={() => child.path && onAddRequest(child.path)}
         onAddFolder={() => child.path && onAddFolder(child.path)}
+        onRename={onRename}
         onRenameFolder={() => child.path && onRename('folder', child.path, child.name)}
         onDeleteFolder={() => child.path && onDeleteFolder(child.path)}
         onCopyRequest={onCopyRequest}

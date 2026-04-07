@@ -5,6 +5,7 @@ import { useRequest } from './useRequest';
 import { GetRequest, GetProjectTree } from '../../wailsjs/go/main/App';
 import { useWorkspaceStore, createEmptyWorkspaceState } from '../store/useWorkspaceStore';
 import { useProjectStore } from '../store/useProjectStore';
+import { useUIStore } from '../store/useUIStore';
 import type { CurlRequest } from '../constants/defaults';
 import type { ProjectTree } from '../store';
 import { apiConfigFromRequest, apiConfigFromHttpSpec, hydrateRequestEditor } from '../utils';
@@ -91,6 +92,10 @@ export const useWorkspaceHandlers = (projectId: string) => {
   }, [projectId, workspaceStore, workspace.apiConfig]);
 
   const handleCaseClick = useCallback(async (caseNode: ProjectTree) => {
+    // Skip if renaming case modal is open - prevent activeCaseId from being changed
+    const uiState = useUIStore.getState();
+    if (uiState.renamingCaseId) return;
+
     if (!caseNode.path) return;
     const parts = caseNode.path.replace('requestCase|', '').split('|');
     if (parts.length !== 3) return;
@@ -226,17 +231,11 @@ export const useWorkspaceHandlers = (projectId: string) => {
     }
   }, [projectId, copyRequest]);
 
-  const handleRename = useCallback(async (type: 'request' | 'folder', path: string, newName: string) => {
-    try {
-      if (type === 'request') {
-        await renameRequest(projectId, path, newName);
-      } else {
-        await renameFolder(projectId, path, newName);
-      }
-    } catch (error) {
-      // Error handled in hook
-    }
-  }, [projectId, renameRequest, renameFolder]);
+  const handleRename = useCallback(async (type: 'request' | 'folder', path: string, currentName: string) => {
+    // Open the rename modal, do not call API directly
+    const uiStore = useUIStore.getState();
+    uiStore.openRenameModal(type, path, currentName);
+  }, []);
 
   const handleDeleteFolder = useCallback(async (path: string) => {
     try {
@@ -290,15 +289,11 @@ export const useWorkspaceHandlers = (projectId: string) => {
     }
   }, [projectId, deleteCase]);
 
-  const handleRenameCase = useCallback(async (casePath: string, newName: string) => {
-    const parts = casePath.replace('requestCase|', '').split('|');
-    if (parts.length !== 3) return;
-    try {
-      await renameCase(projectId, parts[1], parts[2], newName);
-    } catch (error) {
-      // Error handled in hook
-    }
-  }, [projectId, renameCase]);
+  const handleRenameCase = useCallback(async (casePath: string, currentName: string) => {
+    // Open the rename modal for case, do not call API directly
+    const uiStore = useUIStore.getState();
+    uiStore.openCaseRenameModal(casePath);
+  }, []);
 
   const loadRequestContent = useCallback(async (path: string) => {
     if (!projectId) return;
