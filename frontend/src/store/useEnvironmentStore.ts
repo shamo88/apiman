@@ -87,7 +87,12 @@ export const useEnvironmentStore = create<EnvironmentStore>()(
       openEnvironmentTab: (env) => set((state) => {
         const tabKey = `env-${env.id}`;
         if (state.environmentTabs.some((tab) => tab.key === tabKey)) {
-          return { activeEnvironmentTab: tabKey };
+          return {
+            activeEnvironmentTab: tabKey,
+            editingEnvironmentId: env.id,
+            environmentFormName: env.name,
+            environmentFormVariables: get().environmentToRows(env.variables),
+          };
         }
         return {
           environmentTabs: [...state.environmentTabs, { key: tabKey, title: env.name, environmentId: env.id }],
