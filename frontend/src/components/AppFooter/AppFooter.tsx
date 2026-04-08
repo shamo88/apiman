@@ -1,10 +1,14 @@
 import React from 'react';
 import { Button } from 'antd';
-import { SafetyOutlined, ApiOutlined, FileTextOutlined } from '@ant-design/icons';
+import { SafetyOutlined, ApiOutlined, FileTextOutlined, KeyOutlined } from '@ant-design/icons';
 import { useUIStore } from '../../store';
 import './AppFooter.css';
 
-export const AppFooter: React.FC = () => {
+interface AppFooterProps {
+  onOpenShortcutsHelp?: () => void;
+}
+
+export const AppFooter: React.FC<AppFooterProps> = ({ onOpenShortcutsHelp }) => {
   const uiStore = useUIStore();
   const mcpStatus = useUIStore((state) => state.mcpStatus);
 
@@ -35,6 +39,11 @@ export const AppFooter: React.FC = () => {
       <Button icon={<FileTextOutlined />} onClick={handleLogClick}>
         Log
       </Button>
+      {onOpenShortcutsHelp && (
+        <Button icon={<KeyOutlined />} onClick={onOpenShortcutsHelp}>
+          快捷键
+        </Button>
+      )}
     </div>
   );
 };

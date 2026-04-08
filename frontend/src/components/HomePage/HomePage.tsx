@@ -1,17 +1,28 @@
 import React, { useState, useEffect, DragEvent } from 'react';
 import { Button, Empty, Input, message, Modal, Spin, Tooltip, Upload, Menu } from 'antd';
 import type { UploadProps } from 'antd';
-import { PlusOutlined, SearchOutlined, FolderOutlined, DeleteOutlined, EditOutlined, HomeOutlined, ImportOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, FolderOutlined, DeleteOutlined, EditOutlined, HomeOutlined, ImportOutlined, ClockCircleOutlined, ApiOutlined } from '@ant-design/icons';
 import { useProjectStore, Project } from '../../store';
 import { useUIStore } from '../../store/useUIStore';
-import { CreateProject, DeleteProject, RenameProject, LoadProjectGroupsState, SaveProjectGroupsState, ListProjects, ImportPostmanCollection } from '../../../wailsjs/go/main/App';
+import { CreateProject, DeleteProject, RenameProject, LoadProjectGroupsState, SaveProjectGroupsState, ListProjects, ImportPostmanCollection, ParseOpenAPICollection, ImportOpenAPICollection } from '../../../wailsjs/go/main/App';
 import { ProjectCard } from './ProjectCard';
 import { ProjectGroup } from './ProjectGroup';
 import { CreateProjectModal } from '../modals/CreateProjectModal';
 import { CreateGroupModal } from '../modals/CreateGroupModal';
 import { RenameProjectModal } from '../modals/RenameProjectModal';
 import { RenameGroupModal } from '../modals/RenameGroupModal';
+import { ImportOpenAPIModal } from '../modals/ImportOpenAPIModal';
 import './HomePage.css';
+
+interface CollectionItem {
+  id: string;
+  name: string;
+  item?: CollectionItem[];
+  request?: {
+    method: string;
+    url?: { raw: string };
+  };
+}
 
 interface HomePageProps {
   onProjectOpen: (project: Project) => void;
@@ -34,9 +45,12 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
     projectSearchKeyword,
     setProjectGroupsLoaded,
     setLoading: setStoreLoading,
+    recentProjects,
+    addToRecentProjects,
+    removeFromRecentProjects,
   } = useProjectStore();
 
-  const { openCreateProjectModal, closeCreateProjectModal, createProjectModal } = useUIStore();
+  const { openCreateProjectModal, closeCreateProjectModal, createProjectModal, setDraggingProjectId, draggingProjectId: uiDraggingProjectId } = useUIStore();
   const [newProjectName, setNewProjectName] = useState('');
   const [createGroupModal, setCreateGroupModal] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
@@ -49,6 +63,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
   const [draggedProjectId, setDraggedProjectId] = useState<string | null>(null);
   const [dragOverGroup, setDragOverGroup] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+
+  const [openapiModal, setOpenapiModal] = useState(false);
+  const [openapiProjectName, setOpenapiProjectName] = useState('');
+  const [openapiItems, setOpenapiItems] = useState<CollectionItem[]>([]);
+  const [openapiFileData, setOpenapiFileData] = useState<string>('');
 
   const handleImportPostman: UploadProps['beforeUpload'] = async (file) => {
     setImporting(true);
@@ -63,6 +82,35 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
       setImporting(false);
     }
     return false;
+  };
+
+  const handleOpenAPIFile = async (file: File) => {
+    try {
+      const text = await file.text();
+      const jsonResult = await ParseOpenAPICollection(text);
+      const result = JSON.parse(jsonResult);
+      setOpenapiProjectName(result.projectName);
+      setOpenapiItems(result.items as CollectionItem[]);
+      setOpenapiFileData(text);
+      setOpenapiModal(true);
+    } catch (error: any) {
+      message.error(`解析失败: ${error?.message || error}`);
+    }
+    return false;
+  };
+
+  const handleConfirmOpenAPIImport = async () => {
+    setImporting(true);
+    try {
+      await ImportOpenAPICollection(openapiFileData);
+      message.success('导入成功');
+      setOpenapiModal(false);
+      window.location.reload();
+    } catch (error: any) {
+      message.error(`导入失败: ${error?.message || error}`);
+    } finally {
+      setImporting(false);
+    }
   };
 
   useEffect(() => {
@@ -219,6 +267,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
 
   const handleDragStart = (e: DragEvent, projectId: string) => {
     setDraggedProjectId(projectId);
+    setDraggingProjectId(projectId);
     e.dataTransfer.effectAllowed = 'move';
   };
 
@@ -235,16 +284,17 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
   const handleDrop = async (e: DragEvent, groupName: string) => {
     e.preventDefault();
     setDragOverGroup(null);
-    if (draggedProjectId) {
+    const currentDraggedId = draggedProjectId || uiDraggingProjectId;
+    if (currentDraggedId) {
       try {
         const state = await LoadProjectGroupsState();
         if (groupName === 'ungrouped') {
-          delete state.assignments[draggedProjectId];
-          removeProjectFromGroup(draggedProjectId);
+          delete state.assignments[currentDraggedId];
+          removeProjectFromGroup(currentDraggedId);
           message.success('已移至未分组');
         } else {
-          state.assignments = { ...state.assignments, [draggedProjectId]: groupName };
-          assignProjectGroup(draggedProjectId, groupName);
+          state.assignments = { ...state.assignments, [currentDraggedId]: groupName };
+          assignProjectGroup(currentDraggedId, groupName);
           message.success(`已移动到分组「${groupName}」`);
         }
         await SaveProjectGroupsState(state);
@@ -253,6 +303,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
       }
     }
     setDraggedProjectId(null);
+    setDraggingProjectId(null);
   };
 
   const handleRemoveFromGroup = async (projectId: string) => {
@@ -265,6 +316,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
     } catch (error: any) {
       message.error(`移除失败: ${error?.message || error}`);
     }
+  };
+
+  const handleOpenProject = (project: Project) => {
+    addToRecentProjects(project);
+    onProjectOpen(project);
   };
 
   const handleAssignGroup = async (projectId: string, groupName: string) => {
@@ -310,6 +366,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
               导入 Postman
             </Button>
           </Upload>
+          <Upload accept=".json,.yaml,.yml" showUploadList={false} beforeUpload={handleOpenAPIFile}>
+            <Button icon={<ImportOutlined />} loading={importing} style={{ marginLeft: 8 }}>
+              导入 OpenAPI
+            </Button>
+          </Upload>
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -327,6 +388,27 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
           </Button>
         </div>
       </div>
+
+      {recentProjects.length > 0 && (
+        <div className="recent-projects">
+          <div className="recent-projects-header">
+            <ClockCircleOutlined />
+            <span className="recent-projects-title">最近访问</span>
+          </div>
+          <div className="recent-projects-list">
+            {recentProjects.map((project) => (
+              <div
+                key={project.id}
+                className="recent-project-item"
+                onClick={() => handleOpenProject(project)}
+              >
+                <ApiOutlined className="recent-project-icon" />
+                <span className="recent-project-name">{project.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="home-content">
         {filteredProjects.length === 0 ? (
@@ -350,7 +432,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
               onDragOver={(e) => handleDragOver(e, groupName)}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, groupName)}
-              onProjectOpen={onProjectOpen}
+              onProjectOpen={handleOpenProject}
               setRenameProject={setRenameProject}
               setRenameModal={setRenameModal}
               handleDeleteProject={handleDeleteProject}
@@ -360,7 +442,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
             />
           ))}
             {ungroupedProjects.length > 0 && (
-              <div className="project-group">
+              <div className={`project-group ${uiDraggingProjectId ? 'has-dragging-item' : ''}`}>
                 <div
                   className="project-group-header"
                   onClick={() => toggleProjectGroupCollapse('ungrouped')}
@@ -387,7 +469,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
                         <ProjectCard
                           key={project.id}
                           project={project}
-                          onProjectOpen={onProjectOpen}
+                          onProjectOpen={handleOpenProject}
                           setRenameProject={setRenameProject}
                           setRenameModal={setRenameModal}
                           handleDeleteProject={handleDeleteProject}
@@ -446,6 +528,15 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
         onRename={handleRenameGroup}
         groupName={renameGroupValue}
         onNameChange={setRenameGroupValue}
+      />
+
+      <ImportOpenAPIModal
+        open={openapiModal}
+        onClose={() => setOpenapiModal(false)}
+        onImport={handleConfirmOpenAPIImport}
+        projectName={openapiProjectName}
+        items={openapiItems}
+        loading={importing}
       />
     </div>
   );

@@ -3,6 +3,7 @@ import { Card, Button, Dropdown, Select } from 'antd';
 import type { MenuProps } from 'antd';
 import { ApiOutlined, EditOutlined, DeleteOutlined, EllipsisOutlined } from '@ant-design/icons';
 import { useProjectStore, Project } from '../../store';
+import { useUIStore } from '../../store/useUIStore';
 import './HomePage.css';
 
 interface ProjectCardProps {
@@ -27,9 +28,11 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   handleRemoveFromGroup,
 }) => {
   const { projectGroups, projectGroupAssignments } = useProjectStore();
+  const { draggingProjectId } = useUIStore();
 
   const currentGroup = projectGroupAssignments[project.id];
   const groupOptions = projectGroups.map(g => ({ label: g, value: g }));
+  const isDragging = draggingProjectId === project.id;
 
   const actionMenu: MenuProps['items'] = [
     {
@@ -57,7 +60,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   return (
     <Card
       key={project.id}
-      className="project-card"
+      className={`project-card ${isDragging ? 'dragging' : ''}`}
       size="small"
       draggable
       onClick={() => onProjectOpen(project)}

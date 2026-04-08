@@ -5,7 +5,6 @@
 }
 
 .project-sidebar {
-  width: 280px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -104,25 +103,24 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow: hidden;
   min-width: 0;
-  min-height: 0;
+  height: 100%;
 }
 
 .workspace-request {
-  flex-shrink: 0;
-  /* 请求区根据内容自动调整高度，不限制最大高度 */
+  flex: 1;
   overflow: hidden;
   border-bottom: 1px solid var(--border-color, #f0f0f0);
+  min-height: 100px;
 }
 
 .workspace-response {
-  flex: 1;
-  /* 响应区占据剩余空间，有最小高度限制 */
-  min-height: 200px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  min-height: 100px;
+  flex-shrink: 0;
 }
 
 /* 当整个工作区空间不足时，请求+响应区域一起滚动 */
@@ -821,4 +819,86 @@
 /* Dark theme - request panel */
 .theme-dark .request-panel {
   background: var(--bg-secondary);
+}
+
+/* Resize Handle */
+.resize-handle {
+  width: 6px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  transition: background 0.15s ease;
+  z-index: 10;
+}
+
+.resize-handle:hover,
+.resize-handle.dragging {
+  background: rgba(79, 70, 229, 0.1);
+}
+
+.resize-handle-line {
+  width: 2px;
+  height: 40px;
+  border-radius: 1px;
+  background: var(--border-color, #e0e0e0);
+  transition: background 0.15s ease;
+}
+
+.resize-handle:hover .resize-handle-line,
+.resize-handle.dragging .resize-handle-line {
+  background: var(--accent-primary, #4f46e5);
+}
+
+.theme-dark .resize-handle:hover,
+.theme-dark .resize-handle.dragging {
+  background: rgba(99, 102, 241, 0.15);
+}
+
+.theme-dark .resize-handle-line {
+  background: var(--border-color, #404040);
+}
+
+.theme-dark .resize-handle:hover .resize-handle-line,
+.theme-dark .resize-handle.dragging .resize-handle-line {
+  background: var(--accent-primary, #818cf8);
+}
+
+/* Splitter handle */
+.resize-splitter {
+  flex-shrink: 0;
+  background: var(--bg-secondary, #f5f5f5);
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background 0.15s ease;
+  cursor: row-resize;
+}
+
+.resize-splitter:hover,
+.resize-splitter.dragging {
+  background: var(--accent-primary);
+}
+
+.resize-splitter .splitter-handle {
+  background: transparent;
+  cursor: row-resize;
+}
+
+.resize-splitter:hover .splitter-handle,
+.resize-splitter.dragging .splitter-handle {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+/* Dark theme splitter */
+.theme-dark .resize-splitter {
+  background: var(--bg-secondary, #252525);
+  border-color: var(--border-subtle);
+}
+
+.theme-dark .resize-splitter:hover,
+.theme-dark .resize-splitter.dragging {
+  background: var(--accent-primary);
 }

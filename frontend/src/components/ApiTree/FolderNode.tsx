@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { DragEvent } from 'react';
 import { Dropdown } from 'antd';
 import { FolderOutlined, RightOutlined, DownOutlined, PlusOutlined, MoreOutlined, EditOutlined, CloseOutlined } from '@ant-design/icons';
 import { ProjectTree } from '../../store';
+import { useUIStore } from '../../store/useUIStore';
 import { ApiTreeItem } from './ApiTreeItem';
 import './ApiTree.css';
 
@@ -26,6 +27,9 @@ interface FolderNodeProps {
   onDuplicateCase: (casePath: string) => void;
   onRenameCase: (casePath: string, currentName: string) => void;
   onDeleteCase: (casePath: string) => void;
+  onDragOver?: (e: DragEvent, folderPath: string) => void;
+  onDragLeave?: () => void;
+  onDrop?: (e: DragEvent, folderPath: string) => void;
 }
 
 export const FolderNode: React.FC<FolderNodeProps> = ({
@@ -49,11 +53,39 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
   onDuplicateCase,
   onRenameCase,
   onDeleteCase,
+  onDragOver,
+  onDragLeave,
+  onDrop,
 }) => {
+  const { dropTargetFolderPath } = useUIStore();
   const folderPath = folder.path || '';
   const folderChildren = folder.children || [];
   const orderedKids = folderChildren.filter((child: ProjectTree) => child.type === 'folder' || child.type === 'request');
   const totalCount = folderChildren.length;
+  const isDropTarget = dropTargetFolderPath === folderPath;
+
+  const handleDragOver = (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDragOver?.(e, folderPath);
+  };
+
+  const handleDragLeave = (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDragLeave?.();
+  };
+
+  const handleDrop = (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDrop?.(e, folderPath);
+  };
+
+  const handleHeaderClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggleFolder(folderPath);
+  };
 
   // Helper to check if the selected case BELONGS to a specific request
   const selectedCaseBelongsToRequest = (request: ProjectTree): boolean => {
@@ -64,8 +96,11 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
   return (
     <div className="api-folder">
       <div
-        className={`api-folder-header ${movedHighlightPath === (folder.path || folder.id) ? 'moved-highlight' : ''}`}
-        onClick={(e) => { e.stopPropagation(); onToggleFolder(folderPath); }}
+        className={`api-folder-header ${movedHighlightPath === (folder.path || folder.id) ? 'moved-highlight' : ''} ${isDropTarget ? 'drop-target-active' : ''}`}
+        onClick={handleHeaderClick}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
       >
         <span className="folder-toggle-icon">
           {isCollapsed ? <RightOutlined /> : <DownOutlined />}
@@ -157,6 +192,9 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
                 onDuplicateCase={onDuplicateCase}
                 onRenameCase={onRenameCase}
                 onDeleteCase={onDeleteCase}
+                onDragOver={onDragOver}
+                onDragLeave={onDragLeave}
+                onDrop={onDrop}
               />
             )
           )}

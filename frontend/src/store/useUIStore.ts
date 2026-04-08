@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
+import { ProjectTree } from './useProjectStore';
 
 interface UIStore {
   // 模态框状态
@@ -27,10 +28,15 @@ interface UIStore {
   renameProjectModal: boolean;
   renameProjectId: string;
   renameProjectValue: string;
-  renameGroupModal: boolean;
-  renameGroupValue: string;
+      renameGroupModal: boolean;
+      renameGroupValue: string;
+      globalSearchVisible: boolean;
 
-  // 拖拽状态
+      // 批量执行
+      batchExecuteModalVisible: boolean;
+      batchExecuteSelectedItems: ProjectTree[];
+
+      // 拖拽状态
   draggingNode: { type: 'request' | 'folder'; path: string } | null;
   dropTargetFolderPath: string | null;
   invalidDropHint: { message: string; x: number; y: number } | null;
@@ -42,6 +48,7 @@ interface UIStore {
 
   // 侧边栏
   sidebarMenu: 'apis' | 'environments' | 'scripts';
+  sidebarWidth: number;
 
   // 主题/动画
   appTheme: 'light' | 'dark';
@@ -70,6 +77,7 @@ interface UIStore {
   setAnimationEnabled: (enabled: boolean) => void;
   setForceListAnimation: (force: boolean) => void;
   setSidebarMenu: (menu: 'apis' | 'environments' | 'scripts') => void;
+  setSidebarWidth: (width: number) => void;
   setCookieModalVisible: (visible: boolean) => void;
   setHistoryModalVisible: (visible: boolean) => void;
   setMcpModalVisible: (visible: boolean) => void;
@@ -91,6 +99,10 @@ interface UIStore {
   setProjectDropTargetGroup: (group: string | null) => void;
   setDraggingGroupName: (name: string | null) => void;
   setGroupSortDropTarget: (group: string | null) => void;
+  openGlobalSearch: () => void;
+  closeGlobalSearch: () => void;
+  openBatchExecuteModal: (items: ProjectTree[]) => void;
+  closeBatchExecuteModal: () => void;
 }
 
 export const useUIStore = create<UIStore>()(
@@ -123,6 +135,11 @@ export const useUIStore = create<UIStore>()(
       renameProjectValue: '',
       renameGroupModal: false,
       renameGroupValue: '',
+      globalSearchVisible: false,
+
+      // 批量执行初始状态
+      batchExecuteModalVisible: false,
+      batchExecuteSelectedItems: [],
 
       // 拖拽初始状态
       draggingNode: null,
@@ -136,6 +153,7 @@ export const useUIStore = create<UIStore>()(
 
       // 侧边栏
       sidebarMenu: 'apis',
+      sidebarWidth: parseInt(localStorage.getItem('apiman-sidebar-width') || '280', 10),
 
       // 主题/动画
       appTheme: (localStorage.getItem('apiman-theme') as 'light' | 'dark') || 'light',
@@ -171,6 +189,10 @@ export const useUIStore = create<UIStore>()(
       setAnimationEnabled: (enabled) => set({ animationEnabled: enabled }),
       setForceListAnimation: (force) => set({ forceListAnimation: force }),
       setSidebarMenu: (menu) => set({ sidebarMenu: menu }),
+      setSidebarWidth: (width) => {
+        localStorage.setItem('apiman-sidebar-width', String(width));
+        set({ sidebarWidth: width });
+      },
       setCookieModalVisible: (visible) => set({ cookieModalVisible: visible }),
       setHistoryModalVisible: (visible) => set({ historyModalVisible: visible }),
       setMcpModalVisible: (visible) => set({ mcpModalVisible: visible }),
@@ -192,6 +214,10 @@ export const useUIStore = create<UIStore>()(
       setProjectDropTargetGroup: (group) => set({ projectDropTargetGroup: group }),
       setDraggingGroupName: (name) => set({ draggingGroupName: name }),
       setGroupSortDropTarget: (group) => set({ groupSortDropTarget: group }),
+      openGlobalSearch: () => set({ globalSearchVisible: true }),
+      closeGlobalSearch: () => set({ globalSearchVisible: false }),
+      openBatchExecuteModal: (items: ProjectTree[]) => set({ batchExecuteModalVisible: true, batchExecuteSelectedItems: items }),
+      closeBatchExecuteModal: () => set({ batchExecuteModalVisible: false, batchExecuteSelectedItems: [] }),
     }),
     { name: 'UIStore' }
   )

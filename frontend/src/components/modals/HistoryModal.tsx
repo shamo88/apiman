@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { Button, Col, Input, Modal, Row, Select, Table } from 'antd';
-import { SearchOutlined } from '@ant-design/icons';
-import { ListHistory, GetHistoryEntry, ClearHistory, SearchHistory } from '../../../wailsjs/go/main/App';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Button, Col, Input, Modal, Row, Select, Table, Tag, Space, message } from 'antd';
+import { SearchOutlined, ReloadOutlined, DeleteOutlined, ClockCircleOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import { ListHistory, GetHistoryEntry, ClearHistory, SearchHistory, DeleteHistory, ExecuteHTTPRequestWithProject } from '../../../wailsjs/go/main/App';
+import { models } from '../../../wailsjs/go/models';
 import { useUIStore } from '../../store';
 import { JsonView, darkStyles, allExpanded } from 'react-json-view-lite';
 import 'react-json-view-lite/dist/index.css';
@@ -16,12 +17,16 @@ interface HistoryEntry {
   method: string;
   url: string;
   created_at: string;
-  spec?: any;
+  status_code?: number;
+  duration?: number;
+  spec?: unknown;
   response?: {
     status_code?: number;
     duration?: number;
   };
 }
+
+type TimeRange = 'all' | 'today' | 'week' | 'month';
 
 const getMethodColor = (method: string) => {
   const colors: Record<string, string> = {
@@ -40,47 +45,52 @@ const getStatusColor = (code?: number) => {
   return '#666';
 };
 
+const getTimeRange = (range: TimeRange): { from: string; to: string } => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  switch (range) {
+    case 'today':
+      return {
+        from: today.toISOString().split('T')[0],
+        to: now.toISOString().split('T')[0],
+      };
+    case 'week': {
+      const weekStart = new Date(today);
+      weekStart.setDate(today.getDate() - today.getDay());
+      return {
+        from: weekStart.toISOString().split('T')[0],
+        to: now.toISOString().split('T')[0],
+      };
+    }
+    case 'month': {
+      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      return {
+        from: monthStart.toISOString().split('T')[0],
+        to: now.toISOString().split('T')[0],
+      };
+    }
+    default:
+      return { from: '', to: '' };
+  }
+};
+
 export const HistoryModal: React.FC = () => {
   const { historyModalVisible, setHistoryModalVisible, appTheme } = useUIStore();
   const [historyList, setHistoryList] = useState<HistoryEntry[]>([]);
   const [historyDetail, setHistoryDetail] = useState<HistoryEntry | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [historySearchProject, setHistorySearchProject] = useState('');
-  const [historySearchName, setHistorySearchName] = useState('');
-  const [historySearchURL, setHistorySearchURL] = useState('');
-  const [historySearchMethod, setHistorySearchMethod] = useState('');
-  const [historySearchStatus, setHistorySearchStatus] = useState('');
-  const [historySearchSource, setHistorySearchSource] = useState('');
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>('all');
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [methodFilter, setMethodFilter] = useState<string>('');
 
   useEffect(() => {
     if (historyModalVisible) {
       loadHistoryList();
     }
   }, [historyModalVisible]);
-
-  const buildHistorySearchParams = (): any => {
-    const params: any = {};
-    if (historySearchProject) params.project = historySearchProject;
-    if (historySearchName) params.name = historySearchName;
-    if (historySearchURL) params.url = historySearchURL;
-    if (historySearchMethod) params.method = historySearchMethod.toUpperCase();
-    if (historySearchStatus) params.status = parseInt(historySearchStatus, 10) || 0;
-    if (historySearchSource) params.source = historySearchSource.toUpperCase();
-    return params;
-  };
-
-  const searchHistory = async () => {
-    setHistoryLoading(true);
-    try {
-      const params = buildHistorySearchParams();
-      const list = await SearchHistory(params, 100);
-      setHistoryList(list || []);
-    } catch (e) {
-      console.error('Failed to search history:', e);
-    } finally {
-      setHistoryLoading(false);
-    }
-  };
 
   const loadHistoryList = async () => {
     setHistoryLoading(true);
@@ -94,28 +104,71 @@ export const HistoryModal: React.FC = () => {
     }
   };
 
+  const searchHistory = async () => {
+    setHistoryLoading(true);
+    setSelectedRowKeys([]);
+    try {
+      const timeRange = getTimeRange(selectedTimeRange);
+      const params = new models.HistorySearchParams();
+      if (searchKeyword) params.keyword = searchKeyword;
+      if (statusFilter) params.status = parseInt(statusFilter, 10) || 0;
+      if (methodFilter) params.method = methodFilter.toUpperCase();
+      if (timeRange.from) params.from = timeRange.from;
+      if (timeRange.to) params.to = timeRange.to;
+      
+      const list = await SearchHistory(params, 100);
+      setHistoryList(list || []);
+    } catch (e) {
+      console.error('Failed to search history:', e);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const handleTimeRangeChange = (range: TimeRange) => {
+    setSelectedTimeRange(range);
+    setTimeout(() => searchHistory(), 0);
+  };
+
   const clearHistorySearch = () => {
-    setHistorySearchProject('');
-    setHistorySearchName('');
-    setHistorySearchURL('');
-    setHistorySearchMethod('');
-    setHistorySearchStatus('');
-    setHistorySearchSource('');
+    setSearchKeyword('');
+    setStatusFilter('');
+    setMethodFilter('');
+    setSelectedTimeRange('all');
+    setSelectedRowKeys([]);
     loadHistoryList();
   };
 
   const handleClose = () => {
     setHistoryModalVisible(false);
     setHistoryDetail(null);
+    setSelectedRowKeys([]);
   };
 
   const handleClearAll = async () => {
     Modal.confirm({
       title: '确认清空',
       content: '确定要清空所有历史记录吗？',
-      onOk: async () => {
+      async onOk() {
         await ClearHistory();
         setHistoryList([]);
+        setSelectedRowKeys([]);
+      },
+    });
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedRowKeys.length === 0) return;
+    Modal.confirm({
+      title: '确认删除',
+      content: `确定要删除选中的 ${selectedRowKeys.length} 条历史记录吗？`,
+      async onOk() {
+        for (const id of selectedRowKeys) {
+          await DeleteHistory(id as string);
+        }
+        setSelectedRowKeys([]);
+        searchHistory();
+        message.success(`已删除 ${selectedRowKeys.length} 条记录`);
       },
     });
   };
@@ -132,22 +185,166 @@ export const HistoryModal: React.FC = () => {
     }
   };
 
+  const handleReExecute = async (record: HistoryEntry) => {
+    try {
+      const detail = await GetHistoryEntry(record.id);
+      if (detail && detail.spec) {
+        await ExecuteHTTPRequestWithProject(
+          detail.project_id || '',
+          detail.project_name || '',
+          detail.request_name || '',
+          detail.request_path || '',
+          detail.spec
+        );
+        message.success('请求已重新发送');
+      }
+    } catch (e) {
+      message.error('重新执行失败');
+      console.error('Failed to re-execute:', e);
+    }
+  };
+
+  const handleBatchReExecute = async () => {
+    if (selectedRowKeys.length === 0) return;
+    message.loading('正在批量执行...');
+    
+    const selectedEntries = historyList.filter(e => selectedRowKeys.includes(e.id));
+    let successCount = 0;
+    
+    for (const entry of selectedEntries) {
+      try {
+        const detail = await GetHistoryEntry(entry.id);
+        if (detail && detail.spec) {
+          await ExecuteHTTPRequestWithProject(
+            detail.project_id || '',
+            detail.project_name || '',
+            detail.request_name || '',
+            detail.request_path || '',
+            detail.spec
+          );
+          successCount++;
+        }
+      } catch (e) {
+        console.error('Failed to re-execute:', e);
+      }
+    }
+    
+    message.success(`已执行 ${successCount}/${selectedRowKeys.length} 个请求`);
+  };
+
+  const avgDuration = useMemo(() => {
+    if (historyList.length === 0) return 0;
+    const sum = historyList.reduce((acc, e) => acc + (e.duration || 0), 0);
+    return Math.round(sum / historyList.length);
+  }, [historyList]);
+
   const columns = [
-    { title: '时间', dataIndex: 'created_at', width: 150, render: (v: string) => v ? new Date(v).toLocaleString() : '' },
     {
-      title: '来源', dataIndex: 'source', width: 70, render: (v: string, record: HistoryEntry) => {
+      title: '时间',
+      dataIndex: 'created_at',
+      width: 140,
+      render: (v: string) => v ? new Date(v).toLocaleString() : '',
+    },
+    {
+      title: '来源',
+      dataIndex: 'source',
+      width: 60,
+      render: (v: string, record: HistoryEntry) => {
         if (v === 'MCP') {
           return <span style={{ color: '#49cc90', fontSize: 11 }} title={record.source_tool}>{v}</span>;
         }
         return <span style={{ color: '#61affe', fontSize: 11 }}>{v}</span>;
-      }
+      },
     },
-    { title: '项目', dataIndex: 'project_name', width: 100, ellipsis: true },
-    { title: '请求', dataIndex: 'request_name', width: 120, ellipsis: true },
-    { title: '方法', dataIndex: 'method', width: 60, render: (v: string) => <span style={{ color: getMethodColor(v) }}>{v}</span> },
-    { title: 'URL', dataIndex: 'url', ellipsis: true },
-    { title: '状态', dataIndex: 'status_code', width: 60, render: (_: any, record: HistoryEntry) => <span style={{ color: getStatusColor(record.response?.status_code) }}>{record.response?.status_code || '-'}</span> },
-    { title: '耗时', dataIndex: 'duration', width: 70, render: (_: any, record: HistoryEntry) => record.response?.duration ? `${record.response.duration}ms` : '-' },
+    {
+      title: '项目',
+      dataIndex: 'project_name',
+      width: 100,
+      ellipsis: true,
+    },
+    {
+      title: '请求',
+      dataIndex: 'request_name',
+      width: 120,
+      ellipsis: true,
+    },
+    {
+      title: '方法',
+      dataIndex: 'method',
+      width: 60,
+      render: (v: string) => <span style={{ color: getMethodColor(v) }}>{v}</span>,
+    },
+    {
+      title: 'URL',
+      dataIndex: 'url',
+      ellipsis: true,
+    },
+    {
+      title: '状态',
+      dataIndex: 'status_code',
+      width: 60,
+      render: (_: unknown, record: HistoryEntry) => (
+        <span style={{ color: getStatusColor(record.response?.status_code) }}>
+          {record.response?.status_code || '-'}
+        </span>
+      ),
+    },
+    {
+      title: '耗时',
+      dataIndex: 'duration',
+      width: 70,
+      render: (_: unknown, record: HistoryEntry) => (
+        record.response?.duration ? `${record.response.duration}ms` : '-'
+      ),
+    },
+    {
+      title: '操作',
+      width: 100,
+      render: (_: unknown, record: HistoryEntry) => (
+        <Space size={4}>
+          <Button
+            type="text"
+            size="small"
+            icon={<PlayCircleOutlined />}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleReExecute(record);
+            }}
+            title="重新执行"
+          />
+          <Button
+            type="text"
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={(e) => {
+              e.stopPropagation();
+              Modal.confirm({
+                title: '确认删除',
+                content: '确定要删除这条历史记录吗？',
+                onOk: async () => {
+                  await DeleteHistory(record.id);
+                  searchHistory();
+                },
+              });
+            }}
+            title="删除"
+          />
+        </Space>
+      ),
+    },
+  ];
+
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: (keys: React.Key[]) => setSelectedRowKeys(keys),
+  };
+
+  const timeRangeButtons: { key: TimeRange; label: string }[] = [
+    { key: 'all', label: '全部' },
+    { key: 'today', label: '今天' },
+    { key: 'week', label: '本周' },
+    { key: 'month', label: '本月' },
   ];
 
   return (
@@ -157,50 +354,55 @@ export const HistoryModal: React.FC = () => {
         open={historyModalVisible}
         onCancel={handleClose}
         footer={null}
-        width={1000}
+        width={1100}
         destroyOnClose
       >
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <Button size='small' danger onClick={handleClearAll}>清空全部</Button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <Space>
+              <Button size='small' danger onClick={handleClearAll}>清空全部</Button>
+              {selectedRowKeys.length > 0 && (
+                <>
+                  <Button size='small' icon={<ReloadOutlined />} onClick={handleBatchReExecute}>
+                    重新执行 ({selectedRowKeys.length})
+                  </Button>
+                  <Button size='small' danger icon={<DeleteOutlined />} onClick={handleDeleteSelected}>
+                    删除 ({selectedRowKeys.length})
+                  </Button>
+                </>
+              )}
+            </Space>
+            <Space style={{ color: '#888', fontSize: 12 }}>
+              <ClockCircleOutlined />
+              <span>平均耗时: <strong style={{ color: '#333' }}>{avgDuration}ms</strong></span>
+              <span>|</span>
+              <span>共 <strong>{historyList.length}</strong> 条</span>
+            </Space>
           </div>
-          <div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-              <Input
-                size='small'
-                placeholder='项目'
-                value={historySearchProject}
-                onChange={(e) => setHistorySearchProject(e.target.value)}
-                onPressEnter={searchHistory}
-                style={{ width: 120 }}
-                allowClear
-              />
-              <Input
-                size='small'
-                placeholder='请求名称'
-                value={historySearchName}
-                onChange={(e) => setHistorySearchName(e.target.value)}
-                onPressEnter={searchHistory}
-                style={{ width: 120 }}
-                allowClear
-              />
-              <Input
-                size='small'
-                placeholder='URL'
-                value={historySearchURL}
-                onChange={(e) => setHistorySearchURL(e.target.value)}
-                onPressEnter={searchHistory}
-                style={{ flex: 1 }}
-                allowClear
-              />
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {timeRangeButtons.map((btn) => (
+                  <Button
+                    key={btn.key}
+                    size='small'
+                    type={selectedTimeRange === btn.key ? 'primary' : 'default'}
+                    onClick={() => handleTimeRangeChange(btn.key)}
+                  >
+                    {btn.label}
+                  </Button>
+                ))}
+              </div>
               <Select
                 size='small'
                 placeholder='方法'
-                value={historySearchMethod || undefined}
-                onChange={(v) => setHistorySearchMethod(v || '')}
-                style={{ width: 100 }}
+                value={methodFilter || undefined}
+                onChange={(v) => {
+                  setMethodFilter(v || '');
+                  setTimeout(() => searchHistory(), 0);
+                }}
+                style={{ width: 90 }}
                 allowClear
               >
                 <Select.Option value="GET">GET</Select.Option>
@@ -211,36 +413,43 @@ export const HistoryModal: React.FC = () => {
                 <Select.Option value="OPTIONS">OPTIONS</Select.Option>
                 <Select.Option value="HEAD">HEAD</Select.Option>
               </Select>
-              <Input
-                size='small'
-                placeholder='状态码'
-                value={historySearchStatus}
-                onChange={(e) => setHistorySearchStatus(e.target.value)}
-                onPressEnter={searchHistory}
-                style={{ width: 80 }}
-                allowClear
-              />
               <Select
                 size='small'
-                placeholder='来源'
-                value={historySearchSource || undefined}
-                onChange={(v) => setHistorySearchSource(v || '')}
-                style={{ width: 100 }}
+                placeholder='状态'
+                value={statusFilter || undefined}
+                onChange={(v) => {
+                  setStatusFilter(v || '');
+                  setTimeout(() => searchHistory(), 0);
+                }}
+                style={{ width: 80 }}
                 allowClear
               >
-                <Select.Option value="GUI">GUI</Select.Option>
-                <Select.Option value="MCP">MCP</Select.Option>
+                <Select.Option value="200">2xx</Select.Option>
+                <Select.Option value="300">3xx</Select.Option>
+                <Select.Option value="400">4xx</Select.Option>
+                <Select.Option value="500">5xx</Select.Option>
               </Select>
+              <Input
+                size='small'
+                placeholder='搜索项目/请求名/URL'
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+                onPressEnter={searchHistory}
+                style={{ width: 200 }}
+                allowClear
+              />
               <Button size='small' type='primary' onClick={searchHistory} icon={<SearchOutlined />}>搜索</Button>
               <Button size='small' onClick={clearHistorySearch}>重置</Button>
             </div>
           </div>
+
           <Table
             dataSource={historyList}
             rowKey='id'
             size='small'
             loading={historyLoading}
-            pagination={{ pageSize: 10, showTotal: (total: number) => `共 ${total} 条记录` }}
+            rowSelection={rowSelection}
+            pagination={{ pageSize: 10, showTotal: (total: number) => `共 ${total} 条` }}
             onRow={(record) => ({
               onClick: () => handleRowClick(record),
               style: { cursor: 'pointer' },
@@ -254,21 +463,44 @@ export const HistoryModal: React.FC = () => {
         title={historyDetail ? `${historyDetail.request_name || '请求详情'} - ${historyDetail.method}` : '请求详情'}
         open={!!historyDetail}
         onCancel={() => setHistoryDetail(null)}
-        footer={null}
+        footer={
+          historyDetail ? (
+            <Space>
+              <Button
+                type='primary'
+                icon={<ReloadOutlined />}
+                onClick={() => handleReExecute(historyDetail as HistoryEntry)}
+              >
+                重新执行
+              </Button>
+              <Button onClick={() => setHistoryDetail(null)}>关闭</Button>
+            </Space>
+          ) : null
+        }
         width={1200}
         destroyOnClose
       >
         {historyDetail && (
           <div>
-            <div style={{ marginBottom: 12 }}>
+            <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
               <strong>{historyDetail.request_name || '未命名请求'}</strong>
-              <span style={{ marginLeft: 12, color: getMethodColor(historyDetail.method) }}>{historyDetail.method}</span>
-              <span style={{ marginLeft: 12 }}>{historyDetail.url}</span>
+              <Tag color={getMethodColor(historyDetail.method)}>{historyDetail.method}</Tag>
+              <span style={{ color: '#666' }}>{historyDetail.url}</span>
             </div>
             <Row gutter={12}>
-              <Col span={12} style={{ textAlign: "left" }}>
+              <Col span={12}>
                 <h4>请求信息</h4>
-                <div className="json-view-container" style={{ background: 'var(--bg-tertiary)', padding: 12, borderRadius: 4, maxHeight: 500, overflow: 'auto', minHeight: 250 }}>
+                <div
+                  className="json-view-container"
+                  style={{
+                    background: 'var(--bg-tertiary)',
+                    padding: 12,
+                    borderRadius: 4,
+                    maxHeight: 500,
+                    overflow: 'auto',
+                    minHeight: 250,
+                  }}
+                >
                   <JsonView
                     data={historyDetail.spec || {}}
                     style={appTheme === 'dark' ? darkStyles : undefined}
@@ -277,17 +509,27 @@ export const HistoryModal: React.FC = () => {
                   />
                 </div>
               </Col>
-              <Col span={12} style={{ textAlign: "left" }}>
-                <div style={{ display: "flex" }}>
-                  <h4>响应信息</h4>
-                  <div style={{ marginLeft: 8, display: 'flex', gap: 12 }}>
-                    <span style={{ color: getStatusColor(historyDetail.response?.status_code) }}>
+              <Col span={12}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <h4 style={{ margin: 0 }}>响应信息</h4>
+                  <Space>
+                    <Tag color={getStatusColor(historyDetail.response?.status_code)}>
                       Status: {historyDetail.response?.status_code || 'N/A'}
-                    </span>
-                    <span>Duration: {historyDetail.response?.duration || 0}ms</span>
-                  </div>
+                    </Tag>
+                    <Tag>Duration: {historyDetail.response?.duration || 0}ms</Tag>
+                  </Space>
                 </div>
-                <div className="json-view-container" style={{ background: 'var(--bg-tertiary)', padding: 12, borderRadius: 4, maxHeight: 470, overflow: 'auto', minHeight: 250 }}>
+                <div
+                  className="json-view-container"
+                  style={{
+                    background: 'var(--bg-tertiary)',
+                    padding: 12,
+                    borderRadius: 4,
+                    maxHeight: 500,
+                    overflow: 'auto',
+                    minHeight: 250,
+                  }}
+                >
                   <JsonView
                     data={historyDetail.response || {}}
                     style={appTheme === 'dark' ? darkStyles : undefined}

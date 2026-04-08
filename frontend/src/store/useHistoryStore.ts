@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
+import { models } from '../../wailsjs/go/models';
 
 interface HistoryEntry {
   id: string;
@@ -38,7 +39,7 @@ interface HistoryStore {
   setHistoryLoading: (loading: boolean) => void;
   setFilter: (field: keyof HistoryFilters, value: string) => void;
   clearFilters: () => void;
-  buildSearchParams: () => Record<string, string | number>;
+  buildSearchParams: () => models.HistorySearchParams;
 }
 
 export const useHistoryStore = create<HistoryStore>()(
@@ -74,13 +75,17 @@ export const useHistoryStore = create<HistoryStore>()(
       }),
       buildSearchParams: () => {
         const { filters } = get();
-        const params: Record<string, string | number> = {};
-        if (filters.project) params.project = filters.project;
-        if (filters.name) params.name = filters.name;
-        if (filters.url) params.url = filters.url;
-        if (filters.method) params.method = filters.method.toUpperCase();
-        if (filters.status) params.status = parseInt(filters.status, 10) || 0;
-        if (filters.source) params.source = filters.source.toUpperCase();
+        const params = new models.HistorySearchParams();
+        params.project = filters.project;
+        params.name = filters.name;
+        params.url = filters.url;
+        params.method = filters.method.toUpperCase();
+        params.status = parseInt(filters.status, 10) || 0;
+        params.source = filters.source.toUpperCase();
+        params.tool = '';
+        params.from = '';
+        params.to = '';
+        params.keyword = '';
         return params;
       },
     }),

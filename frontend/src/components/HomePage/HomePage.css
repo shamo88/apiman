@@ -34,6 +34,77 @@
   padding: 24px 32px;
 }
 
+.recent-projects {
+  padding: 16px 32px 0;
+}
+
+.recent-projects-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.recent-projects-title {
+  font-weight: 500;
+}
+
+.recent-projects-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.recent-project-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.recent-project-item:hover {
+  border-color: var(--accent-primary);
+  background: var(--bg-hover);
+}
+
+.recent-project-icon {
+  color: var(--accent-primary);
+  font-size: 14px;
+}
+
+.recent-project-name {
+  font-size: 13px;
+  color: var(--text-primary);
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.theme-dark .recent-project-item {
+  background: var(--bg-secondary);
+  border-color: var(--border-subtle);
+}
+
+.theme-dark .recent-project-item:hover {
+  border-color: var(--accent-primary);
+}
+
+.theme-dark .recent-project-name {
+  color: var(--text-primary);
+}
+
+.theme-dark .recent-projects-header {
+  color: var(--text-muted);
+}
+
 .project-group {
   margin-bottom: 32px;
 }
@@ -94,6 +165,176 @@
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 12px;
   padding-left: 8px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.project-group-content.drag-over {
+  background: rgba(79, 70, 229, 0.08);
+  border-radius: 8px;
+  padding: 12px;
+  margin: -12px;
+  margin-left: -4px;
+  margin-right: -4px;
+  box-shadow: inset 0 0 0 2px rgba(79, 70, 229, 0.2);
+}
+
+.project-group-content.drag-over .project-card {
+  transform: scale(0.98);
+  transition: transform 0.2s ease;
+}
+
+.project-group-content.drag-over .project-card:hover {
+  transform: scale(1);
+}
+
+/* Drag over animation */
+@keyframes groupDragOver {
+  0% {
+    box-shadow: inset 0 0 0 2px rgba(79, 70, 229, 0.1);
+  }
+  50% {
+    box-shadow: inset 0 0 0 2px rgba(79, 70, 229, 0.3);
+  }
+  100% {
+    box-shadow: inset 0 0 0 2px rgba(79, 70, 229, 0.2);
+  }
+}
+
+.project-group-content.drag-over {
+  animation: groupDragOver 0.6s ease-in-out;
+}
+
+/* Project card dragging state */
+.project-card.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  cursor: grabbing;
+}
+
+/* Drop indicator for project cards */
+.project-card-drop-indicator {
+  position: relative;
+}
+
+.project-card-drop-indicator::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -6px;
+  height: 3px;
+  background: var(--accent-primary);
+  border-radius: 2px;
+  opacity: 0;
+  transform: scaleX(0);
+  transition: all 0.15s ease;
+}
+
+.project-card-drop-indicator.bottom::before {
+  top: auto;
+  bottom: -6px;
+}
+
+.project-card-drop-indicator::before.visible {
+  opacity: 1;
+  transform: scaleX(1);
+  box-shadow: 0 0 8px rgba(79, 70, 229, 0.4);
+}
+
+/* Ungrouped section drag over */
+.ungrouped-drop-zone {
+  position: relative;
+}
+
+.ungrouped-drop-zone.drag-over .project-group-content {
+  background: rgba(79, 70, 229, 0.06);
+  border: 2px dashed var(--accent-primary);
+  border-radius: 8px;
+}
+
+/* Project group header drag states */
+.project-group-header.sort-drop-target {
+  background: rgba(79, 70, 229, 0.12);
+  outline: 1px dashed var(--accent-primary);
+  transform: scale(1.01);
+  transition: all 0.15s ease;
+}
+
+.project-group-header.sort-drop-target.insert-above::before {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: 8px;
+  right: 8px;
+  height: 3px;
+  background: var(--accent-primary);
+  border-radius: 2px;
+}
+
+.project-group-header.sort-drop-target.insert-below::after {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: 8px;
+  right: 8px;
+  height: 3px;
+  background: var(--accent-primary);
+  border-radius: 2px;
+}
+
+/* Group has dragging item - subtle indicator that group can receive */
+.project-group.has-dragging-item .project-group-content {
+  background: rgba(79, 70, 229, 0.02);
+  transition: background 0.2s ease;
+}
+
+/* Drop placeholder animation */
+@keyframes dropPlaceHolder {
+  0% {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scaleY(0.5);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+.drop-placeholder {
+  height: 80px;
+  border: 2px dashed var(--accent-primary);
+  border-radius: 8px;
+  background: rgba(79, 70, 229, 0.05);
+  animation: dropPlaceHolder 0.2s ease forwards;
+  margin: 4px 0;
+}
+
+/* Project card hover lift effect when dragging over */
+.project-card:not(.dragging):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+/* Dragging card shadow enhancement */
+.project-card.dragging {
+  opacity: 0.6;
+  transform: scale(0.95);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+  cursor: grabbing;
+  z-index: 1000;
+}
+
+/* Group header when dragging */
+.project-group.has-dragging-item .project-group-header {
+  border: 1px dashed rgba(79, 70, 229, 0.3);
+  background: rgba(79, 70, 229, 0.03);
 }
 
 /* Project card styles - minimalist design */

@@ -80,7 +80,7 @@ export const hydrateRequestEditor = (
   request: CurlRequest | null,
   currentProjectId: string,
   workspaceStore: WorkspaceStore,
-  _scriptStore: ScriptStore
+  _scriptStore: ScriptStore | null
 ) => {
   if (!request) return;
 

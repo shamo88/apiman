@@ -9,3 +9,4 @@ export { useWorkspaceHandlers, useWorkspace } from './useWorkspaceHandlers';
 export { useEnvironmentHandlers } from './useEnvironmentHandlers';
 export { useScriptHandlers } from './useScriptHandlers';
 export { useCookieHandlers } from './useCookieHandlers';
+export { useKeyboardShortcuts, SHORTCUTS_LIST, formatShortcut, getModifierKey } from './useKeyboardShortcuts';

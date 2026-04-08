@@ -8,6 +8,8 @@ export function AddGlobalCookies(arg1:string):Promise<void>;
 
 export function AddRequestCase(arg1:string,arg2:string):Promise<models.CurlRequest>;
 
+export function BatchExecuteHTTPRequests(arg1:Array<any>,arg2:string,arg3:boolean,arg4:number):Promise<any>;
+
 export function ClearHistory():Promise<void>;
 
 export function CopyRequest(arg1:string):Promise<models.CurlRequest>;
@@ -15,6 +17,8 @@ export function CopyRequest(arg1:string):Promise<models.CurlRequest>;
 export function CreateEnvironment(arg1:string,arg2:string,arg3:Record<string, string>):Promise<models.Environment>;
 
 export function CreateFolder(arg1:string,arg2:string,arg3:string):Promise<models.Folder>;
+
+export function CreateGitBranch(arg1:string):Promise<void>;
 
 export function CreateProject(arg1:string):Promise<models.Project>;
 
@@ -25,6 +29,8 @@ export function CreateRequest(arg1:string,arg2:string,arg3:string,arg4:models.Ht
 export function DeleteEnvironment(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteFolder(arg1:string):Promise<void>;
+
+export function DeleteGitBranch(arg1:string):Promise<void>;
 
 export function DeleteGlobalCookie(arg1:string):Promise<void>;
 
@@ -58,6 +64,8 @@ export function ExtractVariables(arg1:string):Promise<Array<string>>;
 
 export function GetConfigDir():Promise<string>;
 
+export function GetCurrentGitBranch():Promise<string>;
+
 export function GetGlobalVariables():Promise<Record<string, string>>;
 
 export function GetHistoryEntry(arg1:string):Promise<models.RequestHistory>;
@@ -70,11 +78,15 @@ export function GetProjectsDir():Promise<string>;
 
 export function GetRequest(arg1:string):Promise<models.CurlRequest>;
 
+export function ImportOpenAPICollection(arg1:string):Promise<models.Project>;
+
 export function ImportPostmanCollection(arg1:string):Promise<models.Project>;
 
 export function InitGitRepo():Promise<void>;
 
 export function InitProjectsDir():Promise<void>;
+
+export function ListGitBranches():Promise<Array<string>>;
 
 export function ListHistory(arg1:number):Promise<Array<models.HistoryEntry>>;
 
@@ -97,6 +109,8 @@ export function LoadProjectGroupsState():Promise<project.ProjectGroupsState>;
 export function MoveFolder(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function MoveRequest(arg1:string,arg2:string,arg3:string):Promise<string>;
+
+export function ParseOpenAPICollection(arg1:string):Promise<string>;
 
 export function PullGitRepo():Promise<void>;
 
@@ -125,6 +139,8 @@ export function SearchHistory(arg1:models.HistorySearchParams,arg2:number):Promi
 export function StartMCP():Promise<void>;
 
 export function StopMCP():Promise<void>;
+
+export function SwitchGitBranch(arg1:string):Promise<void>;
 
 export function SyncAllProjectsToGit():Promise<void>;
 

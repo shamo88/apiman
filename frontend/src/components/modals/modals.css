@@ -448,3 +448,77 @@
 .theme-dark .ant-modal-confirm .ant-modal-footer {
     border-color: var(--border-subtle);
 }
+
+/* Global Search Modal - Dark theme */
+.global-search-modal.theme-dark.ant-modal .ant-modal-content {
+    background: var(--bg-secondary) !important;
+}
+
+.global-search-modal.theme-dark.ant-modal .ant-modal-container {
+    background: var(--bg-secondary) !important;
+}
+
+.global-search-modal.theme-dark.ant-modal .ant-modal-mask {
+    background: rgba(0, 0, 0, 0.5) !important;
+}
+
+.global-search-modal.theme-dark.ant-modal>.ant-modal-wrap {
+    background: var(--bg-secondary) !important;
+}
+
+.global-search-modal.theme-dark .ant-modal-content {
+    background: var(--bg-secondary) !important;
+}
+
+.global-search-modal.theme-dark .ant-modal-header {
+    background: var(--bg-secondary) !important;
+    border-bottom-color: var(--border-subtle) !important;
+}
+
+.global-search-modal.theme-dark .ant-modal-body {
+    background: var(--bg-secondary) !important;
+}
+
+.global-search-modal.theme-dark .ant-modal-footer {
+    background: var(--bg-secondary) !important;
+}
+
+.global-search-modal.theme-dark .ant-modal-title {
+    color: var(--text-primary) !important;
+}
+
+.global-search-modal.theme-dark .ant-modal-close {
+    color: var(--text-secondary) !important;
+}
+
+.global-search-modal.theme-dark .ant-modal-close:hover {
+    color: var(--text-primary) !important;
+}
+
+.global-search-modal.theme-dark .ant-input {
+    background: var(--bg-primary) !important;
+    border-color: var(--border-subtle) !important;
+    color: var(--text-primary) !important;
+}
+
+.global-search-modal.theme-dark .ant-input::placeholder {
+    color: var(--text-muted) !important;
+}
+
+.global-search-modal.theme-dark .ant-input:hover {
+    border-color: var(--accent-primary) !important;
+}
+
+.global-search-modal.theme-dark .ant-input:focus {
+    border-color: var(--accent-primary) !important;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important;
+}
+
+.global-search-modal.theme-dark .ant-checkbox-wrapper {
+    color: var(--text-secondary) !important;
+}
+
+.global-search-modal.theme-dark .ant-checkbox-checked .ant-checkbox-inner {
+    background-color: var(--accent-primary) !important;
+    border-color: var(--accent-primary) !important;
+}

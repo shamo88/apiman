@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { DragEvent } from 'react';
 import { Dropdown, Button } from 'antd';
 import { DownOutlined, RightOutlined, MoreOutlined, PlusOutlined, CopyOutlined, EditOutlined, CloseOutlined, ExperimentOutlined } from '@ant-design/icons';
 import { ProjectTree } from '../../store';
+import { useUIStore } from '../../store/useUIStore';
 import { getMethodColor, formatSidebarMethodLabel } from '../../constants/httpMethods';
 import './ApiTree.css';
 
@@ -21,6 +22,10 @@ interface ApiTreeItemProps {
   onDuplicateCase: (casePath: string) => void;
   onRenameCase: (casePath: string, currentName: string) => void;
   onDeleteCase: (casePath: string) => void;
+  onDragStart?: (e: DragEvent, node: ProjectTree) => void;
+  onDragOver?: (e: DragEvent, nodePath: string) => void;
+  onDragLeave?: () => void;
+  onDrop?: (e: DragEvent, nodePath: string) => void;
 }
 
 export const ApiTreeItem: React.FC<ApiTreeItemProps> = ({
@@ -39,17 +44,51 @@ export const ApiTreeItem: React.FC<ApiTreeItemProps> = ({
   onDuplicateCase,
   onRenameCase,
   onDeleteCase,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
 }) => {
+  const { draggingNode } = useUIStore();
   const caseKids = (request.children || []).filter((c): c is ProjectTree => c.type === 'case');
   const hasCases = caseKids.length > 0;
   const method = formatSidebarMethodLabel(request.method || 'GET');
   const mc = getMethodColor(request.method || 'GET');
+  const isDragging = draggingNode?.path === request.path;
+
+  const handleDragStart = (e: DragEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    onDragStart?.(e, request);
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDragOver?.(e, request.path || '');
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDragLeave?.();
+  };
+
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDrop?.(e, request.path || '');
+  };
 
   return (
     <div className="api-request-block">
       <div
-        className={`api-item ${isActive ? 'active' : ''} ${movedHighlightPath === request.path ? 'moved-highlight' : ''}`}
+        className={`api-item ${isActive ? 'active' : ''} ${movedHighlightPath === request.path ? 'moved-highlight' : ''} ${isDragging ? 'dragging' : ''}`}
         onClick={onClick}
+        draggable
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
       >
         <div className="api-request-expand-cell">
           {hasCases ? (

@@ -6,6 +6,7 @@ import (
 	"apiman/internal/git"
 	"apiman/internal/history"
 	"apiman/internal/models"
+	"apiman/internal/openapi"
 	"apiman/internal/postman"
 	"apiman/internal/project"
 	"apiman/internal/script"
@@ -21,6 +22,7 @@ type Service struct {
 	ProjectMgr         *project.ProjectManager
 	CurlExecutor       *curl.CurlExecutor
 	PostmanImporter    *postman.PostmanImporter
+	OpenAPIImporter    *openapi.OpenAPIImporter
 	ScriptableExecutor *curl.ScriptableExecutor
 	GlobalVarStore     *script.GlobalVariableStore
 	GitSyncMgr         *git.GitSyncManager
@@ -39,6 +41,7 @@ func NewService() (*Service, error) {
 	}
 	curlExec := curl.NewCurlExecutor()
 	postmanImp := postman.NewPostmanImporter(cfgMgr)
+	openapiImp := openapi.NewOpenAPIImporter(cfgMgr)
 	scriptExec := curl.NewScriptableExecutor()
 
 	globals, _ := cfgMgr.GetGlobalVariables()
@@ -51,6 +54,7 @@ func NewService() (*Service, error) {
 		ProjectMgr:         projectMgr,
 		CurlExecutor:       curlExec,
 		PostmanImporter:    postmanImp,
+		OpenAPIImporter:    openapiImp,
 		ScriptableExecutor: scriptExec,
 		GlobalVarStore:     globalVarStore,
 		GitSyncMgr:         gitSyncMgr,
@@ -501,6 +505,41 @@ func (s *Service) ImportPostmanCollection(jsonData string) (*models.Project, err
 	return project, nil
 }
 
+func (s *Service) ImportOpenAPICollection(jsonData string) (*models.Project, error) {
+	parseResult, err := s.OpenAPIImporter.ParseOpenAPICollection(jsonData)
+	if err != nil {
+		return nil, err
+	}
+
+	projectName := s.OpenAPIImporter.EnsureUniqueProjectName(parseResult.ProjectName)
+
+	project, err := s.ProjectMgr.CreateProject(projectName)
+	if err != nil {
+		return nil, err
+	}
+
+	projectDir, err := s.ProjectMgr.ProjectPathByID(project.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	coll := postman.NewCollection(projectName)
+	coll.Item = parseResult.Items
+
+	if err := postman.SaveCollection(projectDir, coll); err != nil {
+		return nil, err
+	}
+
+	if s.shouldAutoSync() {
+		go s.SyncProjectToGit(project.ID)
+	}
+	return project, nil
+}
+
+func (s *Service) ParseOpenAPICollection(jsonData string) (*openapi.ParseResult, error) {
+	return s.OpenAPIImporter.ParseOpenAPICollection(jsonData)
+}
+
 func (s *Service) LoadProjectGroupsState() (*project.ProjectGroupsState, error) {
 	return s.ProjectMgr.LoadProjectGroupsState()
 }
@@ -948,6 +987,31 @@ func (s *Service) PullGitRepo() error {
 	return s.GitSyncMgr.CloneOrPull(appCfg.GitSync.RemoteURL, appCfg.GitSync.Branch, appCfg.GitSync.Password)
 }
 
+// ListGitBranches returns all branches in the repository
+func (s *Service) ListGitBranches() ([]string, error) {
+	return s.GitSyncMgr.ListBranches()
+}
+
+// GetCurrentGitBranch returns the current checked-out branch
+func (s *Service) GetCurrentGitBranch() (string, error) {
+	return s.GitSyncMgr.GetCurrentBranch()
+}
+
+// CreateGitBranch creates a new local branch
+func (s *Service) CreateGitBranch(name string) error {
+	return s.GitSyncMgr.CreateBranch(name)
+}
+
+// SwitchGitBranch switches to the specified branch
+func (s *Service) SwitchGitBranch(name string) error {
+	return s.GitSyncMgr.SwitchBranch(name)
+}
+
+// DeleteGitBranch deletes a local branch
+func (s *Service) DeleteGitBranch(name string) error {
+	return s.GitSyncMgr.DeleteBranch(name)
+}
+
 // LoadGlobalCookies loads all global cookies.
 func (s *Service) LoadGlobalCookies() ([]models.GlobalCookie, error) {
 	return s.ConfigManager.LoadGlobalCookies()
@@ -1040,4 +1104,41 @@ func (s *Service) RecordHistoryWithSource(projectID, projectName, requestName, r
 		Response:    resp,
 	}
 	return s.HistoryMgr.AddEntry(entry)
+}
+
+func (s *Service) BatchExecuteHTTPRequests(
+	items []curl.BatchExecuteItem,
+	environmentID string,
+	parallel bool,
+	concurrency int,
+) (*curl.BatchExecuteResponse, error) {
+	appCfg, err := s.ConfigManager.LoadAppConfig()
+	proxyOpts := &curl.ProxyOptions{}
+	timeout := 30
+	if err == nil && appCfg != nil {
+		proxyOpts.Enabled = appCfg.Proxy.Enabled
+		proxyOpts.HTTPHost = appCfg.Proxy.HTTPHost
+		proxyOpts.HTTPPort = appCfg.Proxy.HTTPPort
+		proxyOpts.HTTPSHost = appCfg.Proxy.HTTPSHost
+		proxyOpts.HTTPSPort = appCfg.Proxy.HTTPSPort
+		proxyOpts.SOCKS5Host = appCfg.Proxy.SOCKS5Host
+		proxyOpts.SOCKS5Port = appCfg.Proxy.SOCKS5Port
+		timeout = appCfg.HTTP.Timeout
+		if timeout == 0 {
+			timeout = 30
+		}
+	}
+
+	if concurrency <= 0 {
+		concurrency = 5
+	}
+
+	var resp *curl.BatchExecuteResponse
+	if parallel {
+		resp = s.CurlExecutor.ExecuteBatchConcurrent(items, proxyOpts, timeout, concurrency)
+	} else {
+		resp = s.CurlExecutor.ExecuteBatchSequential(items, proxyOpts, timeout)
+	}
+
+	return resp, nil
 }

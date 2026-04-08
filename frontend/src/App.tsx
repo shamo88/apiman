@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { TitleBar } from './components/TitleBar';
 import { HomePage } from './components/HomePage';
@@ -6,7 +6,9 @@ import { ProjectWorkspace } from './components/ProjectWorkspace';
 import { ScriptHelpWindow } from './components/ScriptHelp';
 import { MCPSettingsModal } from './components/MCPSettings';
 import { AppFooter } from './components/AppFooter';
+import { KeyboardShortcutsHelp, ShortcutToast } from './components/KeyboardShortcutsHelp';
 import { CookieModal, HistoryModal, CreateRequestModal, CreateFolderModal, RenameModal, AddCaseModal, CaseRenameModal } from './components/modals';
+import { GlobalSearchModal } from './components/modals/GlobalSearchModal';
 
 import {
   useProjectStore,
@@ -14,21 +16,34 @@ import {
 } from './store';
 import {
   useProjectHandlers,
+  useKeyboardShortcuts,
 } from './hooks';
 import './App.css';
 
 const App: React.FC = () => {
-  // ============ Stores ============
+  const [shortcutsHelpVisible, setShortcutsHelpVisible] = useState(false);
+
   const projectStore = useProjectStore();
   const uiStore = useUIStore();
 
-  // ============ Handlers ============
   const { handleOpenProject } = useProjectHandlers();
 
-  // ============ Derived State ============
   const activeTab = projectStore.activeTab;
 
-  // ============ Initialization ============
+  const { activeShortcut } = useKeyboardShortcuts();
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === '/') {
+        e.preventDefault();
+        setShortcutsHelpVisible(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   useEffect(() => {
     const init = async () => {
       projectStore.setLoading(true);
@@ -47,9 +62,30 @@ const App: React.FC = () => {
     init();
   }, []);
 
+  const getShortcutMessage = () => {
+    switch (activeShortcut) {
+      case 'send-request':
+        return '发送请求';
+      case 'new-request':
+        return '新建请求';
+      case 'save':
+        return '保存';
+      case 'new-folder':
+        return '新建文件夹';
+      case 'environment':
+        return '切换环境';
+      case 'search':
+        return '全局搜索';
+      case 'tab-switch':
+        return '切换标签';
+      default:
+        return '';
+    }
+  };
+
   return (
     <div className={`app-container ${uiStore.appTheme === 'dark' ? 'theme-dark' : ''}`}>
-      <TitleBar />
+      <TitleBar onOpenShortcutsHelp={() => setShortcutsHelpVisible(true)} />
 
       <div className="app-content">
         {activeTab === 'home' ? (
@@ -59,10 +95,15 @@ const App: React.FC = () => {
         )}
       </div>
 
-      {/* Footer */}
-      <AppFooter />
+      <AppFooter onOpenShortcutsHelp={() => setShortcutsHelpVisible(true)} />
 
-      {/* Modals */}
+      <ShortcutToast shortcutId={activeShortcut} message={getShortcutMessage()} />
+
+      <KeyboardShortcutsHelp
+        visible={shortcutsHelpVisible}
+        onClose={() => setShortcutsHelpVisible(false)}
+      />
+
       <ScriptHelpWindow />
 
       <MCPSettingsModal />
@@ -80,6 +121,8 @@ const App: React.FC = () => {
       <AddCaseModal />
 
       <CaseRenameModal />
+
+      <GlobalSearchModal />
     </div>
   );
 };

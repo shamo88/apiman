@@ -3,3 +3,4 @@ export { ResponseCookies } from './ResponseCookies';
 export { ResponseHeaders } from './ResponseHeaders';
 export { ResponseStatus } from './ResponseStatus';
 export { ResponsePanel } from './ResponsePanel';
+export { EnhancedJsonView } from './EnhancedJsonView';

@@ -10,6 +10,10 @@ export function AddRequestCase(arg1, arg2) {
   return window['go']['main']['App']['AddRequestCase'](arg1, arg2);
 }
 
+export function BatchExecuteHTTPRequests(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['BatchExecuteHTTPRequests'](arg1, arg2, arg3, arg4);
+}
+
 export function ClearHistory() {
   return window['go']['main']['App']['ClearHistory']();
 }
@@ -24,6 +28,10 @@ export function CreateEnvironment(arg1, arg2, arg3) {
 
 export function CreateFolder(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateFolder'](arg1, arg2, arg3);
+}
+
+export function CreateGitBranch(arg1) {
+  return window['go']['main']['App']['CreateGitBranch'](arg1);
 }
 
 export function CreateProject(arg1) {
@@ -44,6 +52,10 @@ export function DeleteEnvironment(arg1, arg2) {
 
 export function DeleteFolder(arg1) {
   return window['go']['main']['App']['DeleteFolder'](arg1);
+}
+
+export function DeleteGitBranch(arg1) {
+  return window['go']['main']['App']['DeleteGitBranch'](arg1);
 }
 
 export function DeleteGlobalCookie(arg1) {
@@ -110,6 +122,10 @@ export function GetConfigDir() {
   return window['go']['main']['App']['GetConfigDir']();
 }
 
+export function GetCurrentGitBranch() {
+  return window['go']['main']['App']['GetCurrentGitBranch']();
+}
+
 export function GetGlobalVariables() {
   return window['go']['main']['App']['GetGlobalVariables']();
 }
@@ -134,6 +150,10 @@ export function GetRequest(arg1) {
   return window['go']['main']['App']['GetRequest'](arg1);
 }
 
+export function ImportOpenAPICollection(arg1) {
+  return window['go']['main']['App']['ImportOpenAPICollection'](arg1);
+}
+
 export function ImportPostmanCollection(arg1) {
   return window['go']['main']['App']['ImportPostmanCollection'](arg1);
 }
@@ -144,6 +164,10 @@ export function InitGitRepo() {
 
 export function InitProjectsDir() {
   return window['go']['main']['App']['InitProjectsDir']();
+}
+
+export function ListGitBranches() {
+  return window['go']['main']['App']['ListGitBranches']();
 }
 
 export function ListHistory(arg1) {
@@ -188,6 +212,10 @@ export function MoveFolder(arg1, arg2, arg3) {
 
 export function MoveRequest(arg1, arg2, arg3) {
   return window['go']['main']['App']['MoveRequest'](arg1, arg2, arg3);
+}
+
+export function ParseOpenAPICollection(arg1) {
+  return window['go']['main']['App']['ParseOpenAPICollection'](arg1);
 }
 
 export function PullGitRepo() {
@@ -244,6 +272,10 @@ export function StartMCP() {
 
 export function StopMCP() {
   return window['go']['main']['App']['StopMCP']();
+}
+
+export function SwitchGitBranch(arg1) {
+  return window['go']['main']['App']['SwitchGitBranch'](arg1);
 }
 
 export function SyncAllProjectsToGit() {

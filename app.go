@@ -2,6 +2,7 @@ package main
 
 import (
 	"apiman/internal/config"
+	"apiman/internal/curl"
 	"apiman/internal/mcp"
 	"apiman/internal/models"
 	"apiman/internal/project"
@@ -177,6 +178,39 @@ func (a *App) ImportPostmanCollection(jsonData string) (*models.Project, error) 
 	return a.service.ImportPostmanCollection(jsonData)
 }
 
+func (a *App) ImportOpenAPICollection(jsonData string) (*models.Project, error) {
+	return a.service.ImportOpenAPICollection(jsonData)
+}
+
+func (a *App) ParseOpenAPICollection(jsonData string) (string, error) {
+	result, err := a.service.ParseOpenAPICollection(jsonData)
+	if err != nil {
+		return "", err
+	}
+
+	itemsInterface := make([]any, len(result.Items))
+	for i, item := range result.Items {
+		itemsInterface[i] = item
+	}
+
+	type ParsePreview struct {
+		ProjectName string `json:"projectName"`
+		Items       []any  `json:"items"`
+	}
+
+	preview := ParsePreview{
+		ProjectName: result.ProjectName,
+		Items:       itemsInterface,
+	}
+
+	previewJSON, err := json.Marshal(preview)
+	if err != nil {
+		return "", err
+	}
+
+	return string(previewJSON), nil
+}
+
 func (a *App) LoadProjectGroupsState() (*project.ProjectGroupsState, error) {
 	return a.service.LoadProjectGroupsState()
 }
@@ -247,6 +281,26 @@ func (a *App) DisableGitSync() error {
 
 func (a *App) PullGitRepo() error {
 	return a.service.PullGitRepo()
+}
+
+func (a *App) ListGitBranches() ([]string, error) {
+	return a.service.ListGitBranches()
+}
+
+func (a *App) GetCurrentGitBranch() (string, error) {
+	return a.service.GetCurrentGitBranch()
+}
+
+func (a *App) CreateGitBranch(name string) error {
+	return a.service.CreateGitBranch(name)
+}
+
+func (a *App) SwitchGitBranch(name string) error {
+	return a.service.SwitchGitBranch(name)
+}
+
+func (a *App) DeleteGitBranch(name string) error {
+	return a.service.DeleteGitBranch(name)
 }
 
 // LoadGlobalCookies returns all saved global cookies as JSON string.
@@ -378,4 +432,83 @@ func (a *App) DeleteHistory(id string) error {
 // ClearHistory clears all history entries.
 func (a *App) ClearHistory() error {
 	return a.service.ClearHistory()
+}
+
+// BatchExecuteHTTPRequests executes multiple HTTP requests in sequence or parallel.
+func (a *App) BatchExecuteHTTPRequests(items []interface{}, environmentID string, parallel bool, concurrency int) (interface{}, error) {
+	batchItems := make([]curl.BatchExecuteItem, 0, len(items))
+	for _, item := range items {
+		itemMap, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		bi := curl.BatchExecuteItem{}
+		if v, ok := itemMap["projectID"].(string); ok {
+			bi.ProjectID = v
+		}
+		if v, ok := itemMap["projectName"].(string); ok {
+			bi.ProjectName = v
+		}
+		if v, ok := itemMap["requestName"].(string); ok {
+			bi.RequestName = v
+		}
+		if v, ok := itemMap["requestPath"].(string); ok {
+			bi.RequestPath = v
+		}
+		if v, ok := itemMap["spec"].(map[string]interface{}); ok {
+			spec := models.HttpRequestSpec{}
+			if method, ok := v["method"].(string); ok {
+				spec.Method = method
+			}
+			if httpURL, ok := v["http_url"].(string); ok {
+				spec.HttpURL = httpURL
+			}
+			if headers, ok := v["headers"].([]interface{}); ok {
+				for _, h := range headers {
+					if hm, ok := h.(map[string]interface{}); ok {
+						spec.Headers = append(spec.Headers, models.RequestKeyVal{
+							Key:     getString(hm, "key"),
+							Value:   getString(hm, "value"),
+							Enabled: getBool(hm, "enabled"),
+						})
+					}
+				}
+			}
+			if params, ok := v["params"].([]interface{}); ok {
+				for _, p := range params {
+					if pm, ok := p.(map[string]interface{}); ok {
+						spec.Params = append(spec.Params, models.RequestKeyVal{
+							Key:     getString(pm, "key"),
+							Value:   getString(pm, "value"),
+							Enabled: getBool(pm, "enabled"),
+						})
+					}
+				}
+			}
+			if body, ok := v["body"].(string); ok {
+				spec.Body = body
+			}
+			if bodyType, ok := v["body_type"].(string); ok {
+				spec.BodyType = bodyType
+			}
+			bi.Spec = spec
+		}
+		batchItems = append(batchItems, bi)
+	}
+
+	return a.service.BatchExecuteHTTPRequests(batchItems, environmentID, parallel, concurrency)
+}
+
+func getString(m map[string]interface{}, key string) string {
+	if v, ok := m[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+func getBool(m map[string]interface{}, key string) bool {
+	if v, ok := m[key].(bool); ok {
+		return v
+	}
+	return true
 }

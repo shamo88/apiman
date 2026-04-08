@@ -1,34 +1,58 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button, Dropdown, Input, message, Select, Space, Tabs } from 'antd';
-import { ApiOutlined, EnvironmentOutlined, FileOutlined, FolderOutlined, PlusOutlined, SearchOutlined, CodeOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import { ApiOutlined, EnvironmentOutlined, FileOutlined, FolderOutlined, PlusOutlined, SearchOutlined, CodeOutlined, QuestionCircleOutlined, PlayCircleOutlined } from '@ant-design/icons';
 
 import { ApiTree } from '../ApiTree';
 import { RequestPanel } from '../RequestPanel';
 import { ResponsePanel } from '../ResponsePanel';
 import { EnvironmentEditor } from './EnvironmentEditor';
 import { ScriptEditor } from './ScriptEditor';
+import { ResizeHandle } from './ResizeHandle';
+import { ResizeSplitter } from './ResizeSplitter';
+import { BatchExecuteModal } from '../modals/BatchExecuteModal';
 import { CurlResponse } from '../../types';
 import { Environment, ProjectScript, useEnvironmentStore, useScriptStore, EnvironmentVariableRow } from '../../store';
 import { useWorkspace, useWorkspaceHandlers, useEnvironments, useScripts } from '../../hooks';
-import { useUIStore, useWorkspaceStore, useProjectStore } from '../../store';
+import { useUIStore, useWorkspaceStore, useProjectStore, ProjectTree } from '../../store';
 import './ProjectWorkspace.css';
 
 interface ProjectWorkspaceProps {
   projectId: string;
 }
 
+function collectAllRequests(nodes: ProjectTree[]): ProjectTree[] {
+  const result: ProjectTree[] = [];
+  for (const node of nodes) {
+    if (node.type === 'request') {
+      result.push(node);
+    }
+    if (node.children && node.children.length > 0) {
+      result.push(...collectAllRequests(node.children));
+    }
+  }
+  return result;
+}
+
 export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId }) => {
   const uiStore = useUIStore();
   const workspaceStore = useWorkspaceStore();
   const projectStore = useProjectStore();
+  const { sidebarWidth, setSidebarWidth } = uiStore;
   const [sidebarMenu, setSidebarMenu] = useState<'apis' | 'environments' | 'scripts'>('apis');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [filterMethod, setFilterMethod] = useState('ALL');
   const [searchVersion, setSearchVersion] = useState(0);
+  const [responseHeight, setResponseHeight] = useState(() => {
+    const saved = localStorage.getItem('apiman-response-height');
+    return saved ? parseInt(saved, 10) : 300;
+  });
 
   const { workspace, projectTree } = useWorkspace(projectId);
   const { collapsedFolders } = projectStore;
   const { formattedResponse, executing } = workspaceStore;
+
+  // Batch execute state
+  const [batchSelectedItems, setBatchSelectedItems] = useState<ProjectTree[]>([]);
 
   // Environment store state
   const {
@@ -211,9 +235,29 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
     uiStore.openAddCaseModal(requestPath);
   };
 
+  const handleBatchExecute = useCallback((items: ProjectTree[]) => {
+    setBatchSelectedItems(items);
+  }, []);
+
+  const handleCloseBatchExecute = useCallback(() => {
+    setBatchSelectedItems([]);
+  }, []);
+
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchKeyword(e.target.value);
     setSearchVersion(v => v + 1);
+  };
+
+  const handleSidebarResize = (deltaX: number) => {
+    setSidebarWidth(Math.min(500, Math.max(200, sidebarWidth + deltaX)));
+  };
+
+  const handleSidebarResizeEnd = () => {
+  };
+
+  const handleResponseHeightChange = (height: number) => {
+    setResponseHeight(height);
+    localStorage.setItem('apiman-response-height', height.toString());
   };
 
   const requestTabs = workspace.requestTabs || [];
@@ -223,7 +267,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
 
   return (
     <div className="project-workspace">
-      <div className="project-sidebar">
+      <div className="project-sidebar" style={{ width: sidebarWidth }}>
         <div className="sidebar-header sidebar-menu-header">
           <div className="sidebar-top-menu">
             <button
@@ -246,17 +290,29 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
             </button>
           </div>
           {sidebarMenu === 'apis' ? (
-            <Dropdown
-              menu={{
-                items: [
-                  { key: 'folder', icon: <FolderOutlined />, label: '新建文件夹', onClick: () => handleAddFolder('') },
-                  { key: 'request', icon: <FileOutlined />, label: '新建请求', onClick: () => handleAddRequest('') },
-                ]
-              }}
-              trigger={['click']}
-            >
-              <Button size="small" icon={<PlusOutlined />} />
-            </Dropdown>
+            <Space size="small">
+              <Dropdown
+                menu={{
+                  items: [
+                    { key: 'folder', icon: <FolderOutlined />, label: '新建文件夹', onClick: () => handleAddFolder('') },
+                    { key: 'request', icon: <FileOutlined />, label: '新建请求', onClick: () => handleAddRequest('') },
+                  ]
+                }}
+                trigger={['click']}
+              >
+                <Button size="small" icon={<PlusOutlined />} />
+              </Dropdown>
+              <Button size="small" icon={<PlayCircleOutlined />} onClick={() => {
+                if (projectTree && projectTree.children) {
+                  const allRequests = collectAllRequests(projectTree.children);
+                  if (allRequests.length > 0) {
+                    handleBatchExecute(allRequests);
+                  } else {
+                    message.warning('没有可执行的请求');
+                  }
+                }
+              }} />
+            </Space>
           ) : sidebarMenu === 'environments' ? (
             <Button size="small" icon={<PlusOutlined />} onClick={handleCreateEnvironment} />
           ) : (
@@ -380,6 +436,8 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
         )}
       </div>
 
+      <ResizeHandle sidebarWidth={sidebarWidth} onResize={handleSidebarResize} onResizeEnd={handleSidebarResizeEnd} />
+
       <div className="project-main">
         {sidebarMenu === 'apis' && requestTabs.length > 0 && (
           <div className="request-tabs-row">
@@ -431,7 +489,13 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
                   projectScripts={scripts.map((s) => ({ id: s.id, name: s.name }))}
                 />
               </div>
-              <div className="workspace-response">
+              <ResizeSplitter
+                onRatioChange={handleResponseHeightChange}
+                initialRatio={responseHeight}
+                minRatio={100}
+                maxRatio={800}
+              />
+              <div className="workspace-response" style={{ height: responseHeight }}>
                 <ResponsePanel
                   response={workspace.response as CurlResponse | null}
                   formattedResponse={formattedResponse}
@@ -455,6 +519,14 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
           )}
         </div>
       </div>
+
+      {batchSelectedItems.length > 0 && (
+        <BatchExecuteModal
+          selectedItems={batchSelectedItems}
+          onClose={handleCloseBatchExecute}
+          onBatchExecute={handleCloseBatchExecute}
+        />
+      )}
     </div>
   );
 };

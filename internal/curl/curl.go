@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	xproxy "golang.org/x/net/proxy"
@@ -607,4 +608,147 @@ func FormatDuration(ms int64) string {
 		return strconv.FormatInt(ms, 10) + " ms"
 	}
 	return strconv.FormatFloat(float64(ms)/1000, 'f', 2, 64) + " s"
+}
+
+type BatchExecuteItem struct {
+	ProjectID   string
+	ProjectName string
+	RequestName string
+	RequestPath string
+	Spec        models.HttpRequestSpec
+	PreScripts  []string
+	PostScripts []string
+}
+
+type BatchExecuteResult struct {
+	RequestName string
+	RequestPath string
+	Success     bool
+	StatusCode  int
+	Duration    int64
+	Error       string
+	Response    *models.CurlResponse
+}
+
+type BatchExecuteResponse struct {
+	Total     int
+	Succeeded int
+	Failed    int
+	Results   []BatchExecuteResult
+}
+
+func (c *CurlExecutor) ExecuteBatchSequential(items []BatchExecuteItem, proxyOpts *ProxyOptions, timeout int) *BatchExecuteResponse {
+	results := make([]BatchExecuteResult, 0, len(items))
+	succeeded := 0
+	failed := 0
+
+	for _, item := range items {
+		start := time.Now()
+		resp, err := c.ExecuteHTTPRequestWithProxy(&item.Spec, proxyOpts, timeout)
+		duration := time.Since(start).Milliseconds()
+
+		result := BatchExecuteResult{
+			RequestName: item.RequestName,
+			RequestPath: item.RequestPath,
+			Duration:    duration,
+			Response:    resp,
+		}
+
+		if err != nil || resp == nil {
+			result.Success = false
+			result.Error = fmt.Sprintf("Request failed: %v", err)
+			if resp != nil {
+				result.StatusCode = resp.StatusCode
+			}
+			failed++
+		} else if resp.Error != "" {
+			result.Success = false
+			result.Error = resp.Error
+			result.StatusCode = resp.StatusCode
+			failed++
+		} else if resp.StatusCode >= 200 && resp.StatusCode < 400 {
+			result.Success = true
+			result.StatusCode = resp.StatusCode
+			succeeded++
+		} else {
+			result.Success = false
+			result.StatusCode = resp.StatusCode
+			failed++
+		}
+
+		results = append(results, result)
+	}
+
+	return &BatchExecuteResponse{
+		Total:     len(items),
+		Succeeded: succeeded,
+		Failed:    failed,
+		Results:   results,
+	}
+}
+
+func (c *CurlExecutor) ExecuteBatchConcurrent(items []BatchExecuteItem, proxyOpts *ProxyOptions, timeout int, concurrency int) *BatchExecuteResponse {
+	results := make([]BatchExecuteResult, len(items))
+	succeeded := 0
+	failed := 0
+	var mu sync.Mutex
+
+	sem := make(chan struct{}, concurrency)
+	var wg sync.WaitGroup
+
+	for i, item := range items {
+		wg.Add(1)
+		go func(idx int, itm BatchExecuteItem) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			start := time.Now()
+			resp, err := c.ExecuteHTTPRequestWithProxy(&itm.Spec, proxyOpts, timeout)
+			duration := time.Since(start).Milliseconds()
+
+			result := BatchExecuteResult{
+				RequestName: itm.RequestName,
+				RequestPath: itm.RequestPath,
+				Duration:    duration,
+				Response:    resp,
+			}
+
+			if err != nil || resp == nil {
+				result.Success = false
+				result.Error = fmt.Sprintf("Request failed: %v", err)
+				if resp != nil {
+					result.StatusCode = resp.StatusCode
+				}
+			} else if resp.Error != "" {
+				result.Success = false
+				result.Error = resp.Error
+				result.StatusCode = resp.StatusCode
+			} else if resp.StatusCode >= 200 && resp.StatusCode < 400 {
+				result.Success = true
+				result.StatusCode = resp.StatusCode
+			} else {
+				result.Success = false
+				result.StatusCode = resp.StatusCode
+			}
+
+			mu.Lock()
+			results[idx] = result
+			if result.Success {
+				succeeded++
+			} else {
+				failed++
+			}
+			mu.Unlock()
+		}(i, item)
+	}
+
+	wg.Wait()
+
+	return &BatchExecuteResponse{
+		Total:     len(items),
+		Succeeded: succeeded,
+		Failed:    failed,
+		Results:   results,
+	}
 }

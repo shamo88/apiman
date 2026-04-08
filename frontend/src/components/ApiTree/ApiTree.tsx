@@ -1,6 +1,7 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, DragEvent } from 'react';
 import { Empty } from 'antd';
 import { ProjectTree } from '../../store';
+import { useUIStore } from '../../store/useUIStore';
 import { getMethodColor, formatSidebarMethodLabel } from '../../constants/httpMethods';
 import { ApiTreeItem } from './ApiTreeItem';
 import { FolderNode } from './FolderNode';
@@ -31,6 +32,10 @@ interface ApiTreeProps {
   onSearchChange: (keyword: string) => void;
   filterMethod: string;
   onFilterMethodChange: (method: string) => void;
+  onDragStart?: (e: DragEvent, node: ProjectTree) => void;
+  onDragOver?: (e: DragEvent, folderPath: string) => void;
+  onDragLeave?: () => void;
+  onDrop?: (e: DragEvent, folderPath: string) => void;
 }
 
 export const ApiTree: React.FC<ApiTreeProps> = ({
@@ -58,7 +63,12 @@ export const ApiTree: React.FC<ApiTreeProps> = ({
   onSearchChange,
   filterMethod,
   onFilterMethodChange,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
 }) => {
+  const { dropTargetFolderPath, draggingNode } = useUIStore();
   const filterTreeNodes = useCallback((node: ProjectTree | null, keyword: string, method: string): ProjectTree | null => {
     if (!node) return null;
     const normalizedKeyword = keyword.trim().toLowerCase();
@@ -174,13 +184,16 @@ export const ApiTree: React.FC<ApiTreeProps> = ({
         onDuplicateCase={onDuplicateCase}
         onRenameCase={onRenameCase}
         onDeleteCase={onDeleteCase}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
       />
     );
   };
 
   return (
     <div className="api-tree">
-      <div className="api-tree-content">
+      <div className={`api-tree-content ${draggingNode && !dropTargetFolderPath ? 'drop-zone-active' : ''}`}>
         {rootChildren.map((child) => (
           <div key={child.path || child.id} className="api-root-sibling">
             {renderChild(child)}

@@ -16,6 +16,7 @@ interface WorkspaceState {
   requestEditorSurface: RequestEditorSurface;
   sidebarHighlightedCasePath: string;
   expandedRequestPaths: Set<string>;
+  requestResponseRatio: number;
 }
 
 export interface WorkspaceStore {
@@ -27,6 +28,7 @@ export interface WorkspaceStore {
   scriptLogsExpanded: boolean;
   testResultsExpanded: boolean;
   activeProjectId: string;
+  requestResponseRatio: number;
 
   // Actions
   getActiveWorkspace: () => WorkspaceState;
@@ -55,6 +57,7 @@ export interface WorkspaceStore {
   setSidebarHighlightedCasePath: (projectId: string, path: string) => void;
   resetWorkspaceState: (projectId: string) => void;
   switchProjectTab: (projectId: string, targetTab: string, skipSaveCurrent?: boolean) => void;
+  setRequestResponseRatio: (ratio: number) => void;
 }
 
 export const createEmptyWorkspaceState = (): WorkspaceState => ({
@@ -71,6 +74,7 @@ export const createEmptyWorkspaceState = (): WorkspaceState => ({
   requestEditorSurface: 'plain',
   sidebarHighlightedCasePath: '',
   expandedRequestPaths: new Set(),
+  requestResponseRatio: 0.5,
 });
 
 export const useWorkspaceStore = create<WorkspaceStore>()(
@@ -84,6 +88,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       scriptLogsExpanded: true,
       testResultsExpanded: true,
       activeProjectId: '',
+      requestResponseRatio: 0.5,
 
       getActiveWorkspace: () => {
         const { activeProjectId, workspaceStates } = get();
@@ -319,6 +324,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         }
         set({ activeProjectId: targetTab });
       },
+
+      setRequestResponseRatio: (ratio) => set({ requestResponseRatio: ratio }),
     }),
     { name: 'WorkspaceStore' }
   )

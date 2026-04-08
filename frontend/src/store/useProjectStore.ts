@@ -25,6 +25,9 @@ export interface ProjectTab {
   project: Project;
 }
 
+const MAX_RECENT_PROJECTS = 5;
+const RECENT_PROJECTS_KEY = 'apiman_recent_projects';
+
 interface ProjectStore {
   projects: Project[];
   projectTabs: ProjectTab[];
@@ -38,11 +41,14 @@ interface ProjectStore {
   projectSearchKeyword: string;
   loading: boolean;
   projectGroupsLoaded: boolean;
+  recentProjects: Project[];
 
   // Actions
   setProjects: (projects: Project[]) => void;
   addProject: (project: Project) => void;
   removeProject: (id: string) => void;
+  addToRecentProjects: (project: Project) => void;
+  removeFromRecentProjects: (projectId: string) => void;
   setLoading: (loading: boolean) => void;
   openProjectTab: (project: Project) => void;
   closeProjectTab: (tabId: string) => void;
@@ -62,6 +68,26 @@ interface ProjectStore {
   reset: () => void;
 }
 
+const loadRecentProjectsFromStorage = (): Project[] => {
+  try {
+    const stored = localStorage.getItem(RECENT_PROJECTS_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.error('Failed to load recent projects:', e);
+  }
+  return [];
+};
+
+const saveRecentProjectsToStorage = (projects: Project[]) => {
+  try {
+    localStorage.setItem(RECENT_PROJECTS_KEY, JSON.stringify(projects));
+  } catch (e) {
+    console.error('Failed to save recent projects:', e);
+  }
+};
+
 export const useProjectStore = create<ProjectStore>()(
   devtools(
     (set, get) => ({
@@ -77,15 +103,32 @@ export const useProjectStore = create<ProjectStore>()(
       projectSearchKeyword: '',
       loading: false,
       projectGroupsLoaded: false,
+      recentProjects: loadRecentProjectsFromStorage(),
 
       setProjects: (projects) => set({ projects }),
       addProject: (project) => set((state) => ({
         projects: [...state.projects, project]
       })),
-      removeProject: (id) => set((state) => ({
-        projects: state.projects.filter((p) => p.id !== id),
-        projectTabs: state.projectTabs.filter((t) => t.id !== id),
-      })),
+      removeProject: (id) => set((state) => {
+        const newRecent = state.recentProjects.filter((p) => p.id !== id);
+        saveRecentProjectsToStorage(newRecent);
+        return {
+          projects: state.projects.filter((p) => p.id !== id),
+          projectTabs: state.projectTabs.filter((t) => t.id !== id),
+          recentProjects: newRecent,
+        };
+      }),
+      addToRecentProjects: (project) => set((state) => {
+        const filtered = state.recentProjects.filter((p) => p.id !== project.id);
+        const updated = [project, ...filtered].slice(0, MAX_RECENT_PROJECTS);
+        saveRecentProjectsToStorage(updated);
+        return { recentProjects: updated };
+      }),
+      removeFromRecentProjects: (projectId) => set((state) => {
+        const newRecent = state.recentProjects.filter((p) => p.id !== projectId);
+        saveRecentProjectsToStorage(newRecent);
+        return { recentProjects: newRecent };
+      }),
       setLoading: (loading) => set({ loading }),
       openProjectTab: (project) => set((state) => {
         const existing = state.projectTabs.find((t) => t.id === project.id);
@@ -178,6 +221,7 @@ export const useProjectStore = create<ProjectStore>()(
         projectSearchKeyword: '',
         loading: false,
         projectGroupsLoaded: false,
+        recentProjects: [],
       }),
     }),
     { name: 'ProjectStore' }

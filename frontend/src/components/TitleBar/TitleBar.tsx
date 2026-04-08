@@ -1,15 +1,25 @@
 import React, { useState } from 'react';
-import { AppstoreOutlined, CloseOutlined, MinusOutlined, SettingOutlined } from '@ant-design/icons';
-import { Tabs } from 'antd';
+import { AppstoreOutlined, CloseOutlined, MinusOutlined, SearchOutlined, SettingOutlined, KeyOutlined } from '@ant-design/icons';
+import { Select, Tabs } from 'antd';
 import { Quit, WindowMinimise, WindowToggleMaximise } from '../../../wailsjs/runtime/runtime';
 import { SettingsModal } from './SettingsModal';
-import { useProjectStore, useUIStore, useWorkspaceStore } from '../../store';
+import { useEnvironmentStore, useProjectStore, useUIStore, useWorkspaceStore } from '../../store';
 
-export const TitleBar: React.FC = () => {
+interface TitleBarProps {
+  onOpenShortcutsHelp?: () => void;
+}
+
+export const TitleBar: React.FC<TitleBarProps> = ({ onOpenShortcutsHelp }) => {
   const projectStore = useProjectStore();
   const uiStore = useUIStore();
+  const workspaceStore = useWorkspaceStore();
+  const environmentStore = useEnvironmentStore();
 
   const [settingsVisible, setSettingsVisible] = useState(false);
+
+  const activeWorkspace = workspaceStore.getActiveWorkspace();
+  const selectedEnvId = activeWorkspace.selectedEnvironmentId || '__none__';
+  const environments = environmentStore.environments;
 
   const activeTab = projectStore.activeTab;
   const projectTabs = projectStore.projectTabs;
@@ -104,6 +114,22 @@ export const TitleBar: React.FC = () => {
         </div>
 
         <div className="title-bar-controls">
+          {projectStore.activeTab !== 'home' && (
+            <Select
+              className={`title-bar-environment-select${uiStore.appTheme === 'dark' ? ' title-bar-environment-select-dark' : ''}`}
+              size="small"
+              value={selectedEnvId}
+              onChange={(value) => {
+                const envId = value === '__none__' ? '' : value;
+                workspaceStore.setSelectedEnvironmentId(projectStore.activeTab, envId);
+              }}
+              options={[
+                { label: '无环境', value: '__none__' },
+                ...environments.map(env => ({ label: env.name, value: env.id }))
+              ]}
+              style={{ width: 120, marginRight: 8 }}
+            />
+          )}
           <button
             className="title-bar-button settings"
             onClick={handleOpenSettings}
@@ -112,6 +138,24 @@ export const TitleBar: React.FC = () => {
           >
             <SettingOutlined />
           </button>
+          <button
+            className="title-bar-button settings"
+            onClick={() => uiStore.openGlobalSearch()}
+            title="全局搜索 (Ctrl+F)"
+            style={{ '--wails-draggable': 'no-drag' } as React.CSSProperties}
+          >
+            <SearchOutlined />
+          </button>
+          {onOpenShortcutsHelp && (
+            <button
+              className="title-bar-button settings"
+              onClick={onOpenShortcutsHelp}
+              title="快捷键 (Ctrl+Shift+?)"
+              style={{ '--wails-draggable': 'no-drag' } as React.CSSProperties}
+            >
+              <KeyOutlined />
+            </button>
+          )}
           <button
             className="title-bar-button minimize"
             onClick={handleMinimize}

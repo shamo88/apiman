@@ -1,6 +1,5 @@
 import React from 'react';
-import { JsonView, darkStyles, allExpanded } from 'react-json-view-lite';
-import 'react-json-view-lite/dist/index.css';
+import { EnhancedJsonView } from './EnhancedJsonView';
 
 interface ResponseBodyViewerProps {
     body: string;
@@ -27,12 +26,7 @@ export const ResponseBodyViewer: React.FC<ResponseBodyViewerProps> = ({
                         const data = JSON.parse(body || '{}');
                         return (
                             <div className="json-view-container">
-                                <JsonView
-                                    data={data}
-                                    style={appTheme === 'dark' ? darkStyles : undefined}
-                                    shouldExpandNode={allExpanded}
-                                    clickToExpandNode
-                                />
+                                <EnhancedJsonView data={data} theme={appTheme} />
                             </div>
                         );
                     } catch {

@@ -592,3 +592,137 @@ func extractProjectID(dirName string) string {
 	// Otherwise return the whole name (might be just the UUID)
 	return dirName
 }
+
+// ListBranches returns all local and remote branch names
+func (g *GitSyncManager) ListBranches() ([]string, error) {
+	repo, err := git.PlainOpen(g.repoPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open repository: %w", err)
+	}
+
+	branches := make([]string, 0)
+
+	// List local branches
+	localBranches, err := repo.Branches()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list local branches: %w", err)
+	}
+	err = localBranches.ForEach(func(ref *plumbing.Reference) error {
+		branches = append(branches, ref.Name().Short())
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to iterate local branches: %w", err)
+	}
+
+	return branches, nil
+}
+
+// GetCurrentBranch returns the name of the current checked-out branch
+func (g *GitSyncManager) GetCurrentBranch() (string, error) {
+	repo, err := git.PlainOpen(g.repoPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open repository: %w", err)
+	}
+
+	head, err := repo.Head()
+	if err != nil {
+		return "", fmt.Errorf("failed to get HEAD: %w", err)
+	}
+
+	return head.Name().Short(), nil
+}
+
+// CreateBranch creates a new local branch
+func (g *GitSyncManager) CreateBranch(name string) error {
+	repo, err := git.PlainOpen(g.repoPath)
+	if err != nil {
+		return fmt.Errorf("failed to open repository: %w", err)
+	}
+
+	worktree, err := repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+
+	// Check if branch already exists
+	_, err = repo.Branch(name)
+	if err == nil {
+		return fmt.Errorf("branch '%s' already exists", name)
+	}
+
+	// Create the branch
+	refName := plumbing.NewBranchReferenceName(name)
+	err = worktree.Checkout(&git.CheckoutOptions{
+		Hash:   plumbing.ZeroHash,
+		Branch: refName,
+		Create: true,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create branch '%s': %w", name, err)
+	}
+
+	log.Printf("[GitSync] Created branch: %s", name)
+	return nil
+}
+
+// SwitchBranch switches to the specified branch
+func (g *GitSyncManager) SwitchBranch(name string) error {
+	repo, err := git.PlainOpen(g.repoPath)
+	if err != nil {
+		return fmt.Errorf("failed to open repository: %w", err)
+	}
+
+	worktree, err := repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+
+	// Check if branch exists locally
+	refName := plumbing.NewBranchReferenceName(name)
+	_, err = repo.Reference(refName, true)
+	if err != nil {
+		return fmt.Errorf("branch '%s' not found locally", name)
+	}
+
+	// Checkout the branch
+	err = worktree.Checkout(&git.CheckoutOptions{
+		Branch: refName,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to switch to branch '%s': %w", name, err)
+	}
+
+	log.Printf("[GitSync] Switched to branch: %s", name)
+	return nil
+}
+
+// DeleteBranch deletes a local branch
+func (g *GitSyncManager) DeleteBranch(name string) error {
+	repo, err := git.PlainOpen(g.repoPath)
+	if err != nil {
+		return fmt.Errorf("failed to open repository: %w", err)
+	}
+
+	// Get current branch to prevent deleting it
+	currentBranch, err := g.GetCurrentBranch()
+	if err == nil && currentBranch == name {
+		return fmt.Errorf("cannot delete the current branch '%s'", name)
+	}
+
+	// Check if branch exists
+	refName := plumbing.NewBranchReferenceName(name)
+	_, err = repo.Reference(refName, true)
+	if err != nil {
+		return fmt.Errorf("branch '%s' not found", name)
+	}
+
+	// Delete the branch
+	err = repo.DeleteBranch(name)
+	if err != nil {
+		return fmt.Errorf("failed to delete branch '%s': %w", name, err)
+	}
+
+	log.Printf("[GitSync] Deleted branch: %s", name)
+	return nil
+}
