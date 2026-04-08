@@ -12,7 +12,7 @@ export interface ProjectScript {
   updated_at?: string;
 }
 
-interface ScriptStore {
+export interface ScriptStore {
   scripts: ProjectScript[];
   editingScriptId: string;
   scriptFormName: string;

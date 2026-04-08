@@ -1,0 +1,148 @@
+/* Ant Design Component Overrides */
+
+/* Tabs in header */
+.app-header .ant-tabs {
+    flex: 1;
+    margin: 0;
+}
+
+.app-header .ant-tabs-nav {
+    margin: 0;
+    padding: 0;
+}
+
+.app-header .ant-tabs-nav::before {
+    display: none;
+}
+
+.app-header .ant-tabs-tab {
+    padding: 8px 16px !important;
+    margin: 0 4px 0 0 !important;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary) !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+}
+
+.app-header .ant-tabs-tab:hover {
+    color: var(--text-primary) !important;
+    background: var(--bg-hover) !important;
+}
+
+.app-header .ant-tabs-tab-active {
+    color: var(--accent-primary) !important;
+    background: var(--bg-tertiary) !important;
+    font-weight: 600;
+}
+
+.app-header .ant-tabs-tab-active .ant-tabs-tab-btn {
+    color: var(--accent-primary) !important;
+}
+
+.app-header .ant-tabs-tab-remove {
+    color: var(--text-muted) !important;
+    margin-left: 8px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.app-header .ant-tabs-tab:hover .ant-tabs-tab-remove {
+    opacity: 1;
+}
+
+.app-header .ant-tabs-tab-remove:hover {
+    color: var(--text-primary) !important;
+    background: var(--bg-active) !important;
+}
+
+.app-header .ant-tabs-nav-operations {
+    display: none;
+}
+
+/* Input styles */
+.ant-input {
+    background: var(--bg-tertiary) !important;
+    border: 1px solid var(--border-subtle) !important;
+    color: var(--text-primary) !important;
+    border-radius: var(--radius-sm);
+}
+
+.ant-input:focus,
+.ant-input-focused {
+    border-color: var(--accent-primary) !important;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1) !important;
+}
+
+.ant-input::placeholder {
+    color: var(--text-muted);
+}
+
+/* Button styles */
+.ant-btn {
+    font-family: var(--font-sans);
+}
+
+/* Tree styles */
+.ant-tree {
+    background: transparent !important;
+    color: var(--text-secondary);
+}
+
+.ant-tree .ant-tree-node-content-wrapper {
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+}
+
+.ant-tree .ant-tree-node-content-wrapper:hover {
+    background: var(--bg-hover);
+}
+
+.ant-tree .ant-tree-node-selected {
+    background: var(--bg-active) !important;
+}
+
+/* Message styles */
+.ant-message-notice-content {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-card);
+}
+
+.ant-message-success {
+    color: var(--text-primary);
+}
+
+/* Light theme - select dropdown (html level) */
+html:not(.theme-dark) .ant-select-dropdown,
+:not(.theme-dark).ant-select-dropdown {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+}
+
+html:not(.theme-dark) .ant-select-dropdown * {
+    background-color: inherit !important;
+}
+
+html:not(.theme-dark) .ant-select-dropdown .ant-select-item-option {
+    color: var(--text-primary) !important;
+}
+
+html:not(.theme-dark) .ant-select-dropdown .ant-select-item-option .ant-select-item-option-content {
+    color: var(--text-primary) !important;
+}
+
+html:not(.theme-dark) .ant-select-dropdown .ant-select-item-option-active {
+    background: rgba(0, 0, 0, 0.04) !important;
+}
+
+html:not(.theme-dark) .ant-select-dropdown .ant-select-item-option-selected {
+    background: rgba(79, 70, 229, 0.1) !important;
+}
+
+html:not(.theme-dark) .ant-select-dropdown .ant-select-item-option-selected .ant-select-item-option-content {
+    color: #4f46e5 !important;
+}

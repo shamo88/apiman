@@ -1,5 +1,33 @@
 export namespace config {
 	
+	export class HTTPConfig {
+	    timeout: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new HTTPConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.timeout = source["timeout"];
+	    }
+	}
+	export class LogConfig {
+	    maxSizeMB: number;
+	    maxBackups: number;
+	    compress: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new LogConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.maxSizeMB = source["maxSizeMB"];
+	        this.maxBackups = source["maxBackups"];
+	        this.compress = source["compress"];
+	    }
+	}
 	export class MCPConfig {
 	    enabled: boolean;
 	    port: number;
@@ -87,6 +115,8 @@ export namespace config {
 	    ui: UIConfig;
 	    gitSync: GitSyncConfig;
 	    mcp: MCPConfig;
+	    log: LogConfig;
+	    http: HTTPConfig;
 	
 	    static createFrom(source: any = {}) {
 	        return new AppConfig(source);
@@ -98,6 +128,8 @@ export namespace config {
 	        this.ui = this.convertValues(source["ui"], UIConfig);
 	        this.gitSync = this.convertValues(source["gitSync"], GitSyncConfig);
 	        this.mcp = this.convertValues(source["mcp"], MCPConfig);
+	        this.log = this.convertValues(source["log"], LogConfig);
+	        this.http = this.convertValues(source["http"], HTTPConfig);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -118,6 +150,8 @@ export namespace config {
 		    return a;
 		}
 	}
+	
+	
 	
 	
 	

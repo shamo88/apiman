@@ -1,3 +1,5 @@
+import { models } from '../../wailsjs/go/models';
+
 export const DEFAULT_PROJECT_GROUP = '未分组';
 
 export const createDefaultApiConfig = (): ApiConfig => ({
@@ -48,7 +50,7 @@ export interface ProjectWorkspaceState {
   requestTabs: RequestTab[];
   activeRequestTab: string;
   currentRequest: CurlRequest | null;
-  response: any;
+  response: models.CurlResponse | null;
   selectedKeys: string[];
   apiConfig: ApiConfig;
   selectedEnvironmentId: string;
@@ -88,7 +90,7 @@ export interface CurlRequest {
   body_type?: string;
   form_data?: { key: string; value: string; enabled?: boolean }[];
   url_encoded?: { key: string; value: string; enabled?: boolean }[];
-  cases?: any[];
+  cases?: models.HttpRequestCase[];
   active_case_id?: string;
-  interface_spec?: any;
+  interface_spec?: models.HttpRequestSpec;
 }

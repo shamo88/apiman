@@ -22,13 +22,14 @@ func main() {
 		return
 	}
 
-	// Initialize logger
-	if err := logger.Init(app.service.ConfigManager.GetConfigDir()); err != nil {
+	// Load config before initializing logger
+	cfg, err := app.service.LoadAppConfig()
+
+	// Initialize logger with log config
+	if err := logger.Init(app.service.ConfigManager.GetConfigDir(), &cfg.Log); err != nil {
 		println("Failed to initialize logger:", err.Error())
 	}
 
-	// Load config to determine theme before app starts
-	cfg, err := app.service.LoadAppConfig()
 	bgColor := &options.RGBA{R: 255, G: 255, B: 255, A: 255}
 	if err == nil && cfg != nil && cfg.UI.Theme == "dark" {
 		// Dark theme background

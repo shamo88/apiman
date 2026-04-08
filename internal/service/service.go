@@ -320,7 +320,11 @@ func (s *Service) ExecuteCurl(command string) (*models.CurlResponse, error) {
 		SOCKS5Port: appCfg.Proxy.SOCKS5Port,
 	}
 
-	return s.CurlExecutor.ExecuteWithProxy(command, proxyOpts)
+	timeout := appCfg.HTTP.Timeout
+	if timeout == 0 {
+		timeout = 30
+	}
+	return s.CurlExecutor.ExecuteWithProxy(command, proxyOpts, timeout)
 }
 
 func (s *Service) ExecuteHTTPRequest(spec models.HttpRequestSpec) (*models.CurlResponse, error) {
@@ -340,7 +344,11 @@ func (s *Service) ExecuteHTTPRequest(spec models.HttpRequestSpec) (*models.CurlR
 		SOCKS5Host: appCfg.Proxy.SOCKS5Host,
 		SOCKS5Port: appCfg.Proxy.SOCKS5Port,
 	}
-	return s.CurlExecutor.ExecuteHTTPRequestWithProxy(&spec, proxyOpts)
+	timeout := appCfg.HTTP.Timeout
+	if timeout == 0 {
+		timeout = 30
+	}
+	return s.CurlExecutor.ExecuteHTTPRequestWithProxy(&spec, proxyOpts, timeout)
 }
 
 // ExecuteHTTPRequestWithProject executes HTTP request and records history with project context.
@@ -362,7 +370,11 @@ func (s *Service) ExecuteHTTPRequestWithProject(projectID, projectName, requestN
 			SOCKS5Host: appCfg.Proxy.SOCKS5Host,
 			SOCKS5Port: appCfg.Proxy.SOCKS5Port,
 		}
-		resp, err = s.CurlExecutor.ExecuteHTTPRequestWithProxy(&spec, proxyOpts)
+		timeout := appCfg.HTTP.Timeout
+		if timeout == 0 {
+			timeout = 30
+		}
+		resp, err = s.CurlExecutor.ExecuteHTTPRequestWithProxy(&spec, proxyOpts, timeout)
 	}
 
 	// 记录历史
@@ -633,6 +645,7 @@ func (s *Service) ExecuteHTTPRequestWithScriptsWithSource(
 
 	appCfg, err := s.ConfigManager.LoadAppConfig()
 	proxyOpts := &curl.ProxyOptions{}
+	timeout := 30
 	if err == nil && appCfg != nil {
 		proxyOpts.Enabled = appCfg.Proxy.Enabled
 		proxyOpts.HTTPHost = appCfg.Proxy.HTTPHost
@@ -641,6 +654,10 @@ func (s *Service) ExecuteHTTPRequestWithScriptsWithSource(
 		proxyOpts.HTTPSPort = appCfg.Proxy.HTTPSPort
 		proxyOpts.SOCKS5Host = appCfg.Proxy.SOCKS5Host
 		proxyOpts.SOCKS5Port = appCfg.Proxy.SOCKS5Port
+		timeout = appCfg.HTTP.Timeout
+		if timeout == 0 {
+			timeout = 30
+		}
 	}
 
 	globalSetter := func(key, value string) {
@@ -658,6 +675,7 @@ func (s *Service) ExecuteHTTPRequestWithScriptsWithSource(
 		globals,
 		environment,
 		globalSetter,
+		timeout,
 	)
 
 	if err != nil {
@@ -711,6 +729,7 @@ func (s *Service) ExecuteHTTPRequestWithScriptsInline(
 
 	appCfg, err := s.ConfigManager.LoadAppConfig()
 	proxyOpts := &curl.ProxyOptions{}
+	timeout := 30
 	if err == nil && appCfg != nil {
 		proxyOpts.Enabled = appCfg.Proxy.Enabled
 		proxyOpts.HTTPHost = appCfg.Proxy.HTTPHost
@@ -719,6 +738,10 @@ func (s *Service) ExecuteHTTPRequestWithScriptsInline(
 		proxyOpts.HTTPSPort = appCfg.Proxy.HTTPSPort
 		proxyOpts.SOCKS5Host = appCfg.Proxy.SOCKS5Host
 		proxyOpts.SOCKS5Port = appCfg.Proxy.SOCKS5Port
+		timeout = appCfg.HTTP.Timeout
+		if timeout == 0 {
+			timeout = 30
+		}
 	}
 
 	globalSetter := func(key, value string) {
@@ -736,6 +759,7 @@ func (s *Service) ExecuteHTTPRequestWithScriptsInline(
 		globals,
 		environment,
 		globalSetter,
+		timeout,
 	)
 
 	if err != nil {

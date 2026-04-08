@@ -37,10 +37,10 @@ type ProxyOptions struct {
 }
 
 func (c *CurlExecutor) Execute(curlCommand string) (*models.CurlResponse, error) {
-	return c.ExecuteWithProxy(curlCommand, nil)
+	return c.ExecuteWithProxy(curlCommand, nil, 30)
 }
 
-func (c *CurlExecutor) ExecuteWithProxy(curlCommand string, proxyOpts *ProxyOptions) (*models.CurlResponse, error) {
+func (c *CurlExecutor) ExecuteWithProxy(curlCommand string, proxyOpts *ProxyOptions, timeoutSeconds int) (*models.CurlResponse, error) {
 	parts, err := c.parseCurlCommand(curlCommand)
 	if err != nil {
 		return &models.CurlResponse{
@@ -92,7 +92,7 @@ func (c *CurlExecutor) ExecuteWithProxy(curlCommand string, proxyOpts *ProxyOpti
 		req.Header.Set("Authorization", parts.Auth)
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{Timeout: time.Duration(timeoutSeconds) * time.Second}
 	if proxyOpts != nil && proxyOpts.Enabled {
 		client.Transport = buildTransportWithProxy(proxyOpts)
 	}

@@ -30,9 +30,10 @@ func (se *ScriptableExecutor) ExecuteWithScripts(
 	globals map[string]string,
 	environment map[string]string,
 	globalSetter func(key, value string),
+	timeoutSeconds int,
 ) (*models.CurlResponse, error) {
 	ctx := context.Background()
-	return se.ExecuteWithScriptsContext(ctx, spec, proxyOpts, preScriptContents, postScriptContents, preScriptNames, postScriptNames, globals, environment, globalSetter)
+	return se.ExecuteWithScriptsContext(ctx, spec, proxyOpts, preScriptContents, postScriptContents, preScriptNames, postScriptNames, globals, environment, globalSetter, timeoutSeconds)
 }
 
 func (se *ScriptableExecutor) ExecuteWithScriptsContext(
@@ -46,6 +47,7 @@ func (se *ScriptableExecutor) ExecuteWithScriptsContext(
 	globals map[string]string,
 	environment map[string]string,
 	globalSetter func(key, value string),
+	timeoutSeconds int,
 ) (*models.CurlResponse, error) {
 	if spec == nil {
 		return &models.CurlResponse{Error: "request is nil"}, nil
@@ -117,7 +119,7 @@ func (se *ScriptableExecutor) ExecuteWithScriptsContext(
 		}
 	}
 
-	curlResp, err := se.CurlExecutor.ExecuteHTTPRequestWithProxy(specCopy, proxyOpts)
+	curlResp, err := se.CurlExecutor.ExecuteHTTPRequestWithProxy(specCopy, proxyOpts, timeoutSeconds)
 	if err != nil {
 		return &models.CurlResponse{Error: err.Error()}, err
 	}

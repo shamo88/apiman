@@ -334,11 +334,24 @@ type MCPConfig struct {
 	APIKey        string `json:"api_key"`
 }
 
+// LogConfig holds logger configuration
+type LogConfig struct {
+	MaxSizeMB  int  `json:"maxSizeMB"`
+	MaxBackups int  `json:"maxBackups"`
+	Compress   bool `json:"compress"`
+}
+
+type HTTPConfig struct {
+	Timeout int `json:"timeout"` // HTTP request timeout in seconds
+}
+
 type AppConfig struct {
 	Proxy   ProxyConfig   `json:"proxy"`
 	UI      UIConfig      `json:"ui"`
 	GitSync GitSyncConfig `json:"gitSync"`
 	MCP     MCPConfig     `json:"mcp"`
+	Log     LogConfig     `json:"log"`
+	HTTP    HTTPConfig    `json:"http"`
 }
 
 type UIConfig struct {
@@ -382,6 +395,14 @@ func (c *ConfigManager) LoadAppConfig() (*AppConfig, error) {
 	// MCP defaults
 	if config.MCP.Port == 0 {
 		config.MCP.Port = 3847
+	}
+	// Log defaults
+	if config.Log.MaxSizeMB == 0 {
+		config.Log.MaxSizeMB = 100
+	}
+	// HTTP defaults
+	if config.HTTP.Timeout == 0 {
+		config.HTTP.Timeout = 30
 	}
 
 	// Decrypt password/token when loading

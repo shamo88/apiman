@@ -1,6 +1,8 @@
 import { models } from '../../wailsjs/go/models';
 import { ApiConfig, createDefaultApiConfig } from '../constants/defaults';
 import type { CurlRequest } from '../constants/defaults';
+import type { WorkspaceStore } from '../store/useWorkspaceStore';
+import type { ScriptStore } from '../store/useScriptStore';
 
 const ALLOWED_BODY_TYPES: ApiConfig['bodyType'][] = [
   'none',
@@ -77,8 +79,8 @@ export interface CaseRow {
 export const hydrateRequestEditor = (
   request: CurlRequest | null,
   currentProjectId: string,
-  workspaceStore: any,
-  scriptStore: any
+  workspaceStore: WorkspaceStore,
+  _scriptStore: ScriptStore
 ) => {
   if (!request) return;
 

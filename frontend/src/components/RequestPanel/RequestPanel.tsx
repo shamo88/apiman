@@ -15,6 +15,14 @@ interface RequestPanelProps {
   projectScripts: Array<{ id: string; name: string }>;
 }
 
+// 动态键值对接口，支持通过变量访问属性
+interface KeyValue {
+  key: string;
+  value: string;
+  enabled?: boolean;
+  [prop: string]: string | boolean | undefined;
+}
+
 export const RequestPanel: React.FC<RequestPanelProps> = ({
   apiConfig,
   onApiConfigChange,
@@ -73,7 +81,7 @@ export const RequestPanel: React.FC<RequestPanelProps> = ({
                     if (field === 'enabled') {
                       newParams[index].enabled = value as boolean;
                     } else {
-                      (newParams[index] as any)[field] = value;
+                      (newParams[index] as KeyValue)[field] = value as string;
                     }
                     updateConfig({ params: newParams });
                   }}
@@ -103,7 +111,7 @@ export const RequestPanel: React.FC<RequestPanelProps> = ({
                     if (field === 'enabled') {
                       newHeaders[index].enabled = value as boolean;
                     } else {
-                      (newHeaders[index] as any)[field] = value;
+                      (newHeaders[index] as KeyValue)[field] = value as string;
                     }
                     updateConfig({ headers: newHeaders });
                   }}
@@ -154,7 +162,7 @@ export const RequestPanel: React.FC<RequestPanelProps> = ({
                         if (field === 'enabled') {
                           newData[index].enabled = value as boolean;
                         } else {
-                          (newData[index] as any)[field] = value;
+                          (newData[index] as KeyValue)[field] = value as string;
                         }
                         updateConfig(apiConfig.bodyType === 'form-data'
                           ? { ...apiConfig, formData: newData }

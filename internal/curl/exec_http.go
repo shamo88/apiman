@@ -14,11 +14,11 @@ import (
 
 // ExecuteHTTPRequest runs an HTTP request from structured fields (Postman-aligned).
 func (c *CurlExecutor) ExecuteHTTPRequest(spec *models.HttpRequestSpec) (*models.CurlResponse, error) {
-	return c.ExecuteHTTPRequestWithProxy(spec, nil)
+	return c.ExecuteHTTPRequestWithProxy(spec, nil, 30)
 }
 
-// ExecuteHTTPRequestWithProxy is like ExecuteHTTPRequest but honors proxy options.
-func (c *CurlExecutor) ExecuteHTTPRequestWithProxy(spec *models.HttpRequestSpec, proxyOpts *ProxyOptions) (*models.CurlResponse, error) {
+// ExecuteHTTPRequestWithProxy is like ExecuteHTTPRequest but honors proxy options and timeout.
+func (c *CurlExecutor) ExecuteHTTPRequestWithProxy(spec *models.HttpRequestSpec, proxyOpts *ProxyOptions, timeoutSeconds int) (*models.CurlResponse, error) {
 	if spec == nil {
 		return &models.CurlResponse{Error: "request is nil"}, nil
 	}
@@ -104,7 +104,7 @@ func (c *CurlExecutor) ExecuteHTTPRequestWithProxy(spec *models.HttpRequestSpec,
 		req.Header.Set(key, value)
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{Timeout: time.Duration(timeoutSeconds) * time.Second}
 	if proxyOpts != nil && proxyOpts.Enabled {
 		client.Transport = buildTransportWithProxy(proxyOpts)
 	}

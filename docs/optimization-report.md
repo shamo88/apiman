@@ -415,14 +415,14 @@ go 1.24.0      # go.mod 要求 1.24.0
 | 代码重复 | `curlUtils.ts` | 删除重复的 `apiConfigFromRequest` 和 `apiConfigFromHttpSpec` |
 | 构造函数 panic | `config.go`, `project.go`, `service.go`, `app.go`, `main.go` | 改为返回 `(*Service, error)` |
 | 前端依赖升级 | `package.json` | 升级 TypeScript@^5.6.0, @vitejs/plugin-react@^4.3.0, @types/react@^18.3.0 |
+| 96 处 `any` 类型 | `defaults.ts`, `useHistoryStore.ts`, `RequestPanel.tsx`, `apiConfig.ts`, `useProjects.ts` | CurlRequest → models.*; useHistoryStore → HistoryEntry[]; RequestPanel → KeyValue接口; apiConfig → useWorkspaceStore/useScriptStore; useProjects → unknown + getErrorMessage |
+| HTTP 超时硬编码 | `curl.go`, `exec_http.go`, `config.go` | 添加 HTTPConfig，30秒超时可配置 |
+| 日志系统配置化 | `logger.go`, `config.go` | 添加 LogConfig (MaxSizeMB, MaxBackups, Compress) |
+| App.css 过于庞大 | `App.css`, `styles/*.css` | 拆分为 theme/global/antd-overrides/theme-dark 4个文件 |
 
 ### ⚠️ 待修复
 
 | 问题 | 优先级 | 说明 |
 |------|--------|------|
-| 96 处 `any` 类型 | P0 | 需要较大重构，建议按模块逐步替换 |
-| 巨型组件 (500+ 行) | P2 | 需要较大重构，建议拆分为多个小组件 |
-| 日志系统过于简单 | P2 | 建议引入 zap 或 zerolog |
-| HTTP 超时硬编码 | P2 | 建议移入配置文件 |
-| 缺少单元测试 | P3 | 建议为关键模块添加测试 |
-| App.css 过于庞大 | P3 | 建议按功能拆分样式文件 |
+| 巨型组件 (500+ 行) | P2 | ProjectWorkspace/HomePage 需要较大重构，建议按阶段拆分 |
+| 缺少单元测试 | P3 | 建议为关键模块（curl, script, project）添加测试 |

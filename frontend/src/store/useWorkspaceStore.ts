@@ -18,7 +18,7 @@ interface WorkspaceState {
   expandedRequestPaths: Set<string>;
 }
 
-interface WorkspaceStore {
+export interface WorkspaceStore {
   workspaceStates: Record<string, WorkspaceState>;
   executing: boolean;
   formattedResponse: string;

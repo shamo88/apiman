@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"apiman/internal/config"
+
 	"github.com/natefinch/lumberjack"
 )
 
@@ -14,7 +16,8 @@ var (
 )
 
 // Init initializes the global logger with lumberjack for log rotation
-func Init(configDir string) error {
+// If config is nil, uses default values (MaxSizeMB: 100, MaxBackups: 0, Compress: false)
+func Init(configDir string, logConfig *config.LogConfig) error {
 	logsDir := filepath.Join(configDir, "logs")
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
 		return err
@@ -22,12 +25,24 @@ func Init(configDir string) error {
 
 	logFile := filepath.Join(logsDir, "apiman.log")
 
+	// Use config values or defaults
+	maxSizeMB := 100
+	maxBackups := 0
+	compress := false
+	if logConfig != nil {
+		if logConfig.MaxSizeMB > 0 {
+			maxSizeMB = logConfig.MaxSizeMB
+		}
+		maxBackups = logConfig.MaxBackups
+		compress = logConfig.Compress
+	}
+
 	// Initialize lumberjack for log rotation
 	lumberjackLogger := &lumberjack.Logger{
 		Filename:   logFile,
-		MaxSize:    100, // MB
-		MaxBackups: 0,   // Keep all old logs (only truncate when MaxSize exceeded)
-		Compress:   false,
+		MaxSize:    maxSizeMB, // MB
+		MaxBackups: maxBackups,
+		Compress:   compress,
 		LocalTime:  true,
 	}
 

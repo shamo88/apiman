@@ -29,6 +29,17 @@ import {
 } from '../../wailsjs/go/main/App';
 import { models } from '../../wailsjs/go/models';
 
+/**
+ * 从错误对象中提取错误消息字符串
+ * 用于将 unknown 类型的 error 转换为可显示的字符串
+ */
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
 export function useProjects() {
   const {
     projects,
@@ -61,8 +72,9 @@ export function useProjects() {
       addProject(created);
       message.success('项目已创建');
       return created;
-    } catch (error: any) {
-      message.error(`创建失败: ${error?.message || error}`);
+    } catch (error: unknown) {
+      const errMsg = getErrorMessage(error);
+      message.error(`创建失败: ${errMsg}`);
       throw error;
     }
   }, [addProject]);
@@ -72,8 +84,9 @@ export function useProjects() {
       await DeleteProject(id);
       removeProject(id);
       message.success('项目已删除');
-    } catch (error: any) {
-      message.error(`删除失败: ${error?.message || error}`);
+    } catch (error: unknown) {
+      const errMsg = getErrorMessage(error);
+      message.error(`删除失败: ${errMsg}`);
       throw error;
     }
   }, [removeProject]);
@@ -82,8 +95,9 @@ export function useProjects() {
     try {
       await RenameProject(id, name);
       message.success('项目已重命名');
-    } catch (error: any) {
-      message.error(`重命名失败: ${error?.message || error}`);
+    } catch (error: unknown) {
+      const errMsg = getErrorMessage(error);
+      message.error(`重命名失败: ${errMsg}`);
       throw error;
     }
   }, []);
@@ -104,8 +118,9 @@ export function useProjects() {
       await CreateFolder(projectId, parentPath, name);
       await loadProjectTree(projectId);
       message.success('文件夹已创建');
-    } catch (error: any) {
-      message.error(`创建失败: ${error?.message || error}`);
+    } catch (error: unknown) {
+      const errMsg = getErrorMessage(error);
+      message.error(`创建失败: ${errMsg}`);
       throw error;
     }
   }, [loadProjectTree]);
@@ -115,8 +130,9 @@ export function useProjects() {
       await DeleteFolder(folderPath);
       await loadProjectTree(projectId);
       message.success('文件夹已删除');
-    } catch (error: any) {
-      message.error(`删除失败: ${error?.message || error}`);
+    } catch (error: unknown) {
+      const errMsg = getErrorMessage(error);
+      message.error(`删除失败: ${errMsg}`);
       throw error;
     }
   }, [loadProjectTree]);
@@ -126,8 +142,9 @@ export function useProjects() {
       await RenameFolder(folderPath, newName);
       await loadProjectTree(projectId);
       message.success('文件夹已重命名');
-    } catch (error: any) {
-      message.error(`重命名失败: ${error?.message || error}`);
+    } catch (error: unknown) {
+      const errMsg = getErrorMessage(error);
+      message.error(`重命名失败: ${errMsg}`);
       throw error;
     }
   }, [loadProjectTree]);
@@ -136,8 +153,9 @@ export function useProjects() {
     try {
       await MoveFolder(projectId, folderPath, targetPath);
       await loadProjectTree(projectId);
-    } catch (error: any) {
-      message.error(`移动失败: ${error?.message || error}`);
+    } catch (error: unknown) {
+      const errMsg = getErrorMessage(error);
+      message.error(`移动失败: ${errMsg}`);
       throw error;
     }
   }, [loadProjectTree]);
@@ -146,8 +164,9 @@ export function useProjects() {
     try {
       await MoveRequest(projectId, requestPath, targetPath);
       await loadProjectTree(projectId);
-    } catch (error: any) {
-      message.error(`移动失败: ${error?.message || error}`);
+    } catch (error: unknown) {
+      const errMsg = getErrorMessage(error);
+      message.error(`移动失败: ${errMsg}`);
       throw error;
     }
   }, [loadProjectTree]);
@@ -157,8 +176,9 @@ export function useProjects() {
       await CopyRequest(requestPath);
       await loadProjectTree(projectId);
       message.success('请求已复制');
-    } catch (error: any) {
-      message.error(`复制失败: ${error?.message || error}`);
+    } catch (error: unknown) {
+      const errMsg = getErrorMessage(error);
+      message.error(`复制失败: ${errMsg}`);
       throw error;
     }
   }, [loadProjectTree]);
@@ -168,8 +188,9 @@ export function useProjects() {
       await CreateRequest(projectId, parentPath, name, toWailsHttpSpec(apiConfig));
       await loadProjectTree(projectId);
       message.success('请求已创建');
-    } catch (error: any) {
-      message.error(`创建失败: ${error?.message || error}`);
+    } catch (error: unknown) {
+      const errMsg = getErrorMessage(error);
+      message.error(`创建失败: ${errMsg}`);
       throw error;
     }
   }, [loadProjectTree]);
@@ -188,8 +209,9 @@ export function useProjects() {
       await DeleteRequest(path);
       await loadProjectTree(projectId);
       message.success('请求已删除');
-    } catch (error: any) {
-      message.error(`删除失败: ${error?.message || error}`);
+    } catch (error: unknown) {
+      const errMsg = getErrorMessage(error);
+      message.error(`删除失败: ${errMsg}`);
       throw error;
     }
   }, [loadProjectTree]);
@@ -199,8 +221,9 @@ export function useProjects() {
       await RenameRequest(path, newName);
       await loadProjectTree(projectId);
       message.success('请求已重命名');
-    } catch (error: any) {
-      message.error(`重命名失败: ${error?.message || error}`);
+    } catch (error: unknown) {
+      const errMsg = getErrorMessage(error);
+      message.error(`重命名失败: ${errMsg}`);
       throw error;
     }
   }, [loadProjectTree]);
@@ -210,8 +233,9 @@ export function useProjects() {
       await AddRequestCase(requestPath, name);
       await loadProjectTree(projectId);
       message.success('用例已添加');
-    } catch (error: any) {
-      message.error(`添加失败: ${error?.message || error}`);
+    } catch (error: unknown) {
+      const errMsg = getErrorMessage(error);
+      message.error(`添加失败: ${errMsg}`);
       throw error;
     }
   }, [loadProjectTree]);
@@ -221,8 +245,9 @@ export function useProjects() {
       await DuplicateRequestCase(`request|${projectId}|${requestId}`, caseId);
       await loadProjectTree(projectId);
       message.success('用例已复制');
-    } catch (error: any) {
-      message.error(`复制失败: ${error?.message || error}`);
+    } catch (error: unknown) {
+      const errMsg = getErrorMessage(error);
+      message.error(`复制失败: ${errMsg}`);
       throw error;
     }
   }, [loadProjectTree]);
@@ -232,8 +257,9 @@ export function useProjects() {
       await DeleteRequestCase(`request|${projectId}|${requestId}`, caseId);
       await loadProjectTree(projectId);
       message.success('用例已删除');
-    } catch (error: any) {
-      message.error(`删除失败: ${error?.message || error}`);
+    } catch (error: unknown) {
+      const errMsg = getErrorMessage(error);
+      message.error(`删除失败: ${errMsg}`);
       throw error;
     }
   }, [loadProjectTree]);
@@ -243,8 +269,9 @@ export function useProjects() {
       await RenameRequestCase(`request|${projectId}|${requestId}`, caseId, name);
       await loadProjectTree(projectId);
       message.success('用例已重命名');
-    } catch (error: any) {
-      message.error(`重命名失败: ${error?.message || error}`);
+    } catch (error: unknown) {
+      const errMsg = getErrorMessage(error);
+      message.error(`重命名失败: ${errMsg}`);
       throw error;
     }
   }, [loadProjectTree]);
@@ -258,10 +285,11 @@ export function useProjects() {
   ) => {
     try {
       if (cases.length === 0) {
+        // cases 为空时传入空数组而非 null，符合 API 期望的类型
         await UpdateRequest(
           requestPath,
           toWailsHttpSpec({ ...apiConfig, name: '' }),
-          null as any,
+          [],
           ''
         );
       } else {
@@ -282,8 +310,9 @@ export function useProjects() {
       await UpdateRequestScripts(requestPath, apiConfig.preScripts, apiConfig.postScripts);
       await loadProjectTree(projectId);
       message.success('请求已保存');
-    } catch (error: any) {
-      message.error(`保存失败: ${error?.message || error}`);
+    } catch (error: unknown) {
+      const errMsg = getErrorMessage(error);
+      message.error(`保存失败: ${errMsg}`);
       throw error;
     }
   }, [loadProjectTree]);

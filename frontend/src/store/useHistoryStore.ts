@@ -1,6 +1,22 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 
+interface HistoryEntry {
+  id: string;
+  source: string;
+  source_tool?: string;
+  project_name: string;
+  request_name: string;
+  method: string;
+  url: string;
+  created_at: string;
+  spec?: unknown;
+  response?: {
+    status_code?: number;
+    duration?: number;
+  };
+}
+
 interface HistoryFilters {
   project: string;
   name: string;
@@ -11,18 +27,18 @@ interface HistoryFilters {
 }
 
 interface HistoryStore {
-  historyList: any[];
-  historyDetail: any | null;
+  historyList: HistoryEntry[];
+  historyDetail: HistoryEntry | null;
   historyLoading: boolean;
   filters: HistoryFilters;
 
   // Actions
-  setHistoryList: (list: any[]) => void;
-  setHistoryDetail: (detail: any | null) => void;
+  setHistoryList: (list: HistoryEntry[]) => void;
+  setHistoryDetail: (detail: HistoryEntry | null) => void;
   setHistoryLoading: (loading: boolean) => void;
   setFilter: (field: keyof HistoryFilters, value: string) => void;
   clearFilters: () => void;
-  buildSearchParams: () => any;
+  buildSearchParams: () => Record<string, string | number>;
 }
 
 export const useHistoryStore = create<HistoryStore>()(
@@ -58,7 +74,7 @@ export const useHistoryStore = create<HistoryStore>()(
       }),
       buildSearchParams: () => {
         const { filters } = get();
-        const params: any = {};
+        const params: Record<string, string | number> = {};
         if (filters.project) params.project = filters.project;
         if (filters.name) params.name = filters.name;
         if (filters.url) params.url = filters.url;
