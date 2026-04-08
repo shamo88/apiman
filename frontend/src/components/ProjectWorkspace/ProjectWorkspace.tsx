@@ -4,7 +4,7 @@ import { ApiOutlined, EnvironmentOutlined, FileOutlined, FolderOutlined, PlusOut
 import { javascript } from '@codemirror/lang-javascript';
 import CodeMirror from '@uiw/react-codemirror';
 import { ApiTree } from '../ApiTree';
-import { RequestEditor } from '../RequestEditor';
+import { RequestPanel } from '../RequestPanel';
 import { ResponsePanel } from '../ResponsePanel';
 import { CurlResponse } from '../../types';
 import { Environment, ProjectScript, useEnvironmentStore, useScriptStore, EnvironmentVariableRow } from '../../store';
@@ -553,7 +553,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
           {sidebarMenu === 'apis' ? (
             <>
               <div className="workspace-request">
-                <RequestEditor
+                <RequestPanel
                   apiConfig={workspace.apiConfig}
                   onApiConfigChange={(config) => handleUpdateWorkspace({ apiConfig: config })}
                   executing={executing}

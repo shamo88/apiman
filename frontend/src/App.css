@@ -7,7 +7,7 @@
 @import './components/TitleBar/TitleBar.css';
 @import './components/HomePage/HomePage.css';
 @import './components/ApiTree/ApiTree.css';
-@import './components/RequestEditor/RequestEditor.css';
+@import './components/RequestPanel/RequestPanel.css';
 @import './components/ResponsePanel/ResponsePanel.css';
 @import './components/VariableInput/VariableInput.css';
 @import './components/ProjectWorkspace/ProjectWorkspace.css';

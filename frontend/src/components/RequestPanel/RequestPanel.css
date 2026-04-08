@@ -1,174 +1,16 @@
-.request-editor {
+/* API Request Bar */
+.api-request-bar {
   display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-
-.request-editor-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px;
-  border-bottom: 1px solid var(--border-color, #f0f0f0);
-  background: var(--bg-secondary, #fff);
-}
-
-.method-select {
-  flex-shrink: 0;
-}
-
-.url-input-wrapper {
-  flex: 1;
-  display: flex;
-}
-
-.execute-btn {
-  flex-shrink: 0;
-}
-
-.request-editor-tabs {
-  flex: 1;
-  overflow: hidden;
-}
-
-.request-editor-tabs .ant-tabs-nav {
-  margin-bottom: 0;
-  padding: 0 12px;
-}
-
-.request-editor-tabs .ant-tabs-content {
-  height: calc(100% - 40px);
-}
-
-.request-editor-tabs .ant-tabs-tabpane {
-  height: 100%;
-  overflow-y: auto;
-  padding: 12px;
-}
-
-/* Params & Headers Editor */
-.params-editor,
-.headers-editor {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.kv-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.kv-row .ant-switch {
-  flex-shrink: 0;
-}
-
-/* Body Editor */
-.body-editor {
-  display: flex;
-  flex-direction: column;
   gap: 12px;
+  margin-bottom: 20px;
+  padding: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
 }
 
-.body-type-radio {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.api-request-bar .ant-select {
+  width: 120px !important;
 }
-
-.body-empty-hint {
-  color: var(--text-secondary, #999);
-  text-align: center;
-  padding: 40px;
-}
-
-.body-raw-editor {
-  border: 1px solid var(--border-color, #d9d9d9);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.body-form-data,
-.body-urlencoded {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-/* Scripts Editor */
-.scripts-editor {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.scripts-editor-empty {
-  color: var(--text-secondary, #999);
-  text-align: center;
-  padding: 40px;
-}
-
-.scripts-section h4 {
-  margin: 0 0 4px 0;
-  color: var(--text-primary, #333);
-}
-
-.scripts-hint {
-  margin: 0 0 12px 0;
-  font-size: 12px;
-  color: var(--text-secondary, #999);
-}
-
-.scripts-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-/* Curl Editor */
-.curl-editor {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.curl-toolbar {
-  margin-bottom: 12px;
-}
-
-.curl-content {
-  flex: 1;
-  border: 1px solid var(--border-color, #d9d9d9);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.curl-codemirror {
-  height: 100%;
-}
-
-.curl-codemirror .cm-editor {
-  height: 300px;
-}
-
-/* Dark theme */
-.theme-dark .request-editor-toolbar {
-  background: var(--bg-secondary, #242424);
-  border-color: var(--border-color, #303030);
-}
-
-.theme-dark .body-raw-editor,
-.theme-dark .curl-content {
-  border-color: var(--border-color, #434343);
-}
-
-.theme-dark .scripts-section h4 {
-  color: var(--text-primary, #e8e8e8);
-}
-
-/* Additional RequestEditor styles from App.css */
 
 /* API Config Section */
 .api-config-section {
@@ -234,6 +76,26 @@
   padding: 16px;
 }
 
+/* KV Editor */
+.kv-editor {
+  padding: 0;
+}
+
+.kv-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.kv-row-params .kv-param-enabled {
+  flex-shrink: 0;
+}
+
+.kv-row .ant-input {
+  flex: 1;
+}
+
 /* Body Editor */
 .body-editor {
   padding: 0;
@@ -254,23 +116,17 @@
   padding: 20px 0;
 }
 
-.kv-editor {
-  padding: 0;
+.body-raw-editor {
+  border: 1px solid var(--border-color, #d9d9d9);
+  border-radius: 4px;
+  overflow: hidden;
 }
 
-.kv-row {
+.body-form-data,
+.body-urlencoded {
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  margin-bottom: 8px;
-  align-items: center;
-}
-
-.kv-row-params .kv-param-enabled {
-  flex-shrink: 0;
-}
-
-.kv-row .ant-input {
-  flex: 1;
 }
 
 /* Script Binding Panel */
@@ -287,17 +143,6 @@
 .script-binding-row span {
   font-size: 13px;
   color: var(--text-secondary);
-}
-
-/* Request bar */
-.api-request-bar {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.api-request-bar .ant-select {
-  width: 120px !important;
 }
 
 /* Dark theme - KV editor */
@@ -338,6 +183,11 @@
   background: var(--bg-secondary);
 }
 
+.theme-dark .body-raw-editor,
+.theme-dark .curl-content {
+  border-color: var(--border-color, #434343);
+}
+
 /* Dark theme - Body type selector */
 .theme-dark .body-type-selector .ant-radio-group {
   background: var(--bg-tertiary);
@@ -359,4 +209,10 @@
   background: var(--accent-primary);
   border-color: var(--accent-primary);
   color: #fff;
+}
+
+/* Dark theme - Request bar input */
+.theme-dark .api-request-bar .variable-editable-wrapper .ant-input {
+  background: var(--bg-primary) !important;
+  border-color: var(--border-subtle) !important;
 }
