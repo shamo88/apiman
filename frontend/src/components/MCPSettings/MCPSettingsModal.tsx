@@ -93,6 +93,17 @@ export const MCPSettingsModal: React.FC = () => {
         message.success('已复制到剪贴板');
     };
 
+    const handleCopyAuth = () => {
+        const apiKey = form.getFieldValue('api_key');
+        if (!apiKey) {
+            message.error('请先生成 API 密钥');
+            return;
+        }
+        const authHeader = `Authorization: Bearer ${apiKey}`;
+        navigator.clipboard.writeText(authHeader);
+        message.success('已复制认证头到剪贴板');
+    };
+
     useEffect(() => {
         if (visible && mcpConfig) {
             form.setFieldsValue({
@@ -196,15 +207,23 @@ export const MCPSettingsModal: React.FC = () => {
                     label="API 密钥"
                     extra={
                         <span className="mcp-extra">
-                            AI 客户端认证 Bearer Token
                             <Button
                                 type="link"
                                 size="small"
                                 icon={<CopyOutlined />}
                                 onClick={handleCopyUrl}
-                                style={{ padding: 0, marginLeft: 8 }}
+                                style={{ padding: 0 }}
                             >
                                 复制连接地址
+                            </Button>
+                            <Button
+                                type="link"
+                                size="small"
+                                icon={<CopyOutlined />}
+                                onClick={handleCopyAuth}
+                                style={{ padding: 0, marginLeft: 12 }}
+                            >
+                                复制认证头
                             </Button>
                         </span>
                     }

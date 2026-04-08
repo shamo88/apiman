@@ -19,4 +19,16 @@
 
 .app-footer .mcp-status.running {
   color: #52c41a;
+  background-color: rgba(82, 196, 26, 0.1);
+  border-color: #52c41a;
+}
+
+.app-footer .mcp-status.running:hover {
+  color: #52c41a;
+  background-color: rgba(82, 196, 26, 0.1);
+  border-color: #52c41a;
+}
+
+.app-footer .mcp-status.running .anticon {
+  color: #52c41a;
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, DragEvent } from 'react';
 import { Button, Card, Empty, Input, message, Modal, Spin, Tooltip, Select, Dropdown, Upload, Menu } from 'antd';
 import type { UploadProps, MenuProps } from 'antd';
-import { PlusOutlined, SearchOutlined, FolderOutlined, DeleteOutlined, EditOutlined, HomeOutlined, ImportOutlined, EllipsisOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, ApiOutlined, FolderOutlined, DeleteOutlined, EditOutlined, HomeOutlined, ImportOutlined, EllipsisOutlined } from '@ant-design/icons';
 import { useProjectStore, Project } from '../../store';
 import { useUIStore } from '../../store/useUIStore';
 import { CreateProject, DeleteProject, RenameProject, LoadProjectGroupsState, SaveProjectGroupsState, ListProjects, ImportPostmanCollection } from '../../../wailsjs/go/main/App';
@@ -323,7 +323,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
         <div className="project-card-content">
           <div className="project-card-header">
             <div className="project-card-icon">
-              <FolderOutlined />
+              <ApiOutlined />
             </div>
             <div className="project-card-info">
               <div className="project-card-name">{project.name}</div>

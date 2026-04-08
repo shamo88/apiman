@@ -7,6 +7,7 @@ import {
   StopMCP,
   GetMCPStatus,
 } from '../../wailsjs/go/main/App';
+import { useUIStore } from '../store';
 
 interface MCPConfig {
   enabled: boolean;
@@ -24,7 +25,9 @@ export function useMCP() {
     environment_id: '',
     api_key: '',
   });
-  const [mcpStatus, setMCPStatus] = useState<'stopped' | 'running' | 'error'>('stopped');
+  // 使用 UIStore 共享状态
+  const mcpStatus = useUIStore((state) => state.mcpStatus);
+  const setMcpStatus = useUIStore((state) => state.setMcpStatus);
 
   const loadMCPConfig = useCallback(async () => {
     try {
@@ -41,44 +44,54 @@ export function useMCP() {
     try {
       await SaveMCPConfig(config);
       setMCPConfig(config);
+
+      // 根据 enabled 标志启动或停止 MCP 服务
+      if (config.enabled) {
+        await StartMCP();
+        setMcpStatus('running');
+      } else {
+        await StopMCP();
+        setMcpStatus('stopped');
+      }
+
       message.success('MCP 配置已保存');
     } catch (error: any) {
       message.error(`保存失败: ${error?.message || error}`);
       throw error;
     }
-  }, []);
+  }, [setMcpStatus]);
 
   const startMCP = useCallback(async () => {
     try {
       await StartMCP();
-      setMCPStatus('running');
+      setMcpStatus('running');
       message.success('MCP Server 已启动');
     } catch (error: any) {
-      setMCPStatus('error');
+      setMcpStatus('error');
       message.error(`启动失败: ${error?.message || error}`);
       throw error;
     }
-  }, []);
+  }, [setMcpStatus]);
 
   const stopMCP = useCallback(async () => {
     try {
       await StopMCP();
-      setMCPStatus('stopped');
+      setMcpStatus('stopped');
       message.success('MCP Server 已停止');
     } catch (error: any) {
       message.error(`停止失败: ${error?.message || error}`);
       throw error;
     }
-  }, []);
+  }, [setMcpStatus]);
 
   const loadMCPStatus = useCallback(async () => {
     try {
       const status = await GetMCPStatus();
-      setMCPStatus(status as 'stopped' | 'running' | 'error');
+      setMcpStatus(status as 'stopped' | 'running' | 'error');
     } catch (error) {
       console.error('Failed to get MCP status:', error);
     }
-  }, []);
+  }, [setMcpStatus]);
 
   return {
     mcpConfig,

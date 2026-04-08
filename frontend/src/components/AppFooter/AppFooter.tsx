@@ -2,12 +2,11 @@ import React from 'react';
 import { Button } from 'antd';
 import { SafetyOutlined, ApiOutlined, FileTextOutlined } from '@ant-design/icons';
 import { useUIStore } from '../../store';
-import { useMCP } from '../../hooks';
 import './AppFooter.css';
 
 export const AppFooter: React.FC = () => {
   const uiStore = useUIStore();
-  const { mcpStatus } = useMCP();
+  const mcpStatus = useUIStore((state) => state.mcpStatus);
 
   const handleCookieClick = () => {
     uiStore.setCookieModalVisible(true);

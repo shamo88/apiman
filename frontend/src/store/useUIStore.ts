@@ -48,6 +48,10 @@ interface UIStore {
   animationEnabled: boolean;
   forceListAnimation: boolean;
 
+  // MCP 状态
+  mcpStatus: 'stopped' | 'running' | 'error';
+  setMcpStatus: (status: 'stopped' | 'running' | 'error') => void;
+
   // Actions
   openCreateProjectModal: () => void;
   closeCreateProjectModal: () => void;
@@ -137,6 +141,10 @@ export const useUIStore = create<UIStore>()(
       appTheme: (localStorage.getItem('apiman-theme') as 'light' | 'dark') || 'light',
       animationEnabled: false,
       forceListAnimation: false,
+
+      // MCP 状态
+      mcpStatus: 'stopped',
+      setMcpStatus: (status) => set({ mcpStatus: status }),
 
       // Actions
       openCreateProjectModal: () => set({ createProjectModal: true }),
