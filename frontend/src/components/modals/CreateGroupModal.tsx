@@ -1,34 +1,31 @@
 import React from 'react';
 import { Modal, Input } from 'antd';
 
-interface CreateProjectModalProps {
+interface CreateGroupModalProps {
   open: boolean;
   onClose: () => void;
   onCreate: () => void;
-  projectName: string;
+  groupName: string;
   onNameChange: (name: string) => void;
-  loading?: boolean;
 }
 
-export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
+export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   open,
   onClose,
   onCreate,
-  projectName,
+  groupName,
   onNameChange,
-  loading,
 }) => {
   return (
     <Modal
-      title="新建项目"
+      title="新建分组"
       open={open}
       onCancel={onClose}
       onOk={onCreate}
-      confirmLoading={loading}
     >
       <Input
-        placeholder="项目名称"
-        value={projectName}
+        placeholder="分组名称"
+        value={groupName}
         onChange={(e) => onNameChange(e.target.value)}
         onPressEnter={onCreate}
       />

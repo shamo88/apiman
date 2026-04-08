@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button, Dropdown, Empty, Input, message, Select, Space, Tabs } from 'antd';
+import { Button, Dropdown, Input, message, Select, Space, Tabs } from 'antd';
 import { ApiOutlined, EnvironmentOutlined, FileOutlined, FolderOutlined, PlusOutlined, SearchOutlined, CodeOutlined, QuestionCircleOutlined } from '@ant-design/icons';
-import { javascript } from '@codemirror/lang-javascript';
-import CodeMirror from '@uiw/react-codemirror';
+
 import { ApiTree } from '../ApiTree';
 import { RequestPanel } from '../RequestPanel';
 import { ResponsePanel } from '../ResponsePanel';
+import { EnvironmentEditor } from './EnvironmentEditor';
+import { ScriptEditor } from './ScriptEditor';
 import { CurlResponse } from '../../types';
 import { Environment, ProjectScript, useEnvironmentStore, useScriptStore, EnvironmentVariableRow } from '../../store';
 import { useWorkspace, useWorkspaceHandlers, useEnvironments, useScripts } from '../../hooks';
@@ -219,139 +220,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
   const activeRequestTab = workspace.activeRequestTab || '';
   const activeTab = requestTabs.find(t => t.id === activeRequestTab);
   const activeRequestPath = activeTab?.path || '';
-
-  // Render environment editor
-  const renderEnvironmentEditor = () => (
-    <div className="request-panel">
-      {environmentTabs.length > 0 ? (
-        <>
-          <Tabs
-            activeKey={activeEnvironmentTab}
-            onChange={(key) => setActiveEnvironmentTab(key)}
-            type="editable-card"
-            hideAdd
-            onEdit={(targetKey, action) => {
-              if (action === 'remove') {
-                handleCloseEnvironmentTab(targetKey as string);
-              }
-            }}
-            items={environmentTabs.map(tab => ({
-              key: tab.key,
-              label: tab.title,
-            }))}
-            size="small"
-            style={{ marginBottom: 12 }}
-          />
-          <div className="environment-panel">
-            <Input
-              placeholder="环境名称"
-              value={environmentFormName}
-              onChange={(e) => setEnvironmentFormName(e.target.value)}
-              style={{ marginBottom: 10 }}
-            />
-            <div className="environment-vars-header">
-              <span>变量</span>
-              <Button
-                size="small"
-                type="link"
-                icon={<PlusOutlined />}
-                onClick={() => setEnvironmentFormVariables([...environmentFormVariables, { id: `${Date.now()}`, key: '', value: '' } as EnvironmentVariableRow])}
-              >
-                添加
-              </Button>
-            </div>
-            <div className="environment-vars-list">
-              {environmentFormVariables.map((item) => (
-                <div className="environment-var-row" key={item.id}>
-                  <Input
-                    placeholder="变量名"
-                    value={item.key}
-                    onChange={(e) => {
-                      setEnvironmentFormVariables(environmentFormVariables.map((row) => row.id === item.id ? { ...row, key: e.target.value } : row));
-                    }}
-                  />
-                  <Input
-                    placeholder="变量值"
-                    value={item.value}
-                    onChange={(e) => {
-                      setEnvironmentFormVariables(environmentFormVariables.map((row) => row.id === item.id ? { ...row, value: e.target.value } : row));
-                    }}
-                  />
-                  <Button
-                    type="text"
-                    danger
-                    onClick={() => {
-                      const next = environmentFormVariables.filter((row) => row.id !== item.id);
-                      setEnvironmentFormVariables(next.length > 0 ? next : [{ id: `${Date.now()}`, key: '', value: '' } as EnvironmentVariableRow]);
-                    }}
-                  >
-                    ×
-                  </Button>
-                </div>
-              ))}
-            </div>
-            <Space style={{ width: '100%', justifyContent: 'space-between', marginTop: 12 }}>
-              <Button onClick={resetEnvironmentEditor}>清空</Button>
-              <Space>
-                {editingEnvironmentId && (
-                  <Button danger onClick={handleDeleteEnvironment}>删除</Button>
-                )}
-                <Button type="primary" onClick={handleSaveEnvironment}>保存</Button>
-              </Space>
-            </Space>
-          </div>
-        </>
-      ) : (
-        <Empty description="请先在左侧选择环境，或点击新建" />
-      )}
-    </div>
-  );
-
-  // Render script editor
-  const renderScriptEditor = () => {
-    const appTheme = document.body.classList.contains('theme-dark') ? 'dark' : 'light';
-
-    return (
-      <div className="request-panel">
-        {editingScriptId || scriptFormName ? (
-          <div className="environment-panel script-panel">
-            <div className="script-editor-header">
-              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                <Input
-                  placeholder="脚本名称"
-                  value={scriptFormName}
-                  onChange={(e) => setScriptFormName(e.target.value)}
-                  style={{ maxWidth: 200 }}
-                />
-                <Input.TextArea
-                  placeholder="描述（可选）"
-                  value={scriptFormDescription}
-                  onChange={(e) => setScriptFormDescription(e.target.value)}
-                  style={{ maxWidth: 300, minWidth: 200, minHeight: 60, maxHeight: 120 }}
-                  autoSize={{ minRows: 2, maxRows: 4 }}
-                />
-              </div>
-              <Space>
-                <Button danger onClick={handleDeleteScript}>删除</Button>
-                <Button type="primary" onClick={handleSaveScript}>保存脚本</Button>
-              </Space>
-            </div>
-            <div className="script-editor-wrapper">
-              <CodeMirror
-                value={scriptFormContent}
-                height="100%"
-                theme={appTheme}
-                extensions={[javascript()]}
-                onChange={(value) => setScriptFormContent(value)}
-              />
-            </div>
-          </div>
-        ) : (
-          <Empty description="请先在左侧选择脚本，或点击新建" />
-        )}
-      </div>
-    );
-  };
 
   return (
     <div className="project-workspace">
@@ -577,9 +445,13 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
               </div>
             </>
           ) : sidebarMenu === 'environments' ? (
-            renderEnvironmentEditor()
+            <EnvironmentEditor
+              onSave={handleSaveEnvironment}
+              onDelete={handleDeleteEnvironment}
+              onCloseTab={handleCloseEnvironmentTab}
+            />
           ) : (
-            renderScriptEditor()
+            <ScriptEditor />
           )}
         </div>
       </div>

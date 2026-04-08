@@ -419,10 +419,10 @@ go 1.24.0      # go.mod 要求 1.24.0
 | HTTP 超时硬编码 | `curl.go`, `exec_http.go`, `config.go` | 添加 HTTPConfig，30秒超时可配置 |
 | 日志系统配置化 | `logger.go`, `config.go` | 添加 LogConfig (MaxSizeMB, MaxBackups, Compress) |
 | App.css 过于庞大 | `App.css`, `styles/*.css` | 拆分为 theme/global/antd-overrides/theme-dark 4个文件 |
+| 巨型组件拆分 | `HomePage.tsx`, `ProjectWorkspace.tsx` | 提取 ProjectCard, ProjectGroup, 4个Modal, EnvironmentEditor, ScriptEditor 组件 |
 
 ### ⚠️ 待修复
 
 | 问题 | 优先级 | 说明 |
 |------|--------|------|
-| 巨型组件 (500+ 行) | P2 | ProjectWorkspace/HomePage 需要较大重构，建议按阶段拆分 |
 | 缺少单元测试 | P3 | 建议为关键模块（curl, script, project）添加测试 |

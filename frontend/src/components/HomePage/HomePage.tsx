@@ -1,10 +1,16 @@
 import React, { useState, useEffect, DragEvent } from 'react';
-import { Button, Card, Empty, Input, message, Modal, Spin, Tooltip, Select, Dropdown, Upload, Menu } from 'antd';
-import type { UploadProps, MenuProps } from 'antd';
-import { PlusOutlined, SearchOutlined, ApiOutlined, FolderOutlined, DeleteOutlined, EditOutlined, HomeOutlined, ImportOutlined, EllipsisOutlined } from '@ant-design/icons';
+import { Button, Empty, Input, message, Modal, Spin, Tooltip, Upload, Menu } from 'antd';
+import type { UploadProps } from 'antd';
+import { PlusOutlined, SearchOutlined, FolderOutlined, DeleteOutlined, EditOutlined, HomeOutlined, ImportOutlined } from '@ant-design/icons';
 import { useProjectStore, Project } from '../../store';
 import { useUIStore } from '../../store/useUIStore';
 import { CreateProject, DeleteProject, RenameProject, LoadProjectGroupsState, SaveProjectGroupsState, ListProjects, ImportPostmanCollection } from '../../../wailsjs/go/main/App';
+import { ProjectCard } from './ProjectCard';
+import { ProjectGroup } from './ProjectGroup';
+import { CreateProjectModal } from '../modals/CreateProjectModal';
+import { CreateGroupModal } from '../modals/CreateGroupModal';
+import { RenameProjectModal } from '../modals/RenameProjectModal';
+import { RenameGroupModal } from '../modals/RenameGroupModal';
 import './HomePage.css';
 
 interface HomePageProps {
@@ -284,129 +290,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
   const groupedProjects = (groupName: string) =>
     filteredProjects.filter((p) => projectGroupAssignments[p.id] === groupName);
 
-  const renderProjectCard = (project: Project) => {
-    const currentGroup = projectGroupAssignments[project.id];
-    const groupOptions = projectGroups.map(g => ({ label: g, value: g }));
-
-    const actionMenu: MenuProps['items'] = [
-      {
-        key: 'rename',
-        label: '重命名',
-        icon: <EditOutlined />,
-        onClick: (e) => {
-          e.domEvent.stopPropagation();
-          setRenameProject({ id: project.id, name: project.name });
-          setRenameModal(true);
-        },
-      },
-      {
-        key: 'delete',
-        label: '删除',
-        icon: <DeleteOutlined />,
-        danger: true,
-        onClick: (e) => {
-          e.domEvent.stopPropagation();
-          handleDeleteProject(project.id);
-        },
-      },
-    ];
-
-    return (
-      <Card
-        key={project.id}
-        className="project-card"
-        size="small"
-        draggable
-        onClick={() => onProjectOpen(project)}
-        onDragStart={(e) => handleDragStart(e, project.id)}
-      >
-        <div className="project-card-content">
-          <div className="project-card-header">
-            <div className="project-card-icon">
-              <ApiOutlined />
-            </div>
-            <div className="project-card-info">
-              <div className="project-card-name">{project.name}</div>
-            </div>
-            <div className="project-card-actions" onClick={(e) => e.stopPropagation()}>
-              <Dropdown menu={{ items: actionMenu }} trigger={['click']} placement="bottomRight">
-                <Button
-                  type="text"
-                  size="small"
-                  className="action-btn"
-                  icon={<EllipsisOutlined />}
-                />
-              </Dropdown>
-            </div>
-          </div>
-          <div className="project-card-group" onClick={(e) => e.stopPropagation()}>
-            <Select
-              size="small"
-              placeholder="选择分组"
-              value={currentGroup}
-              options={groupOptions}
-              onChange={(value) => handleAssignGroup(project.id, value)}
-              style={{ width: '100%' }}
-              allowClear
-              onClear={() => handleRemoveFromGroup(project.id)}
-            />
-          </div>
-        </div>
-      </Card>
-    );
-  };
-
-  const renderGroup = (groupName: string) => {
-    const isCollapsed = collapsedProjectGroups.has(groupName);
-    const projectsInGroup = groupedProjects(groupName);
-    const isDragOver = dragOverGroup === groupName;
-
-    return (
-      <div key={groupName} className="project-group">
-        <div
-          className="project-group-header"
-          onClick={() => toggleProjectGroupCollapse(groupName)}
-        >
-          <span className={`group-toggle ${isCollapsed ? 'collapsed' : ''}`}>
-            {isCollapsed ? '▶' : '▼'}
-          </span>
-          <span className="group-name">{groupName}</span>
-          <span className="group-count">({projectsInGroup.length})</span>
-          <div className="group-actions" onClick={(e) => e.stopPropagation()}>
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => openRenameGroupModal(groupName)}
-            />
-            <Button
-              type="text"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => handleDeleteGroup(groupName)}
-            />
-          </div>
-        </div>
-        {!isCollapsed && (
-          <div
-            className={`project-group-content ${isDragOver ? 'drag-over' : ''}`}
-            onDragOver={(e) => handleDragOver(e, groupName)}
-            onDragLeave={handleDragLeave}
-            onDrop={(e) => handleDrop(e, groupName)}
-          >
-            {projectsInGroup.length === 0 ? (
-              <div className="project-group-empty-drop-zone">
-                拖动项目到此处
-              </div>
-            ) : ""}
-            {projectsInGroup.map(renderProjectCard)}
-          </div>
-        )}
-      </div>
-    );
-  };
-
   return (
     <div className="home-page">
       <div className="home-header">
@@ -454,7 +337,28 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
           </Empty>
         ) : (
           <>
-            {projectGroups.map(renderGroup)}
+            {projectGroups.map((groupName) => (
+            <ProjectGroup
+              key={groupName}
+              groupName={groupName}
+              isCollapsed={collapsedProjectGroups.has(groupName)}
+              projectsInGroup={groupedProjects(groupName)}
+              isDragOver={dragOverGroup === groupName}
+              onToggleCollapse={() => toggleProjectGroupCollapse(groupName)}
+              onOpenRenameModal={() => openRenameGroupModal(groupName)}
+              onDeleteGroup={() => handleDeleteGroup(groupName)}
+              onDragOver={(e) => handleDragOver(e, groupName)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, groupName)}
+              onProjectOpen={onProjectOpen}
+              setRenameProject={setRenameProject}
+              setRenameModal={setRenameModal}
+              handleDeleteProject={handleDeleteProject}
+              handleDragStart={handleDragStart}
+              handleAssignGroup={handleAssignGroup}
+              handleRemoveFromGroup={handleRemoveFromGroup}
+            />
+          ))}
             {ungroupedProjects.length > 0 && (
               <div className="project-group">
                 <div
@@ -479,7 +383,19 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
                         拖动项目到此处
                       </div>
                     ) : (
-                      ungroupedProjects.map(renderProjectCard)
+                      ungroupedProjects.map((project) => (
+                        <ProjectCard
+                          key={project.id}
+                          project={project}
+                          onProjectOpen={onProjectOpen}
+                          setRenameProject={setRenameProject}
+                          setRenameModal={setRenameModal}
+                          handleDeleteProject={handleDeleteProject}
+                          handleDragStart={handleDragStart}
+                          handleAssignGroup={handleAssignGroup}
+                          handleRemoveFromGroup={handleRemoveFromGroup}
+                        />
+                      ))
                     )}
                   </div>
                 )}
@@ -489,80 +405,48 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
         )}
       </div>
 
-      {/* Create Project Modal */}
-      <Modal
-        title="新建项目"
+      <CreateProjectModal
         open={createProjectModal}
-        onCancel={closeCreateProjectModal}
-        onOk={handleCreateProject}
-        confirmLoading={localLoading}
-      >
-        <Input
-          placeholder="项目名称"
-          value={newProjectName}
-          onChange={(e) => setNewProjectName(e.target.value)}
-          onPressEnter={handleCreateProject}
-        />
-      </Modal>
+        onClose={closeCreateProjectModal}
+        onCreate={handleCreateProject}
+        projectName={newProjectName}
+        onNameChange={setNewProjectName}
+        loading={localLoading}
+      />
 
-      {/* Create Group Modal */}
-      <Modal
-        title="新建分组"
+      <CreateGroupModal
         open={createGroupModal}
-        onCancel={() => {
+        onClose={() => {
           setCreateGroupModal(false);
           setNewGroupName('');
         }}
-        onOk={handleCreateGroup}
-      >
-        <Input
-          placeholder="分组名称"
-          value={newGroupName}
-          onChange={(e) => setNewGroupName(e.target.value)}
-          onPressEnter={handleCreateGroup}
-        />
-      </Modal>
+        onCreate={handleCreateGroup}
+        groupName={newGroupName}
+        onNameChange={setNewGroupName}
+      />
 
-      {/* Rename Project Modal */}
-      <Modal
-        title="重命名项目"
+      <RenameProjectModal
         open={renameModal}
-        onCancel={() => {
+        onClose={() => {
           setRenameModal(false);
           setRenameProject(null);
         }}
-        onOk={handleRenameProject}
-      >
-        {renameProject && (
-          <Input
-            placeholder="项目名称"
-            value={renameProject.name}
-            onChange={(e) =>
-              setRenameProject({ ...renameProject, name: e.target.value })
-            }
-            onPressEnter={handleRenameProject}
-          />
-        )}
-      </Modal>
+        onRename={handleRenameProject}
+        project={renameProject}
+        onNameChange={setRenameProject}
+      />
 
-      {/* Rename Group Modal */}
-      <Modal
-        title="重命名分组"
+      <RenameGroupModal
         open={renameGroupModal}
-        onCancel={() => {
+        onClose={() => {
           setRenameGroupModal(false);
           setEditingGroupName('');
           setRenameGroupValue('');
         }}
-        onOk={handleRenameGroup}
-      >
-        <Input
-          placeholder="分组名称"
-          value={renameGroupValue}
-          onChange={(e) => setRenameGroupValue(e.target.value)}
-          onPressEnter={handleRenameGroup}
-        />
-      </Modal>
+        onRename={handleRenameGroup}
+        groupName={renameGroupValue}
+        onNameChange={setRenameGroupValue}
+      />
     </div>
   );
 };

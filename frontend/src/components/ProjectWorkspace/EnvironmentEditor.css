@@ -1,0 +1,40 @@
+/* EnvironmentEditor styles - extracted from ProjectWorkspace.css */
+.environment-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.environment-vars-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  padding: 0 4px;
+}
+
+.environment-vars-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.environment-var-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  transition: background 0.15s ease;
+}
+
+.environment-var-row:hover {
+  background: var(--bg-hover);
+}
+
+.environment-var-row .ant-input {
+  background: var(--bg-card);
+}
