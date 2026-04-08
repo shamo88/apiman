@@ -156,7 +156,7 @@ export const useUIStore = create<UIStore>()(
       sidebarWidth: parseInt(localStorage.getItem('apiman-sidebar-width') || '280', 10),
 
       // 主题/动画
-      appTheme: (localStorage.getItem('apiman-theme') as 'light' | 'dark') || 'light',
+      appTheme: 'light' as 'light' | 'dark',
       animationEnabled: false,
       forceListAnimation: false,
 
@@ -182,10 +182,7 @@ export const useUIStore = create<UIStore>()(
         dropTargetFolderPath: null,
         invalidDropHint: null,
       }),
-      setAppTheme: (theme) => {
-        localStorage.setItem('apiman-theme', theme);
-        set({ appTheme: theme });
-      },
+      setAppTheme: (theme) => set({ appTheme: theme }),
       setAnimationEnabled: (enabled) => set({ animationEnabled: enabled }),
       setForceListAnimation: (force) => set({ forceListAnimation: force }),
       setSidebarMenu: (menu) => set({ sidebarMenu: menu }),

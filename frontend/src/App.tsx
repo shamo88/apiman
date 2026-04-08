@@ -45,6 +45,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    // 初始化主题：优先从 config 读取，否则从 localStorage 读取
     const init = async () => {
       projectStore.setLoading(true);
       try {
@@ -53,6 +54,9 @@ const App: React.FC = () => {
         if (config?.ui?.theme) {
           uiStore.setAppTheme(config.ui.theme as 'light' | 'dark');
         }
+        // 同步到 HTML 根元素
+        const theme = config?.ui?.theme || localStorage.getItem('apiman-theme') || 'light';
+        document.documentElement.classList.toggle('theme-dark', theme === 'dark');
       } catch (error) {
         console.error('Failed to initialize:', error);
       } finally {
@@ -61,6 +65,11 @@ const App: React.FC = () => {
     };
     init();
   }, []);
+
+  // 监听主题变化，同步到 HTML 根元素（防止 Ant Design 等组件样式失效）
+  useEffect(() => {
+    document.documentElement.classList.toggle('theme-dark', uiStore.appTheme === 'dark');
+  }, [uiStore.appTheme]);
 
   const getShortcutMessage = () => {
     switch (activeShortcut) {
