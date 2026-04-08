@@ -15,10 +15,14 @@ type App struct {
 	service *service.Service
 }
 
-func NewApp() *App {
-	return &App{
-		service: service.NewService(),
+func NewApp() (*App, error) {
+	svc, err := service.NewService()
+	if err != nil {
+		return nil, err
 	}
+	return &App{
+		service: svc,
+	}, nil
 }
 
 func (a *App) startup(ctx context.Context) {
@@ -375,4 +379,3 @@ func (a *App) DeleteHistory(id string) error {
 func (a *App) ClearHistory() error {
 	return a.service.ClearHistory()
 }
-

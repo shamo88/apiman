@@ -6,7 +6,14 @@ export default defineConfig({
   plugins: [react()],
   server: {
     watch: {
-      ignored: ['**/wailsjs/**']
+      ignored: ['**/wailsjs/**'],
+      usePolling: true
+    },
+    hmr: {
+      overlay: false
     }
+  },
+  build: {
+    chunkSizeWarningLimit: 2000
   }
 })

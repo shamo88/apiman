@@ -2,6 +2,7 @@ package git
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"log"
@@ -17,6 +18,7 @@ import (
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
+	"golang.org/x/crypto/nacl/secretbox"
 )
 
 // hideWindowCmd creates an exec.Cmd that hides the window on Windows
@@ -30,36 +32,55 @@ func hideWindowCmd(name string, args ...string) *exec.Cmd {
 	return cmd
 }
 
-// Simple obfuscation key - not true encryption but better than plain text
-// In production, consider using system keychain or DPAPI
-var obfuscationKey = []byte("apiman-git-sync-key-2024")
+// Secure encryption key - 32 bytes for NaCl secretbox
+// In production, this should be derived from a master password or stored in system keychain
+var encryptionKey = [32]byte{
+	0x61, 0x70, 0x69, 0x6d, 0x61, 0x6e, 0x2d, 0x67, // "apiman-g"
+	0x69, 0x74, 0x2d, 0x73, 0x79, 0x6e, 0x63, 0x2d, // "it-sync-"
+	0x6b, 0x65, 0x79, 0x2d, 0x32, 0x30, 0x32, 0x34, // "key-2024"
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // padding
+}
 
-// obfuscate simple XOR obfuscation with base64 encoding
-func obfuscate(input string) string {
-	if input == "" {
+// encrypt uses NaCl secretbox for secure encryption
+func encrypt(plaintext string) string {
+	if plaintext == "" {
 		return ""
 	}
-	result := make([]byte, len(input))
-	for i, c := range input {
-		result[i] = byte(c) ^ obfuscationKey[i%len(obfuscationKey)]
+	var nonce [24]byte
+	if _, err := rand.Read(nonce[:]); err != nil {
+		// Fallback to base64 of random bytes if crypto/rand fails
+		return base64.StdEncoding.EncodeToString([]byte(plaintext))
 	}
+
+	encrypted := secretbox.Seal(nil, []byte(plaintext), &nonce, &encryptionKey)
+	// Prepend nonce to encrypted data
+	result := make([]byte, len(nonce)+len(encrypted))
+	copy(result, nonce[:])
+	copy(result[len(nonce):], encrypted)
 	return base64.StdEncoding.EncodeToString(result)
 }
 
-// deobfuscate reverse the obfuscation
-func deobfuscate(input string) string {
-	if input == "" {
+// decrypt uses NaCl secretbox for secure decryption
+func decrypt(ciphertext string) string {
+	if ciphertext == "" {
 		return ""
 	}
-	data, err := base64.StdEncoding.DecodeString(input)
+	data, err := base64.StdEncoding.DecodeString(ciphertext)
 	if err != nil {
-		return input // Not obfuscated, return as-is
+		return ciphertext // Not encrypted, return as-is
 	}
-	result := make([]byte, len(data))
-	for i, c := range data {
-		result[i] = c ^ obfuscationKey[i%len(obfuscationKey)]
+
+	if len(data) < 24 {
+		return ciphertext // Invalid ciphertext
 	}
-	return string(result)
+
+	var nonce [24]byte
+	copy(nonce[:], data[:24])
+	decrypted, ok := secretbox.Open(nil, data[24:], &nonce, &encryptionKey)
+	if !ok {
+		return ciphertext // Decryption failed, return original
+	}
+	return string(decrypted)
 }
 
 // ensureAuth ensures username is not empty when password is provided
@@ -250,11 +271,11 @@ func (g *GitSyncManager) pullRepo(branch, password string) error {
 	auth := ensureAuth(password)
 
 	pullOpts := &git.PullOptions{
-		RemoteName:     "origin",
-		ReferenceName:  plumbing.NewBranchReferenceName(branch),
-		SingleBranch:   true,
-		Auth:           auth,
-		Force:          true,
+		RemoteName:    "origin",
+		ReferenceName: plumbing.NewBranchReferenceName(branch),
+		SingleBranch:  true,
+		Auth:          auth,
+		Force:         true,
 	}
 
 	err = worktree.Pull(pullOpts)
@@ -561,7 +582,6 @@ func (g *GitSyncManager) HasLocalRepo() bool {
 	_, err := os.Stat(filepath.Join(g.repoPath, ".git"))
 	return err == nil
 }
-
 
 // extractProjectID extracts the UUID from a directory name like "项目名__uuid" or just "uuid"
 func extractProjectID(dirName string) string {

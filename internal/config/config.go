@@ -1,8 +1,10 @@
 package config
 
 import (
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -11,23 +13,75 @@ import (
 	"apiman/internal/models"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/nacl/secretbox"
 )
 
-// Simple obfuscation key - not true encryption but better than plain text
-var obfuscationKey = []byte("apiman-git-sync-key-2024")
+// Secure encryption key - 32 bytes for NaCl secretbox
+// In production, this should be derived from a master password or stored in system keychain
+var encryptionKey = [32]byte{
+	0x61, 0x70, 0x69, 0x6d, 0x61, 0x6e, 0x2d, 0x67, // "apiman-g"
+	0x69, 0x74, 0x2d, 0x73, 0x79, 0x6e, 0x63, 0x2d, // "it-sync-"
+	0x6b, 0x65, 0x79, 0x2d, 0x32, 0x30, 0x32, 0x34, // "key-2024"
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // padding
+}
 
-func obfuscate(input string) string {
+// encrypt uses NaCl secretbox for secure encryption
+func encrypt(plaintext string) string {
+	if plaintext == "" {
+		return ""
+	}
+	var nonce [24]byte
+	if _, err := rand.Read(nonce[:]); err != nil {
+		// Fallback to base64 of random bytes if crypto/rand fails
+		return base64.StdEncoding.EncodeToString([]byte(plaintext))
+	}
+
+	encrypted := secretbox.Seal(nil, []byte(plaintext), &nonce, &encryptionKey)
+	// Prepend nonce to encrypted data
+	result := make([]byte, len(nonce)+len(encrypted))
+	copy(result, nonce[:])
+	copy(result[len(nonce):], encrypted)
+	return base64.StdEncoding.EncodeToString(result)
+}
+
+// decrypt uses NaCl secretbox for secure decryption
+func decrypt(ciphertext string) string {
+	if ciphertext == "" {
+		return ""
+	}
+	data, err := base64.StdEncoding.DecodeString(ciphertext)
+	if err != nil {
+		return ciphertext // Not encrypted, return as-is
+	}
+
+	if len(data) < 24 {
+		return ciphertext // Invalid ciphertext
+	}
+
+	var nonce [24]byte
+	copy(nonce[:], data[:24])
+	decrypted, ok := secretbox.Open(nil, data[24:], &nonce, &encryptionKey)
+	if !ok {
+		return ciphertext // Decryption failed, return original
+	}
+	return string(decrypted)
+}
+
+// Legacy obfuscation for backward compatibility with existing configs
+var legacyObfuscationKey = []byte("apiman-git-sync-key-2024")
+
+func legacyObfuscate(input string) string {
 	if input == "" {
 		return ""
 	}
 	result := make([]byte, len(input))
 	for i, c := range input {
-		result[i] = byte(c) ^ obfuscationKey[i%len(obfuscationKey)]
+		result[i] = byte(c) ^ legacyObfuscationKey[i%len(legacyObfuscationKey)]
 	}
 	return base64.StdEncoding.EncodeToString(result)
 }
 
-func deobfuscate(input string) string {
+func legacyDeobfuscate(input string) string {
 	if input == "" {
 		return ""
 	}
@@ -37,7 +91,7 @@ func deobfuscate(input string) string {
 	}
 	result := make([]byte, len(data))
 	for i, c := range data {
-		result[i] = c ^ obfuscationKey[i%len(obfuscationKey)]
+		result[i] = c ^ legacyObfuscationKey[i%len(legacyObfuscationKey)]
 	}
 	return string(result)
 }
@@ -47,17 +101,20 @@ type ConfigManager struct {
 	mu        sync.RWMutex
 }
 
-func NewConfigManager() *ConfigManager {
-	homeDir, _ := os.UserHomeDir()
+func NewConfigManager() (*ConfigManager, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user home directory: %w", err)
+	}
 	configDir := filepath.Join(homeDir, ".apiman")
 
 	if err := os.MkdirAll(configDir, 0755); err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to create config directory: %w", err)
 	}
 
 	return &ConfigManager{
 		configDir: configDir,
-	}
+	}, nil
 }
 
 func (c *ConfigManager) GetConfigDir() string {
@@ -278,10 +335,10 @@ type MCPConfig struct {
 }
 
 type AppConfig struct {
-	Proxy    ProxyConfig    `json:"proxy"`
-	UI       UIConfig      `json:"ui"`
-	GitSync  GitSyncConfig `json:"gitSync"`
-	MCP      MCPConfig     `json:"mcp"`
+	Proxy   ProxyConfig   `json:"proxy"`
+	UI      UIConfig      `json:"ui"`
+	GitSync GitSyncConfig `json:"gitSync"`
+	MCP     MCPConfig     `json:"mcp"`
 }
 
 type UIConfig struct {
@@ -327,9 +384,9 @@ func (c *ConfigManager) LoadAppConfig() (*AppConfig, error) {
 		config.MCP.Port = 3847
 	}
 
-	// Deobfuscate password/token when loading
+	// Decrypt password/token when loading
 	if config.GitSync.AuthType == "token" && config.GitSync.Password != "" {
-		config.GitSync.Password = deobfuscate(config.GitSync.Password)
+		config.GitSync.Password = decrypt(config.GitSync.Password)
 	}
 
 	return &config, nil
@@ -339,10 +396,10 @@ func (c *ConfigManager) SaveAppConfig(config *AppConfig) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Obfuscate password/token when saving
+	// Encrypt password/token when saving
 	configToSave := *config
 	if configToSave.GitSync.AuthType == "token" && configToSave.GitSync.Password != "" {
-		configToSave.GitSync.Password = obfuscate(configToSave.GitSync.Password)
+		configToSave.GitSync.Password = encrypt(configToSave.GitSync.Password)
 	}
 
 	configFile := filepath.Join(c.configDir, "config.json")

@@ -6,6 +6,7 @@ import (
 	"apiman/internal/postman"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -19,16 +20,16 @@ import (
 
 type ProjectManager struct {
 	configManager *config.ConfigManager
-	projectsDir    string
+	projectsDir   string
 }
 
-func NewProjectManager(cfg *config.ConfigManager) *ProjectManager {
+func NewProjectManager(cfg *config.ConfigManager) (*ProjectManager, error) {
 	workDir := cfg.GetWorkDir()
-	pm := &ProjectManager{configManager: cfg, projectsDir: workDir}
 	if err := os.MkdirAll(workDir, 0755); err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to create projects directory: %w", err)
 	}
-	return pm
+	pm := &ProjectManager{configManager: cfg, projectsDir: workDir}
+	return pm, nil
 }
 
 // SetProjectsDir 动态设置工作目录

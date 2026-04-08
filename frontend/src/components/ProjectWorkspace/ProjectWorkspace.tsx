@@ -569,10 +569,10 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
                   formattedResponse={formattedResponse}
                   scriptLogs={scriptLogs}
                   testResults={testResults}
-                  scriptLogsExpanded={true}
-                  testResultsExpanded={true}
-                  onToggleScriptLogs={() => {}}
-                  onToggleTestResults={() => {}}
+                  scriptLogsExpanded={workspaceStore.scriptLogsExpanded}
+                  testResultsExpanded={workspaceStore.testResultsExpanded}
+                  onToggleScriptLogs={() => workspaceStore.setScriptLogsExpanded(!workspaceStore.scriptLogsExpanded)}
+                  onToggleTestResults={() => workspaceStore.setTestResultsExpanded(!workspaceStore.testResultsExpanded)}
                 />
               </div>
             </>

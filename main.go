@@ -16,7 +16,11 @@ import (
 var assets embed.FS
 
 func main() {
-	app := NewApp()
+	app, err := NewApp()
+	if err != nil {
+		println("Failed to create app:", err.Error())
+		return
+	}
 
 	// Initialize logger
 	if err := logger.Init(app.service.ConfigManager.GetConfigDir()); err != nil {

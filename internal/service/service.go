@@ -17,20 +17,26 @@ import (
 )
 
 type Service struct {
-	ConfigManager       *config.ConfigManager
-	ProjectMgr          *project.ProjectManager
-	CurlExecutor        *curl.CurlExecutor
-	PostmanImporter     *postman.PostmanImporter
-	ScriptableExecutor  *curl.ScriptableExecutor
-	GlobalVarStore      *script.GlobalVariableStore
-	GitSyncMgr          *git.GitSyncManager
-	HistoryMgr          *history.HistoryManager
-	gitSyncMu           sync.Mutex // 防止并发 Git 操作
+	ConfigManager      *config.ConfigManager
+	ProjectMgr         *project.ProjectManager
+	CurlExecutor       *curl.CurlExecutor
+	PostmanImporter    *postman.PostmanImporter
+	ScriptableExecutor *curl.ScriptableExecutor
+	GlobalVarStore     *script.GlobalVariableStore
+	GitSyncMgr         *git.GitSyncManager
+	HistoryMgr         *history.HistoryManager
+	gitSyncMu          sync.Mutex // 防止并发 Git 操作
 }
 
-func NewService() *Service {
-	cfgMgr := config.NewConfigManager()
-	projectMgr := project.NewProjectManager(cfgMgr)
+func NewService() (*Service, error) {
+	cfgMgr, err := config.NewConfigManager()
+	if err != nil {
+		return nil, err
+	}
+	projectMgr, err := project.NewProjectManager(cfgMgr)
+	if err != nil {
+		return nil, err
+	}
 	curlExec := curl.NewCurlExecutor()
 	postmanImp := postman.NewPostmanImporter(cfgMgr)
 	scriptExec := curl.NewScriptableExecutor()
@@ -49,7 +55,7 @@ func NewService() *Service {
 		GlobalVarStore:     globalVarStore,
 		GitSyncMgr:         gitSyncMgr,
 		HistoryMgr:         historyMgr,
-	}
+	}, nil
 }
 
 func (s *Service) GetConfigDir() string {
