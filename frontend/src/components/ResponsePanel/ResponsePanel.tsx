@@ -1,8 +1,6 @@
-import React, { useMemo } from 'react';
-import { Tabs, Empty, Spin } from 'antd';
-import { JsonView, darkStyles } from 'react-json-view-lite';
-import 'react-json-view-lite/dist/index.css';
-import { ResponseHeaders } from './ResponseHeaders';
+import React, { useState } from 'react';
+import { Tabs, Empty } from 'antd';
+import { ResponseBodyViewer, ResponseCookies, ResponseHeaders, ResponseStatus } from './index';
 import { CurlResponse } from '../../types';
 import './ResponsePanel.css';
 
@@ -27,145 +25,181 @@ export const ResponsePanel: React.FC<ResponsePanelProps> = ({
   testResultsExpanded,
   onToggleScriptLogs,
   onToggleTestResults,
-  loading,
 }) => {
-  const [activeTab, setActiveTab] = React.useState('body');
+  const [responseBodyHeight] = useState(300);
+  const [scriptResultsHeight] = useState(200);
+  const appTheme = document.body.classList.contains('theme-dark') ? 'dark' : 'light';
 
-  const jsonData = useMemo(() => {
-    if (!formattedResponse) return null;
-    try {
-      return JSON.parse(formattedResponse);
-    } catch {
-      return null;
+  // Parse workflow items from logs
+  const parseWorkflowItems = () => {
+    const workflowItems: { name: string; type: 'pre' | 'post' | 'http'; status: 'running' | 'success' | 'failed' }[] = [];
+    const logs = response?.script_logs || [];
+    let currentScript = '';
+    let currentType: 'pre' | 'post' | 'http' = 'pre';
+    let currentStatus: 'running' | 'success' | 'failed' = 'running';
+
+    for (const log of logs) {
+      const startMatch = log.match(/\[([^\]]+)\] ▶ START/);
+      if (startMatch) {
+        currentScript = startMatch[1];
+        currentType = currentScript.toLowerCase().includes('pre') ? 'pre' : 'post';
+        currentStatus = 'running';
+        workflowItems.push({ name: currentScript, type: currentType, status: currentStatus });
+        continue;
+      }
+      const successMatch = log.match(/\[([^\]]+)\] ✓ SUCCESS/);
+      if (successMatch) {
+        currentStatus = 'success';
+        if (workflowItems.length > 0 && workflowItems[workflowItems.length - 1].status === 'running') {
+          workflowItems[workflowItems.length - 1].status = 'success';
+        } else {
+          workflowItems.push({ name: successMatch[1], type: 'http', status: 'success' });
+        }
+        continue;
+      }
+      const failedMatch = log.match(/\[([^\]]+)\] ✗ FAILED/);
+      if (failedMatch) {
+        currentStatus = 'failed';
+        if (workflowItems.length > 0 && workflowItems[workflowItems.length - 1].status === 'running') {
+          workflowItems[workflowItems.length - 1].status = 'failed';
+        } else {
+          workflowItems.push({ name: failedMatch[1], type: 'http', status: 'failed' });
+        }
+        continue;
+      }
     }
-  }, [formattedResponse]);
-
-  const renderBody = () => {
-    if (loading) {
-      return (
-        <div className="response-loading">
-          <Spin tip="加载中..." />
-        </div>
-      );
-    }
-
-    if (!response) {
-      return (
-        <Empty description="发送请求查看响应" />
-      );
-    }
-
-    if (response.error) {
-      return (
-        <div className="response-error">
-          <pre>{response.error}</pre>
-        </div>
-      );
-    }
-
-    if (jsonData) {
-      return (
-        <div className="response-json">
-          <JsonView
-            data={jsonData}
-            style={darkStyles}
-          />
-        </div>
-      );
-    }
-
-    return (
-      <div className="response-text">
-        <pre>{formattedResponse || response.body}</pre>
-      </div>
-    );
+    return workflowItems;
   };
 
-  const renderHeaders = () => {
-    if (!response?.headers) return <Empty description="无响应头" />;
-    return <ResponseHeaders headers={response.headers} />;
-  };
+  const renderScriptResults = () => (
+    <div className="script-results-panel" style={{ height: scriptResultsHeight }}>
+      {response?.script_logs && response.script_logs.length > 0 && (
+        <>
+          <div className="script-workflow">
+            {parseWorkflowItems().map((item, idx) => (
+              <React.Fragment key={idx}>
+                <div className={`script-workflow-item ${item.type === 'pre' ? 'pre-script' : 'post-script'} ${item.status}`}>
+                  <div className="script-workflow-icon">
+                    {item.status === 'success' ? '✓' : item.status === 'failed' ? '✗' : '▶'}
+                  </div>
+                  <div className="script-workflow-content">
+                    <div className="script-workflow-name">{item.name}</div>
+                    <div className="script-workflow-status">
+                      {item.status === 'success' ? '执行成功' : item.status === 'failed' ? '执行失败' : '执行中...'}
+                    </div>
+                  </div>
+                </div>
+                {idx < parseWorkflowItems().length - 1 && <div className="script-workflow-line"></div>}
+              </React.Fragment>
+            ))}
+          </div>
+          <div className="script-logs-section" style={{ marginTop: 16 }}>
+            <div
+              className="section-header clickable"
+              onClick={onToggleScriptLogs}
+            >
+              <span className={`expand-icon ${scriptLogsExpanded ? 'expanded' : ''}`}>▶</span>
+              <span className="section-title">Console Logs</span>
+              <span className="section-count">{response.script_logs.length}</span>
+            </div>
+            {scriptLogsExpanded && (
+              <div className="script-logs-content">
+                {response.script_logs.map((log: string, index: number) => {
+                  let className = 'script-log-entry';
+                  if (log.includes('▶ START')) className += ' script-start';
+                  else if (log.includes('✓ SUCCESS')) className += ' script-success';
+                  else if (log.includes('✗ FAILED')) className += ' script-failed';
+                  return (
+                    <div key={index} className={className}>
+                      {log}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+      {response?.tests && response.tests.length > 0 && (
+        <div className="test-results-section">
+          <div
+            className="section-header clickable"
+            onClick={onToggleTestResults}
+          >
+            <span className={`expand-icon ${testResultsExpanded ? 'expanded' : ''}`}>▶</span>
+            <span className="section-title">Test Results</span>
+            <span className="test-summary">
+              ({response.tests.filter((t: any) => t.passed).length}/{response.tests.length} passed)
+            </span>
+          </div>
+          {testResultsExpanded && (
+            <div className="test-results-list">
+              {response.tests.map((test: any, index: number) => (
+                <div key={index} className={`test-result-item ${test.passed ? 'passed' : 'failed'}`}>
+                  <span className="test-status-icon">{test.passed ? '✓' : '✗'}</span>
+                  <span className="test-name">{test.name}</span>
+                  {!test.passed && test.message && (
+                    <span className="test-message">{test.message}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 
-  const passedTests = testResults.filter((t) => t.passed).length;
-  const totalTests = testResults.length;
+  const scriptTabItems = response?.script_logs?.length || response?.tests?.length
+    ? [{
+        key: 'scripts',
+        label: '脚本结果',
+        children: renderScriptResults(),
+      }]
+    : [];
 
   return (
     <div className="response-panel">
-      <div className="response-status-bar">
-        {response && (
-          <>
-            <span className={`status-code ${response.status_code >= 200 && response.status_code < 300 ? 'success' : 'error'}`}>
-              {response.status_code}
-            </span>
-            <span className="duration">{response.duration}ms</span>
-            {totalTests > 0 && (
-              <span className={`test-results ${passedTests === totalTests ? 'all-passed' : 'some-failed'}`}>
-                {passedTests}/{totalTests} tests passed
-              </span>
-            )}
-          </>
-        )}
-      </div>
-
+      {response && (
+        <ResponseStatus statusCode={response.status_code} duration={response.duration} />
+      )}
       <Tabs
-        activeKey={activeTab}
-        onChange={setActiveTab}
-        className="response-tabs"
+        defaultActiveKey="body"
         items={[
           {
             key: 'body',
             label: 'Body',
-            children: renderBody(),
+            children: (
+              <ResponseBodyViewer
+                body={response?.body || ''}
+                error={response?.error}
+                height={responseBodyHeight}
+                appTheme={appTheme}
+                viewMode="body"
+              />
+            ),
           },
           {
             key: 'headers',
-            label: `Headers (${Object.keys(response?.headers || {}).length})`,
-            children: renderHeaders(),
-          },
-          {
-            key: 'scripts',
-            label: (
-              <span onClick={onToggleScriptLogs}>
-                脚本日志 {scriptLogsExpanded ? '▼' : '▶'}
-              </span>
-            ),
-            children: scriptLogsExpanded && (
-              <div className="script-logs">
-                {scriptLogs.length === 0 ? (
-                  <Empty description="无日志" />
-                ) : (
-                  scriptLogs.map((log, i) => (
-                    <div key={i} className="log-entry">
-                      <pre>{log}</pre>
-                    </div>
-                  ))
-                )}
-              </div>
+            label: 'Header',
+            children: (
+              <ResponseHeaders headers={response?.headers || null} />
             ),
           },
           {
-            key: 'tests',
-            label: (
-              <span onClick={onToggleTestResults}>
-                测试结果 {testResultsExpanded ? '▼' : '▶'}
-              </span>
-            ),
-            children: testResultsExpanded && (
-              <div className="test-results-list">
-                {testResults.length === 0 ? (
-                  <Empty description="无测试结果" />
-                ) : (
-                  testResults.map((test, i) => (
-                    <div key={i} className={`test-item ${test.passed ? 'passed' : 'failed'}`}>
-                      <span className="test-icon">{test.passed ? '✓' : '✗'}</span>
-                      <span className="test-name">{test.name}</span>
-                      {test.message && <span className="test-message">{test.message}</span>}
-                    </div>
-                  ))
-                )}
-              </div>
+            key: 'formatted',
+            label: 'JsonView',
+            children: (
+              <ResponseBodyViewer
+                body={response?.body || ''}
+                formattedResponse={formattedResponse}
+                height={responseBodyHeight}
+                appTheme={appTheme}
+                viewMode="json"
+              />
             ),
           },
+          ...scriptTabItems,
         ]}
       />
     </div>
