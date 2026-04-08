@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Tabs, Empty } from 'antd';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Tabs } from 'antd';
 import { ResponseBodyViewer, ResponseCookies, ResponseHeaders, ResponseStatus } from './index';
 import { CurlResponse } from '../../types';
 import './ResponsePanel.css';
@@ -26,9 +26,63 @@ export const ResponsePanel: React.FC<ResponsePanelProps> = ({
   onToggleScriptLogs,
   onToggleTestResults,
 }) => {
-  const [responseBodyHeight] = useState(300);
-  const [scriptResultsHeight] = useState(200);
+  const [responseBodyHeight, setResponseBodyHeight] = useState(200);
+  const [scriptResultsHeight, setScriptResultsHeight] = useState(200);
   const appTheme = document.body.classList.contains('theme-dark') ? 'dark' : 'light';
+
+  // Calculate response-body height dynamically
+  const calculateResponseBodyHeight = useCallback(() => {
+    const responsePanel = document.querySelector('.response-panel') as HTMLElement;
+    const responseHeader = document.querySelector('.response-panel .response-header') as HTMLElement;
+    if (responsePanel && responseHeader) {
+      const panelHeight = responsePanel.offsetHeight;
+      const headerHeight = responseHeader.offsetHeight;
+      const bodyHeight = panelHeight - headerHeight - 40; // 40 = tabs height
+      setResponseBodyHeight(Math.max(100, bodyHeight));
+    }
+  }, []);
+
+  // Calculate script-results-panel height dynamically
+  const calculateScriptResultsHeight = useCallback(() => {
+    const responsePanel = document.querySelector('.response-panel') as HTMLElement;
+    const responseHeader = document.querySelector('.response-panel .response-header') as HTMLElement;
+    if (responsePanel && responseHeader) {
+      const panelHeight = responsePanel.offsetHeight;
+      const headerHeight = responseHeader.offsetHeight;
+      const bodyHeight = panelHeight - headerHeight - 40; // 40 = tabs height
+      setScriptResultsHeight(Math.max(100, bodyHeight));
+    }
+  }, []);
+
+  // Auto-calculate heights on response change and window resize
+  useEffect(() => {
+    calculateResponseBodyHeight();
+    calculateScriptResultsHeight();
+
+    window.addEventListener('resize', calculateResponseBodyHeight);
+    window.addEventListener('resize', calculateScriptResultsHeight);
+
+    // Use ResizeObserver to detect panel size changes (including window drag)
+    // Listen on .workspace-response instead of .response-panel
+    const workspaceResponse = document.querySelector('.workspace-response');
+    const responsePanel = document.querySelector('.response-panel');
+    const observer = new ResizeObserver(() => {
+      calculateResponseBodyHeight();
+      calculateScriptResultsHeight();
+    });
+    if (workspaceResponse) {
+      observer.observe(workspaceResponse);
+    }
+    if (responsePanel) {
+      observer.observe(responsePanel);
+    }
+
+    return () => {
+      window.removeEventListener('resize', calculateResponseBodyHeight);
+      window.removeEventListener('resize', calculateScriptResultsHeight);
+      observer.disconnect();
+    };
+  }, [response, calculateResponseBodyHeight, calculateScriptResultsHeight]);
 
   // Parse workflow items from logs
   const parseWorkflowItems = () => {
