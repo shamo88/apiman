@@ -11,7 +11,6 @@ import { useUIStore, useProjectStore } from '../../store';
 
 export interface GeneralSettingsProps {
   form: ReturnType<typeof Form.useForm>[0];
-  theme: string;
   onSave: () => void;
   onCancel: () => void;
 }
@@ -41,8 +40,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
   const projectStore = useProjectStore();
   const [activeSettingsTab, setActiveSettingsTab] = useState('general');
   const [form] = Form.useForm();
-
-  const theme = uiStore.appTheme;
 
   const handleGitSyncChange = async (enabled: boolean) => {
     const { ListProjects } = await import('../../../wailsjs/go/main/App');
@@ -96,10 +93,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
         },
         ui: activeSettingsTab === 'general' ? {
           enableListAnimation: Boolean(values?.ui?.enableListAnimation),
-          theme: values?.ui?.theme || 'light',
         } : {
           enableListAnimation: currentConfig?.ui?.enableListAnimation ?? false,
-          theme: currentConfig?.ui?.theme || 'light',
         },
         gitSync: activeSettingsTab === 'git' ? {
           enabled: Boolean(values?.gitSync?.enabled),
@@ -131,7 +126,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
 
       // Update app state directly
       uiStore.setAnimationEnabled(configToSave.ui.enableListAnimation);
-      uiStore.setAppTheme(configToSave.ui.theme as 'light' | 'dark');
 
       await InitProjectsDir();
 
@@ -144,7 +138,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
   };
 
   const renderContent = () => {
-    const props = { form, theme, onSave: handleSave, onCancel: onClose };
+    const props = { form, onSave: handleSave, onCancel: onClose };
     switch (activeSettingsTab) {
       case 'general':
         return <GeneralSettings {...props} />;
@@ -153,7 +147,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
       case 'git':
         return <GitSyncSettings {...props} />;
       case 'about':
-        return <AboutSettings theme={theme} />;
+        return <AboutSettings />;
       default:
         return null;
     }
@@ -166,11 +160,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
       onCancel={onClose}
       footer={null}
       width={800}
-      className={`settings-modal ${theme === 'dark' ? 'theme-dark' : ''}`}
+      className="settings-modal"
     >
-      <div className={theme === 'dark' ? 'theme-dark' : ''} style={{ background: 'var(--bg-secondary)', minHeight: 400 }}>
+      <div style={{ background: 'var(--bg-secondary)', minHeight: 400 }}>
         <Row gutter={0} style={{ minHeight: 400 }}>
-          <Col span={6} style={{ borderRight: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}`, paddingRight: 16 }}>
+          <Col span={6} style={{ borderRight: '1px solid #f0f0f0', paddingRight: 16 }}>
             {settingsMenuItems.map(item => (
               <div
                 key={item.key}
@@ -180,8 +174,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
                   marginBottom: 4,
                   cursor: 'pointer',
                   borderRadius: 6,
-                  background: activeSettingsTab === item.key ? (theme === 'dark' ? 'rgba(99,102,241,0.2)' : '#e6f7ff') : 'transparent',
-                  color: activeSettingsTab === item.key ? (theme === 'dark' ? '#818cf8' : '#1890ff') : (theme === 'dark' ? '#e8e8e8' : '#333'),
+                  background: activeSettingsTab === item.key ? '#e6f7ff' : 'transparent',
+                  color: activeSettingsTab === item.key ? '#1890ff' : '#333',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
@@ -203,8 +197,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
-                color: activeSettingsTab === 'about' ? (theme === 'dark' ? '#818cf8' : '#1890ff') : (theme === 'dark' ? '#e8e8e8' : '#333'),
-                background: activeSettingsTab === 'about' ? (theme === 'dark' ? 'rgba(99,102,241,0.2)' : '#e6f7ff') : 'transparent',
+                color: activeSettingsTab === 'about' ? '#1890ff' : '#333',
+                background: activeSettingsTab === 'about' ? '#e6f7ff' : 'transparent',
               }}
             >
               <InfoCircleOutlined />

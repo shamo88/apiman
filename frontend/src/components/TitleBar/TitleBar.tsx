@@ -116,7 +116,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({ onOpenShortcutsHelp }) => {
         <div className="title-bar-controls">
           {projectStore.activeTab !== 'home' && (
             <Select
-              className={`title-bar-environment-select${uiStore.appTheme === 'dark' ? ' title-bar-environment-select-dark' : ''}`}
+              className="title-bar-environment-select"
               size="small"
               value={selectedEnvId}
               onChange={(value) => {

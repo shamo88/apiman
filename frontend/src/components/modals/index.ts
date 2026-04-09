@@ -7,4 +7,3 @@ export { HistoryModal } from './HistoryModal';
 export { AddCaseModal } from './AddCaseModal';
 export { CaseRenameModal } from './CaseRenameModal';
 export { GlobalSearchModal } from './GlobalSearchModal';
-export { BatchExecuteModal } from './BatchExecuteModal';

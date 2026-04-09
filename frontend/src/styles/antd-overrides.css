@@ -115,34 +115,3 @@
 .ant-message-success {
     color: var(--text-primary);
 }
-
-/* Light theme - select dropdown (html level) */
-html:not(.theme-dark) .ant-select-dropdown,
-:not(.theme-dark).ant-select-dropdown {
-    background: #ffffff !important;
-    background-color: #ffffff !important;
-}
-
-html:not(.theme-dark) .ant-select-dropdown * {
-    background-color: inherit !important;
-}
-
-html:not(.theme-dark) .ant-select-dropdown .ant-select-item-option {
-    color: var(--text-primary) !important;
-}
-
-html:not(.theme-dark) .ant-select-dropdown .ant-select-item-option .ant-select-item-option-content {
-    color: var(--text-primary) !important;
-}
-
-html:not(.theme-dark) .ant-select-dropdown .ant-select-item-option-active {
-    background: rgba(0, 0, 0, 0.04) !important;
-}
-
-html:not(.theme-dark) .ant-select-dropdown .ant-select-item-option-selected {
-    background: rgba(79, 70, 229, 0.1) !important;
-}
-
-html:not(.theme-dark) .ant-select-dropdown .ant-select-item-option-selected .ant-select-item-option-content {
-    color: #4f46e5 !important;
-}

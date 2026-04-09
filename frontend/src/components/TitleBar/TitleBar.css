@@ -25,10 +25,6 @@
     --wails-draggable: no-drag;
 }
 
-.theme-dark .title-bar-logo-img {
-    filter: brightness(0) invert(1);
-}
-
 .title-bar-tabs-wrap {
     flex: 1;
     display: flex;
@@ -235,84 +231,4 @@
 
 .title-bar-button.maximize .anticon {
     font-size: 12px;
-}
-
-/* Dark theme - TitleBar tabs */
-.theme-dark .title-bar-tabs .ant-tabs-tab {
-    background: var(--bg-tertiary) !important;
-    border-color: var(--border-subtle) !important;
-    color: var(--text-secondary) !important;
-}
-
-.theme-dark .title-bar-tabs .ant-tabs-tab:hover,
-.theme-dark .title-bar-tabs .ant-tabs-tab:active,
-.theme-dark .title-bar-tabs .ant-tabs-tab:focus {
-    background: var(--bg-hover) !important;
-    color: #fafafa !important;
-}
-
-.theme-dark .title-bar-tabs .ant-tabs-tab-active {
-    background: var(--bg-secondary) !important;
-    color: #fafafa !important;
-    border-color: #fafafa !important;
-}
-
-.theme-dark .title-bar-tabs .ant-tabs-tab-active:hover,
-.theme-dark .title-bar-tabs .ant-tabs-tab-active:active,
-.theme-dark .title-bar-tabs .ant-tabs-tab-active:focus {
-    background: var(--bg-secondary) !important;
-    color: #fafafa !important;
-    border-color: #fafafa !important;
-}
-
-.theme-dark .title-bar-tabs .ant-tabs-tab-btn {
-    color: var(--text-secondary) !important;
-}
-
-.theme-dark .title-bar-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
-    color: #fafafa !important;
-}
-
-/* Dark theme - Home tab */
-.theme-dark .title-bar-home-tab {
-    background: var(--bg-tertiary);
-    border-color: var(--border-subtle);
-    color: var(--text-secondary);
-}
-
-.theme-dark .title-bar-home-tab:hover {
-    background: var(--bg-hover);
-    color: #fafafa;
-}
-
-.theme-dark .title-bar-home-tab.active {
-    background: var(--bg-secondary);
-    color: #fafafa;
-    border-color: #fafafa;
-}
-
-/* Dark theme - Tab close button */
-.theme-dark .title-bar-tabs .ant-tabs-tab-remove .anticon {
-    color: var(--text-muted);
-}
-
-.theme-dark .title-bar-tabs .ant-tabs-tab-remove:hover .anticon {
-    color: #fafafa;
-}
-
-/* Dark theme - Tab underline */
-.theme-dark .title-bar-tabs-wrap::after {
-    border-bottom-color: var(--border-subtle);
-}
-
-/* Dark theme - Remove browser default tap highlight */
-.theme-dark .title-bar-tabs .ant-tabs-tab {
-    -webkit-tap-highlight-color: transparent;
-    outline: none !important;
-    box-shadow: none !important;
-}
-
-.theme-dark .title-bar-tabs .ant-tabs-tab:focus {
-    outline: none !important;
-    box-shadow: none !important;
 }

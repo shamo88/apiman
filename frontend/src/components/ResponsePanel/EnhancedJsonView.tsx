@@ -4,14 +4,12 @@ import 'react-json-view-lite/dist/index.css';
 
 interface EnhancedJsonViewProps {
     data: unknown;
-    theme?: 'light' | 'dark';
 }
 
 interface JsonNodeProps {
     keyName: string | number | null;
     value: unknown;
     path: string;
-    theme: 'light' | 'dark';
     expandedPaths: Set<string>;
     onToggle: (path: string) => void;
     isArrayChild: boolean;
@@ -48,22 +46,21 @@ const copyToClipboard = async (text: string, type: 'path' | 'value') => {
 const JsonValue: React.FC<{
     value: string | number | boolean | null;
     path: string;
-    theme: 'light' | 'dark';
-}> = ({ value, path, theme }) => {
+}> = ({ value, path }) => {
     const [showActions, setShowActions] = useState(false);
     const type = getValueType(value);
 
     const renderValue = () => {
         if (type === 'string') {
-            return <span className={`json-value json-string ${theme}`}>"{value as string}"</span>;
+            return <span className="json-value json-string">"{value as string}"</span>;
         }
         if (type === 'number') {
-            return <span className={`json-value json-number ${theme}`}>{value}</span>;
+            return <span className="json-value json-number">{value}</span>;
         }
         if (type === 'boolean') {
-            return <span className={`json-value json-boolean ${theme}`}>{value ? 'true' : 'false'}</span>;
+            return <span className="json-value json-boolean">{value ? 'true' : 'false'}</span>;
         }
-        return <span className={`json-value json-null ${theme}`}>null</span>;
+        return <span className="json-value json-null">null</span>;
     };
 
     return (
@@ -72,21 +69,21 @@ const JsonValue: React.FC<{
             onMouseEnter={() => setShowActions(true)}
             onMouseLeave={() => setShowActions(false)}
         >
-            <span className={`json-type-icon json-type-${type} ${theme}`}>
+            <span className={`json-type-icon json-type-${type}`}>
                 {TYPE_ICONS[type]}
             </span>
             {renderValue()}
             {showActions && (
                 <span className="json-value-actions">
                     <button
-                        className={`json-action-btn ${theme}`}
+                        className="json-action-btn"
                         onClick={() => copyToClipboard(path, 'path')}
                         title="复制路径"
                     >
                         ⧉
                     </button>
                     <button
-                        className={`json-action-btn ${theme}`}
+                        className="json-action-btn"
                         onClick={() => copyToClipboard(String(value), 'value')}
                         title="复制值"
                     >
@@ -102,7 +99,6 @@ const JsonNode: React.FC<JsonNodeProps> = ({
     keyName,
     value,
     path,
-    theme,
     expandedPaths,
     onToggle,
     isArrayChild,
@@ -124,74 +120,73 @@ const JsonNode: React.FC<JsonNodeProps> = ({
         return (
             <div className="json-node json-leaf">
                 {isArrayChild && (
-                    <span className={`json-array-index ${theme}`}>[{arrayIndex}]</span>
+                    <span className="json-array-index">[{arrayIndex}]</span>
                 )}
                 {keyName !== null && (
                     <>
-                        <span className={`json-key ${theme}`}>"{keyName}"</span>
-                        <span className={`json-colon ${theme}`}>: </span>
+                        <span className="json-key">"{keyName}"</span>
+                        <span className="json-colon">: </span>
                     </>
                 )}
-                <JsonValue value={value as string | number | boolean | null} path={path} theme={theme} />
+                <JsonValue value={value as string | number | boolean | null} path={path} />
             </div>
         );
     }
 
-    const entries: [string | number, unknown][] = type === 'array' 
+    const entries: [string | number, unknown][] = type === 'array'
         ? (value as unknown[]).map((v, i) => [i, v] as [number, unknown])
         : Object.entries(value as Record<string, unknown>);
 
     const itemCount = entries.length;
-    const collapsedPreview = type === 'array' 
-        ? `Array(${itemCount})` 
+    const collapsedPreview = type === 'array'
+        ? `Array(${itemCount})`
         : `Object(${itemCount})`;
 
     return (
         <div className="json-node json-branch">
             <span
-                className={`json-expand-icon ${theme} ${isExpanded ? 'expanded' : 'collapsed'}`}
+                className={`json-expand-icon ${isExpanded ? 'expanded' : 'collapsed'}`}
                 onClick={toggleExpand}
             >
                 {isExpanded ? '▾' : '▸'}
             </span>
             {isArrayChild && (
-                <span className={`json-array-index ${theme}`}>[{arrayIndex}]</span>
+                <span className="json-array-index">[{arrayIndex}]</span>
             )}
             {keyName !== null && (
                 <>
-                    <span className={`json-key ${theme}`}>"{keyName}"</span>
-                    <span className={`json-colon ${theme}`}>: </span>
+                    <span className="json-key">"{keyName}"</span>
+                    <span className="json-colon">: </span>
                 </>
             )}
-            <span className={`json-bracket ${theme}`}>
+            <span className="json-bracket">
                 {type === 'array' ? '[' : '{'}
             </span>
             {!isExpanded && (
-                <span className={`json-collapsed-preview ${theme}`}>
+                <span className="json-collapsed-preview">
                     {collapsedPreview}
                 </span>
             )}
             {!isExpanded && (
-                <span className={`json-bracket ${theme}`}>
+                <span className="json-bracket">
                     {type === 'array' ? ']' : '}'}
                 </span>
             )}
             <button
-                className={`json-path-btn ${theme}`}
+                className="json-path-btn"
                 onClick={handleCopyPath}
                 title="复制路径"
             >
                 {path.split('.').pop() || path}
             </button>
             {isExpanded && (
-                <div className={`json-children ${theme}`}>
+                <div className="json-children">
                     {entries.map(([key, val], idx) => (
                         <JsonNode
                             key={key}
                             keyName={key}
                             value={val}
                             path={type === 'array' ? `${path}[${key}]` : `${path}.${key}`}
-                            theme={theme}
                             expandedPaths={expandedPaths}
                             onToggle={onToggle}
                             isArrayChild={type === 'array'}
@@ -203,13 +198,13 @@ const JsonNode: React.FC<JsonNodeProps> = ({
             {isExpanded && (
                 <>
                     <span
-                        className={`json-expand-icon ${theme} expanded`}
+                        className="json-expand-icon expanded"
                         onClick={toggleExpand}
                         style={{ visibility: 'hidden' }}
                     >
                         ▾
                     </span>
-                    <span className={`json-bracket ${theme}`}>
+                    <span className="json-bracket">
                         {type === 'array' ? ']' : '}'}
                     </span>
                 </>
@@ -220,7 +215,6 @@ const JsonNode: React.FC<JsonNodeProps> = ({
 
 export const EnhancedJsonView: React.FC<EnhancedJsonViewProps> = ({
     data,
-    theme = 'light',
 }) => {
     const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => {
         const initialExpanded = new Set<string>();
@@ -255,12 +249,11 @@ export const EnhancedJsonView: React.FC<EnhancedJsonViewProps> = ({
     }, []);
 
     return (
-        <div className={`enhanced-json-view ${theme}`}>
+        <div className="enhanced-json-view">
             <JsonNode
                 keyName={null}
                 value={data}
                 path="root"
-                theme={theme}
                 expandedPaths={expandedPaths}
                 onToggle={handleToggle}
                 isArrayChild={false}

@@ -201,24 +201,6 @@
   color: var(--text-secondary, #666);
 }
 
-/* Dark theme */
-.theme-dark .response-status-bar {
-  background: var(--bg-secondary, #242424);
-  border-color: var(--border-color, #303030);
-}
-
-.theme-dark .header-name {
-  color: var(--text-primary, #e8e8e8);
-}
-
-.theme-dark .header-value {
-  color: var(--text-secondary, #a0a0a0);
-}
-
-.theme-dark .test-item {
-  background: var(--bg-secondary, #2a2a2a);
-}
-
 /* Additional ResponsePanel styles from App.css */
 
 /* Response panel base - original App.css version */
@@ -1074,10 +1056,6 @@
   border-radius: 2px;
 }
 
-.theme-dark .json-value-wrapper:hover {
-  background: rgba(255, 255, 255, 0.05);
-}
-
 .json-value-actions {
   display: inline-flex;
   gap: 2px;
@@ -1182,50 +1160,4 @@
 
 .json-path-btn:hover {
   opacity: 1 !important;
-}
-
-/* Dark theme specific overrides for EnhancedJsonView */
-.theme-dark .enhanced-json-container {
-  background: #1a1a1a;
-  padding: 12px;
-  border-radius: 4px;
-}
-
-.theme-dark .json-view-container .enhanced-json-view {
-  background: transparent;
-  padding: 0;
-}
-
-/* Legacy react-json-view-lite dark theme overrides */
-.response-json.theme-dark {
-  background: #1a1a1a;
-}
-
-.response-json.theme-dark .rjvl-container {
-  background: #1a1a1a !important;
-  color: #e0e0e0;
-}
-
-/* Override react-json-view-lite classes for dark theme */
-.response-json.theme-dark ._11RoI {
-  background: #1a1a1a !important;
-  padding: 8px;
-  border-radius: 4px;
-}
-
-.response-json.theme-dark ._1MGIk {
-  color: #6db3f2 !important;
-}
-
-.response-json.theme-dark ._vGjyY {
-  color: #7ccc7c !important;
-}
-
-.response-json.theme-dark ._2T6PJ,
-.response-json.theme-dark ._1Gho6 {
-  color: #ff7b7d !important;
-}
-
-.response-json.theme-dark ._1bQdo {
-  color: #f5c86d !important;
 }

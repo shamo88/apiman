@@ -49,10 +49,7 @@ const App: React.FC = () => {
       projectStore.setLoading(true);
       try {
         const { LoadAppConfig } = await import('../wailsjs/go/main/App');
-        const config = await LoadAppConfig();
-        if (config?.ui?.theme) {
-          uiStore.setAppTheme(config.ui.theme as 'light' | 'dark');
-        }
+        await LoadAppConfig();
       } catch (error) {
         console.error('Failed to initialize:', error);
       } finally {
@@ -84,7 +81,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className={`app-container ${uiStore.appTheme === 'dark' ? 'theme-dark' : ''}`}>
+    <div className="app-container">
       <TitleBar onOpenShortcutsHelp={() => setShortcutsHelpVisible(true)} />
 
       <div className="app-content">

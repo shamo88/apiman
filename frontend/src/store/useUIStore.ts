@@ -50,8 +50,7 @@ interface UIStore {
   sidebarMenu: 'apis' | 'environments' | 'scripts';
   sidebarWidth: number;
 
-  // 主题/动画
-  appTheme: 'light' | 'dark';
+  // 动画
   animationEnabled: boolean;
   forceListAnimation: boolean;
 
@@ -73,7 +72,6 @@ interface UIStore {
   setInvalidDropHint: (hint: { message: string; x: number; y: number } | null) => void;
   setMovedHighlightPath: (path: string | null) => void;
   clearDragState: () => void;
-  setAppTheme: (theme: 'light' | 'dark') => void;
   setAnimationEnabled: (enabled: boolean) => void;
   setForceListAnimation: (force: boolean) => void;
   setSidebarMenu: (menu: 'apis' | 'environments' | 'scripts') => void;
@@ -155,8 +153,7 @@ export const useUIStore = create<UIStore>()(
       sidebarMenu: 'apis',
       sidebarWidth: parseInt(localStorage.getItem('apiman-sidebar-width') || '280', 10),
 
-      // 主题/动画
-      appTheme: (localStorage.getItem('apiman-theme') as 'light' | 'dark') || 'light',
+      // 动画
       animationEnabled: false,
       forceListAnimation: false,
 
@@ -182,10 +179,6 @@ export const useUIStore = create<UIStore>()(
         dropTargetFolderPath: null,
         invalidDropHint: null,
       }),
-      setAppTheme: (theme) => {
-        localStorage.setItem('apiman-theme', theme);
-        set({ appTheme: theme });
-      },
       setAnimationEnabled: (enabled) => set({ animationEnabled: enabled }),
       setForceListAnimation: (force) => set({ forceListAnimation: force }),
       setSidebarMenu: (menu) => set({ sidebarMenu: menu }),
