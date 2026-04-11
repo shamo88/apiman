@@ -22,8 +22,6 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({ onClose }) => {
 
   const { handleSaveScript, handleDeleteScript } = useScriptHandlers();
 
-  const appTheme = document.body.classList.contains('theme-dark') ? 'dark' : 'light';
-
   const handleSave = async () => {
     await handleSaveScript(scriptFormName.trim(), scriptFormDescription.trim(), scriptFormContent);
   };
@@ -62,7 +60,7 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({ onClose }) => {
             <CodeMirror
               value={scriptFormContent}
               height="100%"
-              theme={appTheme}
+              theme="light"
               extensions={[javascript()]}
               onChange={(value) => setScriptFormContent(value)}
             />

@@ -6,7 +6,6 @@ interface ResponseBodyViewerProps {
     error?: string;
     formattedResponse?: string;
     height: number | string;
-    appTheme: 'light' | 'dark';
     viewMode: 'body' | 'json';
 }
 
@@ -15,7 +14,6 @@ export const ResponseBodyViewer: React.FC<ResponseBodyViewerProps> = ({
     error,
     formattedResponse,
     height,
-    appTheme,
     viewMode,
 }) => {
     if (viewMode === 'json') {
@@ -26,7 +24,7 @@ export const ResponseBodyViewer: React.FC<ResponseBodyViewerProps> = ({
                         const data = JSON.parse(body || '{}');
                         return (
                             <div className="json-view-container">
-                                <EnhancedJsonView data={data} theme={appTheme} />
+                                <EnhancedJsonView data={data} />
                             </div>
                         );
                     } catch {

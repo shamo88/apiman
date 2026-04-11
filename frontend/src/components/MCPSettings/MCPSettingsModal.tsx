@@ -29,7 +29,6 @@ export const MCPSettingsModal: React.FC = () => {
     const { environments, loadEnvironments } = useEnvironments();
 
     const visible = uiStore.mcpModalVisible;
-    const appTheme = uiStore.appTheme;
 
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
@@ -142,7 +141,7 @@ export const MCPSettingsModal: React.FC = () => {
                 </Space>
             }
             width={520}
-            className={`mcp-modal theme-${appTheme}`}
+            className="mcp-modal"
         >
             <Form
                 form={form}

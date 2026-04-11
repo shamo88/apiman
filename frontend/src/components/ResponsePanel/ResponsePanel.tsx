@@ -28,7 +28,6 @@ export const ResponsePanel: React.FC<ResponsePanelProps> = ({
 }) => {
   const [responseBodyHeight, setResponseBodyHeight] = useState(200);
   const [scriptResultsHeight, setScriptResultsHeight] = useState(200);
-  const appTheme = document.body.classList.contains('theme-dark') ? 'dark' : 'light';
 
   // Calculate response-body height dynamically
   const calculateResponseBodyHeight = useCallback(() => {
@@ -228,7 +227,6 @@ export const ResponsePanel: React.FC<ResponsePanelProps> = ({
                 body={response?.body || ''}
                 error={response?.error}
                 height={responseBodyHeight}
-                appTheme={appTheme}
                 viewMode="body"
               />
             ),
@@ -248,7 +246,6 @@ export const ResponsePanel: React.FC<ResponsePanelProps> = ({
                 body={response?.body || ''}
                 formattedResponse={formattedResponse}
                 height={responseBodyHeight}
-                appTheme={appTheme}
                 viewMode="json"
               />
             ),

@@ -4,7 +4,7 @@ import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { GeneralSettingsProps } from './SettingsModal';
 import { ListGitBranches, GetCurrentGitBranch, CreateGitBranch, SwitchGitBranch, DeleteGitBranch } from '../../../wailsjs/go/main/App';
 
-export const GitSyncSettings: React.FC<GeneralSettingsProps> = ({ form, theme, onSave, onCancel }) => {
+export const GitSyncSettings: React.FC<GeneralSettingsProps> = ({ form, onSave, onCancel }) => {
   const [branches, setBranches] = useState<string[]>([]);
   const [currentBranch, setCurrentBranch] = useState<string>('');
   const [newBranchName, setNewBranchName] = useState<string>('');
@@ -100,23 +100,23 @@ export const GitSyncSettings: React.FC<GeneralSettingsProps> = ({ form, theme, o
           <Switch />
         </Form.Item>
 
-        <Divider style={{ margin: '16px 0', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }} />
+        <Divider style={{ margin: '16px 0', borderColor: '#f0f0f0' }} />
 
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontWeight: 500, marginBottom: 12, color: theme === 'dark' ? '#e8e8e8' : '#333' }}>仓库配置</div>
+          <div style={{ fontWeight: 500, marginBottom: 12, color: '#333' }}>仓库配置</div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <tbody>
               <tr>
-                <td style={{ padding: '8px 12px', color: theme === 'dark' ? '#a0a0a0' : '#666', fontWeight: 500, width: 80, borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>仓库地址</td>
-                <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
+                <td style={{ padding: '8px 12px', color: '#666', fontWeight: 500, width: 80, borderBottom: '1px solid #f0f0f0' }}>仓库地址</td>
+                <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
                   <Form.Item name={['gitSync', 'remoteUrl']} style={{ marginBottom: 0 }}>
                     <Input placeholder="https://gitee.com/username/repo.git" />
                   </Form.Item>
                 </td>
               </tr>
               <tr>
-                <td style={{ padding: '8px 12px', color: theme === 'dark' ? '#a0a0a0' : '#666', fontWeight: 500, borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>Access Token</td>
-                <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
+                <td style={{ padding: '8px 12px', color: '#666', fontWeight: 500, borderBottom: '1px solid #f0f0f0' }}>Access Token</td>
+                <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
                   <Form.Item name={['gitSync', 'password']} style={{ marginBottom: 0 }}>
                     <Input type="password" placeholder="粘贴你的 Access Token" />
                   </Form.Item>
@@ -126,19 +126,19 @@ export const GitSyncSettings: React.FC<GeneralSettingsProps> = ({ form, theme, o
           </table>
         </div>
 
-        <Divider style={{ margin: '16px 0', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }} />
+        <Divider style={{ margin: '16px 0', borderColor: '#f0f0f0' }} />
 
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ fontWeight: 500, color: theme === 'dark' ? '#e8e8e8' : '#333' }}>分支管理</div>
+            <div style={{ fontWeight: 500, color: '#333' }}>分支管理</div>
             {currentBranch && (
-              <div style={{ 
-                padding: '4px 12px', 
-                background: theme === 'dark' ? 'rgba(82,196,26,0.2)' : '#f6ffed',
-                border: `1px solid ${theme === 'dark' ? 'rgba(82,196,26,0.3)' : '#b7eb8f'}`,
+              <div style={{
+                padding: '4px 12px',
+                background: '#f6ffed',
+                border: '1px solid #b7eb8f',
                 borderRadius: 4,
                 fontSize: 12,
-                color: theme === 'dark' ? '#52c41a' : '#52c41a'
+                color: '#52c41a'
               }}>
                 当前分支: <strong>{currentBranch}</strong>
               </div>
@@ -148,8 +148,8 @@ export const GitSyncSettings: React.FC<GeneralSettingsProps> = ({ form, theme, o
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <tbody>
               <tr>
-                <td style={{ padding: '8px 12px', color: theme === 'dark' ? '#a0a0a0' : '#666', fontWeight: 500, width: 80, borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>当前分支</td>
-                <td style={{ padding: '8px 12px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0'}` }}>
+                <td style={{ padding: '8px 12px', color: '#666', fontWeight: 500, width: 80, borderBottom: '1px solid #f0f0f0' }}>当前分支</td>
+                <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
                   <Form.Item name={['gitSync', 'branch']} style={{ marginBottom: 0 }}>
                     <Select
                       placeholder="选择分支"
@@ -207,7 +207,7 @@ export const GitSyncSettings: React.FC<GeneralSettingsProps> = ({ form, theme, o
 
           {branches.length > 0 && (
             <div style={{ marginTop: 16 }}>
-              <div style={{ fontSize: 12, color: theme === 'dark' ? '#a0a0a0' : '#666', marginBottom: 8 }}>
+              <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
                 所有分支 ({branches.length})
               </div>
               <div style={{ maxHeight: 200, overflowY: 'auto' }}>
@@ -219,26 +219,26 @@ export const GitSyncSettings: React.FC<GeneralSettingsProps> = ({ form, theme, o
                       justifyContent: 'space-between',
                       alignItems: 'center',
                       padding: '6px 12px',
-                      background: branch === currentBranch 
-                        ? (theme === 'dark' ? 'rgba(82,196,26,0.1)' : '#f6ffed')
+                      background: branch === currentBranch
+                        ? '#f6ffed'
                         : 'transparent',
                       borderRadius: 4,
                       marginBottom: 4,
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ 
-                        color: branch === currentBranch 
-                          ? (theme === 'dark' ? '#52c41a' : '#52c41a') 
-                          : (theme === 'dark' ? '#e8e8e8' : '#333')
+                      <span style={{
+                        color: branch === currentBranch
+                          ? '#52c41a'
+                          : '#333'
                       }}>
                         {branch}
                       </span>
                       {branch === currentBranch && (
-                        <span style={{ 
-                          fontSize: 10, 
-                          padding: '2px 6px', 
-                          background: theme === 'dark' ? 'rgba(82,196,26,0.2)' : '#d9f7be',
+                        <span style={{
+                          fontSize: 10,
+                          padding: '2px 6px',
+                          background: '#d9f7be',
                           borderRadius: 4,
                           color: '#52c41a'
                         }}>
@@ -269,10 +269,10 @@ export const GitSyncSettings: React.FC<GeneralSettingsProps> = ({ form, theme, o
           )}
         </div>
 
-        <Divider style={{ marginTop: 32, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }} />
+        <Divider style={{ marginTop: 32, borderColor: '#f0f0f0' }} />
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-          <Button onClick={onCancel} style={{ background: theme === 'dark' ? '#303030' : undefined, color: theme === 'dark' ? '#e8e8e8' : undefined, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : undefined }}>
+          <Button onClick={onCancel}>
             取消
           </Button>
           <Button type="primary" onClick={onSave}>

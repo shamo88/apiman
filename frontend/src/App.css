@@ -6,7 +6,6 @@
 @import './styles/theme.css';
 @import './styles/global.css';
 @import './styles/antd-overrides.css';
-@import './styles/theme-dark.css';
 
 /* Component CSS imports */
 @import './components/TitleBar/TitleBar.css';

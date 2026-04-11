@@ -93,35 +93,3 @@
     transform: translateX(-50%) translateY(0);
   }
 }
-
-.theme-dark .shortcuts-table .ant-table-thead > tr > th {
-  background: transparent;
-  color: #e0e0e0;
-}
-
-.theme-dark .shortcuts-table .ant-table-tbody > tr > td {
-  border-bottom-color: #3a3a3a;
-}
-
-.theme-dark .shortcuts-table .ant-table-tbody > tr:hover > td {
-  background: #2a2a2a;
-}
-
-.theme-dark .shortcut-kbd {
-  color: #e0e0e0;
-  background: #3a3a3a;
-  border-color: #4a4a4a;
-  box-shadow: 0 1px 0 #4a4a4a;
-}
-
-.theme-dark .shortcuts-hint {
-  color: #8b8b9a;
-}
-
-.theme-dark .keyboard-shortcuts-modal .ant-modal-header {
-  border-bottom-color: #3a3a3a;
-}
-
-.theme-dark .shortcut-toast {
-  background: rgba(255, 255, 255, 0.15);
-}

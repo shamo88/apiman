@@ -93,22 +93,6 @@
   color: #ff4d4f;
 }
 
-/* Dark theme */
-.theme-dark .variable-editable {
-  background: #2a2a2a;
-  border-color: #434343;
-  color: #e8e8e8;
-}
-
-.theme-dark .variable-editable-suggestions {
-  background: #2a2a2a;
-  border-color: #434343;
-}
-
-.theme-dark .variable-editable-suggestion-item.active {
-  background: #3a3a3a;
-}
-
 /* Additional VariableInput styles from App.css */
 
 /* Variable editable wrapper */
@@ -231,32 +215,4 @@
 
 .variable-inline-token.missing {
   color: #cf1322;
-}
-
-/* Dark theme - variable editable */
-.theme-dark .variable-editable {
-  background: var(--bg-primary);
-  border-color: var(--border-subtle);
-  color: var(--text-primary);
-}
-
-.theme-dark .variable-editable:hover,
-.theme-dark .variable-editable:focus {
-  border-color: var(--accent-primary);
-}
-
-/* Dark theme - URL input in request bar */
-.theme-dark .api-request-bar .variable-editable-wrapper .ant-input {
-  background: var(--bg-primary) !important;
-  border-color: var(--border-subtle) !important;
-  color: var(--text-primary) !important;
-}
-
-.theme-dark .api-request-bar .variable-editable-wrapper .ant-input:hover {
-  border-color: var(--accent-primary) !important;
-}
-
-.theme-dark .api-request-bar .variable-editable-wrapper .ant-input:focus {
-  border-color: var(--accent-primary) !important;
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important;
 }

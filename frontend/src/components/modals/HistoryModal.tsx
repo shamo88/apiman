@@ -4,7 +4,7 @@ import { SearchOutlined, ReloadOutlined, DeleteOutlined, ClockCircleOutlined, Pl
 import { ListHistory, GetHistoryEntry, ClearHistory, SearchHistory, DeleteHistory, ExecuteHTTPRequestWithProject } from '../../../wailsjs/go/main/App';
 import { models } from '../../../wailsjs/go/models';
 import { useUIStore } from '../../store';
-import { JsonView, darkStyles, allExpanded } from 'react-json-view-lite';
+import { JsonView, allExpanded } from 'react-json-view-lite';
 import 'react-json-view-lite/dist/index.css';
 import './modals.css';
 
@@ -76,7 +76,7 @@ const getTimeRange = (range: TimeRange): { from: string; to: string } => {
 };
 
 export const HistoryModal: React.FC = () => {
-  const { historyModalVisible, setHistoryModalVisible, appTheme } = useUIStore();
+  const { historyModalVisible, setHistoryModalVisible } = useUIStore();
   const [historyList, setHistoryList] = useState<HistoryEntry[]>([]);
   const [historyDetail, setHistoryDetail] = useState<HistoryEntry | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -503,7 +503,6 @@ export const HistoryModal: React.FC = () => {
                 >
                   <JsonView
                     data={historyDetail.spec || {}}
-                    style={appTheme === 'dark' ? darkStyles : undefined}
                     shouldExpandNode={allExpanded}
                     clickToExpandNode
                   />
@@ -532,7 +531,6 @@ export const HistoryModal: React.FC = () => {
                 >
                   <JsonView
                     data={historyDetail.response || {}}
-                    style={appTheme === 'dark' ? darkStyles : undefined}
                     shouldExpandNode={allExpanded}
                     clickToExpandNode
                   />

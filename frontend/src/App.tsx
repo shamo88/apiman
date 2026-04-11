@@ -93,7 +93,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className={`app-container ${uiStore.appTheme === 'dark' ? 'theme-dark' : ''}`}>
+    <div className="app-container">
       <TitleBar onOpenShortcutsHelp={() => setShortcutsHelpVisible(true)} />
 
       <div className="app-content">

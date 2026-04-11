@@ -520,36 +520,3 @@
   padding-left: 8px;
   margin-bottom: 2px;
 }
-
-/* Dark theme */
-.theme-dark .api-name,
-.theme-dark .folder-name {
-  color: var(--text-primary, #e8e8e8);
-}
-
-.theme-dark .api-case-name {
-  color: var(--text-secondary, #a0a0a0);
-}
-
-.theme-dark .api-item:hover,
-.theme-dark .api-folder-header:hover,
-.theme-dark .api-case-item:hover {
-  background: var(--hover-bg, #2a2a2a);
-}
-
-.theme-dark .folder-icon {
-  color: #faad14;
-}
-
-.theme-dark .api-method-tag {
-  background: var(--bg-tertiary);
-}
-
-.theme-dark .sidebar-content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 3px;
-}
-
-.theme-dark .sidebar-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
-}
