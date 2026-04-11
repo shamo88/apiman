@@ -522,21 +522,21 @@ const collectMatchedPaths = (
 export const EnhancedJsonView: React.FC<EnhancedJsonViewProps> = ({ data }) => {
     const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => {
         const initialExpanded = new Set<string>();
-        const collectPaths = (obj: unknown, currentPath: string, depth: number = 0) => {
-            if (obj && typeof obj === 'object' && depth < 3) {
+        const collectPaths = (obj: unknown, currentPath: string) => {
+            if (obj && typeof obj === 'object') {
                 initialExpanded.add(currentPath);
                 if (Array.isArray(obj)) {
-                    obj.slice(0, 10).forEach((item, index) => {
-                        collectPaths(item, `${currentPath}[${index}]`, depth + 1);
+                    obj.forEach((item, index) => {
+                        collectPaths(item, `${currentPath}[${index}]`);
                     });
                 } else {
-                    Object.entries(obj as Record<string, unknown>).slice(0, 10).forEach(([key, value]) => {
-                        collectPaths(value, `${currentPath}.${key}`, depth + 1);
+                    Object.entries(obj as Record<string, unknown>).forEach(([key, value]) => {
+                        collectPaths(value, `${currentPath}.${key}`);
                     });
                 }
             }
         };
-        collectPaths(data, 'root', 0);
+        collectPaths(data, 'root');
         return initialExpanded;
     });
 
