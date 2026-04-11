@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { message } from 'antd';
 import './EnhancedJsonView.css';
 
@@ -16,6 +16,9 @@ interface JsonNodeProps {
     arrayIndex?: number;
     depth: number;
     isLast: boolean;
+    searchQuery: string;
+    isMatched: boolean;
+    isParentMatched: boolean;
 }
 
 type JsonValueType = 'string' | 'number' | 'boolean' | 'null' | 'undefined' | 'object' | 'array';
@@ -66,49 +69,107 @@ const CopyButton: React.FC<{
     );
 };
 
+// 高亮文本组件
+const HighlightText: React.FC<{
+    text: string;
+    highlight: string;
+    className: string;
+}> = ({ text, highlight, className }) => {
+    if (!highlight) {
+        return <span className={className}>{text}</span>;
+    }
+
+    const regex = new RegExp(`(${highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    const parts = text.split(regex);
+
+    return (
+        <span className={className}>
+            {parts.map((part, i) =>
+                regex.test(part) ? (
+                    <span key={i} className="json-highlight">{part}</span>
+                ) : (
+                    part
+                )
+            )}
+        </span>
+    );
+};
+
 // 叶子节点（值）
-const JsonLeaf: React.FC<{
-    keyName: string | number | null;
-    value: unknown;
-    path: string;
-    isArrayChild: boolean;
-    arrayIndex?: number;
-    isLast: boolean;
-    depth: number;
-}> = ({ keyName, value, path, isArrayChild, arrayIndex, isLast, depth }) => {
+const JsonLeaf: React.FC<JsonNodeProps> = ({
+    keyName, value, path, isArrayChild, arrayIndex, isLast, depth,
+    searchQuery, isMatched, isParentMatched
+}) => {
     const type = getValueType(value);
     const [hovered, setHovered] = useState(false);
+
+    const stringValue = useMemo(() => {
+        if (type === 'string') return value as string;
+        return String(value ?? '');
+    }, [value, type]);
+
+    const keyMatch = searchQuery && keyName !== null &&
+        String(keyName).toLowerCase().includes(searchQuery.toLowerCase());
+    const valueMatch = searchQuery &&
+        stringValue.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const isHighlight = isMatched || isParentMatched;
 
     const renderValue = () => {
         switch (type) {
             case 'string':
-                return <span className="json-string">"{value as string}"</span>;
+                return (
+                    <HighlightText
+                        text={`"${stringValue}"`}
+                        highlight={searchQuery}
+                        className="json-string"
+                    />
+                );
             case 'number':
-                return <span className="json-number">{String(value)}</span>;
+                return (
+                    <HighlightText
+                        text={stringValue}
+                        highlight={searchQuery}
+                        className="json-number"
+                    />
+                );
             case 'boolean':
-                return <span className="json-boolean">{String(value)}</span>;
+                return (
+                    <HighlightText
+                        text={stringValue}
+                        highlight={searchQuery}
+                        className="json-boolean"
+                    />
+                );
             case 'null':
                 return <span className="json-null">null</span>;
             case 'undefined':
                 return <span className="json-undefined">undefined</span>;
             default:
-                return <span className="json-value">{String(value)}</span>;
+                return <span className="json-value">{stringValue}</span>;
         }
     };
 
     return (
         <div
-            className={`json-leaf ${hovered ? 'json-leaf-hovered' : ''}`}
+            className={`json-leaf ${hovered ? 'json-leaf-hovered' : ''} ${isHighlight ? 'json-highlight-row' : ''} ${isMatched ? 'json-current-match' : ''}`}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
             style={{ paddingLeft: `${depth * 16}px` }}
+            data-path={path}
         >
             {isArrayChild && (
                 <span className="json-array-index">[{arrayIndex}]</span>
             )}
             {keyName !== null && (
                 <>
-                    <span className="json-key">"{keyName}"</span>
+                    <span className="json-key">
+                        <HighlightText
+                            text={`"${keyName}"`}
+                            highlight={searchQuery}
+                            className=""
+                        />
+                    </span>
                     <span className="json-colon">: </span>
                 </>
             )}
@@ -126,15 +187,8 @@ const JsonLeaf: React.FC<{
 
 // 树枝节点（对象/数组）
 const JsonBranch: React.FC<JsonNodeProps> = ({
-    keyName,
-    value,
-    path,
-    expandedPaths,
-    onToggle,
-    isArrayChild,
-    arrayIndex,
-    depth,
-    isLast,
+    keyName, value, path, expandedPaths, onToggle, isArrayChild, arrayIndex,
+    depth, isLast, searchQuery, isMatched, isParentMatched
 }) => {
     const type = getValueType(value);
     const isExpandable = type === 'object' || type === 'array';
@@ -160,22 +214,32 @@ const JsonBranch: React.FC<JsonNodeProps> = ({
                 keyName={keyName}
                 value={value}
                 path={path}
+                expandedPaths={expandedPaths}
+                onToggle={onToggle}
                 isArrayChild={isArrayChild}
                 arrayIndex={arrayIndex}
-                isLast={isLast}
                 depth={depth}
+                isLast={isLast}
+                searchQuery={searchQuery}
+                isMatched={isMatched}
+                isParentMatched={isParentMatched}
             />
         );
     }
+
+    const keyMatch = !!(searchQuery && keyName !== null &&
+        String(keyName).toLowerCase().includes(searchQuery.toLowerCase()));
+    const isHighlight = isMatched || isParentMatched || keyMatch;
 
     return (
         <div
             className={`json-branch ${hovered ? 'json-branch-hovered' : ''}`}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
+            data-path={path}
         >
             <div
-                className="json-branch-header"
+                className={`json-branch-header ${isHighlight ? 'json-highlight-row' : ''} ${isMatched ? 'json-current-match' : ''}`}
                 style={{ paddingLeft: `${depth * 16}px` }}
             >
                 {/* 缩进线 */}
@@ -206,7 +270,13 @@ const JsonBranch: React.FC<JsonNodeProps> = ({
 
                 {keyName !== null && (
                     <>
-                        <span className="json-key">"{keyName}"</span>
+                        <span className="json-key">
+                            <HighlightText
+                                text={`"${keyName}"`}
+                                highlight={searchQuery}
+                                className=""
+                            />
+                        </span>
                         <span className="json-colon">: </span>
                     </>
                 )}
@@ -256,6 +326,9 @@ const JsonBranch: React.FC<JsonNodeProps> = ({
                             arrayIndex={type === 'array' ? idx : undefined}
                             depth={depth + 1}
                             isLast={idx === entries.length - 1}
+                            searchQuery={searchQuery}
+                            isMatched={false}
+                            isParentMatched={isHighlight}
                         />
                     ))}
                     <div
@@ -295,8 +368,12 @@ const JsonNode: React.FC<JsonNodeProps> = (props) => {
 // 搜索组件
 const JsonSearch: React.FC<{
     onSearch: (query: string) => void;
+    onNext: () => void;
+    onPrev: () => void;
     placeholder?: string;
-}> = ({ onSearch, placeholder = '搜索键名或值...' }) => {
+    resultCount?: number;
+    currentIndex: number;
+}> = ({ onSearch, onNext, onPrev, placeholder = '搜索键名或值...', resultCount, currentIndex }) => {
     const [value, setValue] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -311,64 +388,130 @@ const JsonSearch: React.FC<{
             setValue('');
             onSearch('');
             inputRef.current?.blur();
+        } else if (e.key === 'Enter') {
+            // Enter 跳转到下一个
+            if (e.shiftKey) {
+                onPrev();
+            } else {
+                onNext();
+            }
         }
     };
 
+    const hasResults = resultCount !== undefined && resultCount > 0;
+
     return (
         <div className="json-search">
-            <svg className="json-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="8"></circle>
-                <path d="m21 21-4.35-4.35"></path>
-            </svg>
-            <input
-                ref={inputRef}
-                type="text"
-                className="json-search-input"
-                value={value}
-                onChange={handleChange}
-                onKeyDown={handleKeyDown}
-                placeholder={placeholder}
-            />
-            {value && (
-                <button
-                    className="json-search-clear"
-                    onClick={() => {
-                        setValue('');
-                        onSearch('');
-                    }}
-                    title="清除搜索"
-                >
-                    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
-                    </svg>
-                </button>
-            )}
+            <div className="json-search-input-wrapper">
+                <svg className="json-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="m21 21-4.35-4.35"></path>
+                </svg>
+                <input
+                    ref={inputRef}
+                    type="text"
+                    className="json-search-input"
+                    value={value}
+                    onChange={handleChange}
+                    onKeyDown={handleKeyDown}
+                    placeholder={placeholder}
+                />
+            </div>
+            <div className="json-search-right">
+                {value && (
+                    <button
+                        className="json-search-clear"
+                        onClick={() => {
+                            setValue('');
+                            onSearch('');
+                        }}
+                        title="清除搜索"
+                    >
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+                        </svg>
+                    </button>
+                )}
+                {hasResults && (
+                    <div className="json-search-nav">
+                        <button
+                            className="json-nav-btn"
+                            onClick={onPrev}
+                            title="上一个 (Shift+Enter)"
+                            disabled={currentIndex <= 0}
+                        >
+                            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M10 3l-5 5 5 5V3z"/>
+                            </svg>
+                        </button>
+                        <span className="json-search-count">
+                            {currentIndex + 1}/{resultCount}
+                        </span>
+                        <button
+                            className="json-nav-btn"
+                            onClick={onNext}
+                            title="下一个 (Enter)"
+                            disabled={currentIndex >= resultCount - 1}
+                        >
+                            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M6 3l5 5-5 5V3z"/>
+                            </svg>
+                        </button>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
 
-// 统计信息
-const JsonStats: React.FC<{ data: unknown }> = ({ data }) => {
-    const stats = useMemo(() => {
-        const countKeys = (obj: unknown): number => {
-            if (obj === null || typeof obj !== 'object') return 0;
-            if (Array.isArray(obj)) return obj.length;
-            return Object.keys(obj as Record<string, unknown>).length;
-        };
+// 收集匹配路径
+const collectMatchedPaths = (
+    obj: unknown,
+    path: string,
+    query: string,
+    results: Set<string>
+): boolean => {
+    if (!query) return false;
 
-        const type = getValueType(data);
-        if (type === 'array') {
-            return `Array(${countKeys(data)})`;
+    const type = getValueType(obj);
+    const lowerQuery = query.toLowerCase();
+
+    // 检查键名
+    const entries = type === 'array'
+        ? (obj as unknown[]).map((v, i) => [i, v] as [number, unknown])
+        : Object.entries(obj as Record<string, unknown>);
+
+    let hasMatch = false;
+
+    for (const [key, val] of entries) {
+        const keyStr = String(key);
+        const valType = getValueType(val);
+
+        // 键名匹配
+        if (keyStr.toLowerCase().includes(lowerQuery)) {
+            results.add(path);
+            hasMatch = true;
         }
-        if (type === 'object') {
-            return `Object(${countKeys(data)})`;
+
+        // 值匹配
+        if (valType !== 'object' && valType !== 'array') {
+            const valStr = String(val ?? '');
+            if (valStr.toLowerCase().includes(lowerQuery)) {
+                results.add(path);
+                hasMatch = true;
+            }
         }
-        return '';
-    }, [data]);
 
-    if (!stats) return null;
+        // 递归检查子节点
+        if (valType === 'object' || valType === 'array') {
+            const childPath = type === 'array' ? `${path}[${key}]` : `${path}.${key}`;
+            if (collectMatchedPaths(val, childPath, query, results)) {
+                hasMatch = true;
+            }
+        }
+    }
 
-    return <span className="json-stats">{stats}</span>;
+    return hasMatch;
 };
 
 export const EnhancedJsonView: React.FC<EnhancedJsonViewProps> = ({ data }) => {
@@ -393,7 +536,80 @@ export const EnhancedJsonView: React.FC<EnhancedJsonViewProps> = ({ data }) => {
     });
 
     const [searchQuery, setSearchQuery] = useState('');
+    const [matchedPaths, setMatchedPaths] = useState<string[]>([]);
+    const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
     const [allExpanded, setAllExpanded] = useState(true);
+    const contentRef = useRef<HTMLDivElement>(null);
+
+    const handleSearch = useCallback((query: string) => {
+        setSearchQuery(query);
+
+        if (!query) {
+            setMatchedPaths([]);
+            return;
+        }
+
+        // 收集所有匹配路径
+        const results = new Set<string>();
+        collectMatchedPaths(data, 'root', query, results);
+        const pathArray = Array.from(results);
+        setMatchedPaths(pathArray);
+        setCurrentMatchIndex(0);
+
+        // 自动展开包含匹配结果的路径
+        if (pathArray.length > 0) {
+            const pathsToExpand = new Set<string>();
+            const addParentPaths = (path: string) => {
+                const parts = path.split('.');
+                let current = 'root';
+                pathsToExpand.add(current);
+                for (let i = 0; i < parts.length; i++) {
+                    const part = parts[i];
+                    if (part.includes('[')) {
+                        // 数组索引
+                        current = part;
+                    } else {
+                        current = current ? `${current}.${part}` : part;
+                    }
+                    pathsToExpand.add(current);
+                }
+            };
+
+            pathArray.forEach(path => addParentPaths(path));
+
+            setExpandedPaths(prev => {
+                const next = new Set(prev);
+                pathsToExpand.forEach(p => next.add(p));
+                return next;
+            });
+        }
+    }, [data]);
+
+    // 跳转到指定匹配位置
+    const scrollToMatch = useCallback((index: number) => {
+        if (matchedPaths.length === 0) return;
+
+        const targetPath = matchedPaths[index];
+        // 查找对应的 DOM 元素
+        const elements = document.querySelectorAll(`[data-path="${targetPath}"]`);
+        if (elements.length > 0) {
+            elements[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, [matchedPaths]);
+
+    const handleNextMatch = useCallback(() => {
+        if (matchedPaths.length === 0) return;
+        const nextIndex = (currentMatchIndex + 1) % matchedPaths.length;
+        setCurrentMatchIndex(nextIndex);
+        scrollToMatch(nextIndex);
+    }, [currentMatchIndex, matchedPaths.length, scrollToMatch]);
+
+    const handlePrevMatch = useCallback(() => {
+        if (matchedPaths.length === 0) return;
+        const prevIndex = currentMatchIndex === 0 ? matchedPaths.length - 1 : currentMatchIndex - 1;
+        setCurrentMatchIndex(prevIndex);
+        scrollToMatch(prevIndex);
+    }, [currentMatchIndex, matchedPaths.length, scrollToMatch]);
 
     const handleToggle = useCallback((path: string) => {
         setExpandedPaths(prev => {
@@ -410,11 +626,9 @@ export const EnhancedJsonView: React.FC<EnhancedJsonViewProps> = ({ data }) => {
     // 展开/折叠全部
     const toggleAll = useCallback(() => {
         if (allExpanded) {
-            // 折叠全部
             setExpandedPaths(new Set<string>());
             setAllExpanded(false);
         } else {
-            // 展开全部
             const allPaths = new Set<string>();
             const collectPaths = (obj: unknown, currentPath: string) => {
                 if (obj && typeof obj === 'object') {
@@ -437,11 +651,15 @@ export const EnhancedJsonView: React.FC<EnhancedJsonViewProps> = ({ data }) => {
     }, [data, allExpanded]);
 
     return (
-        <div className="enhanced-json-view">
+        <div className="enhanced-json-view" style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             <div className="json-toolbar">
                 <JsonSearch
-                    onSearch={setSearchQuery}
+                    onSearch={handleSearch}
+                    onNext={handleNextMatch}
+                    onPrev={handlePrevMatch}
                     placeholder="搜索键名或值..."
+                    resultCount={matchedPaths.length}
+                    currentIndex={currentMatchIndex}
                 />
                 <div className="json-toolbar-actions">
                     <button className="json-toolbar-btn" onClick={toggleAll} title={allExpanded ? "折叠全部" : "展开全部"}>
@@ -467,6 +685,9 @@ export const EnhancedJsonView: React.FC<EnhancedJsonViewProps> = ({ data }) => {
                     isArrayChild={false}
                     depth={0}
                     isLast={true}
+                    searchQuery={searchQuery}
+                    isMatched={matchedPaths.includes('root')}
+                    isParentMatched={false}
                 />
             </div>
         </div>

@@ -80,7 +80,7 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow: auto;
 }
 
 /* 工具栏 */
@@ -92,6 +92,14 @@
     background: var(--json-toolbar-bg);
     border-bottom: 1px solid var(--json-toolbar-border);
     flex-shrink: 0;
+}
+
+/* JSON 内容区域 - 滚动容器 */
+.json-content {
+    flex: 1;
+    overflow: auto;
+    padding: 8px 12px;
+    height: calc(100% - 45px);
 }
 
 .json-toolbar-actions {
@@ -126,7 +134,8 @@
     display: flex;
     align-items: center;
     flex: 1;
-    max-width: 300px;
+    max-width: 320px;
+    gap: 6px;
 }
 
 .json-search-icon {
@@ -134,6 +143,14 @@
     left: 10px;
     color: var(--json-preview-color);
     pointer-events: none;
+    z-index: 1;
+}
+
+.json-search-input-wrapper {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
 }
 
 .json-search-input {
@@ -159,19 +176,18 @@
 }
 
 .json-search-clear {
-    position: absolute;
-    right: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 18px;
-    height: 18px;
+    width: 22px;
+    height: 22px;
     padding: 0;
-    border: none;
-    border-radius: 50%;
-    background: transparent;
+    border: 1px solid var(--json-toolbar-border);
+    border-radius: 4px;
+    background: var(--json-search-bg);
     color: var(--json-preview-color);
     cursor: pointer;
+    flex-shrink: 0;
 }
 
 .json-search-clear:hover {
@@ -179,10 +195,16 @@
     color: var(--json-toggle-hover);
 }
 
+.json-search-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
 /* JSON 内容区域 */
 .json-content {
     flex: 1;
-    overflow: auto;
     padding: 8px 0;
 }
 
@@ -430,3 +452,80 @@
         padding-right: 100px;
     }
 }
+
+/* 搜索高亮 */
+.json-highlight {
+    background: #fff3cd;
+    color: #856404;
+    padding: 0 2px;
+    border-radius: 2px;
+}
+
+[data-theme="dark"] .json-highlight,
+.theme-dark .json-highlight {
+    background: #664d03;
+    color: #fbbf24;
+}
+
+.json-highlight-row {
+    background: rgba(255, 193, 7, 0.15);
+}
+
+[data-theme="dark"] .json-highlight-row,
+.theme-dark .json-highlight-row {
+    background: rgba(255, 193, 7, 0.2);
+}
+
+/* 当前匹配项高亮 */
+.json-current-match {
+    background: rgba(255, 193, 7, 0.4) !important;
+    outline: 2px solid #ffc107;
+    outline-offset: -2px;
+}
+
+[data-theme="dark"] .json-current-match,
+.theme-dark .json-current-match {
+    background: rgba(255, 193, 7, 0.3) !important;
+    outline-color: #ffc107;
+}
+
+/* 搜索结果计数 */
+.json-search-count {
+    font-size: 11px;
+    color: var(--json-preview-color);
+    padding: 0 6px;
+}
+
+/* 搜索导航按钮 */
+.json-search-nav {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: 8px;
+}
+
+.json-nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid var(--json-toolbar-border);
+    border-radius: 3px;
+    background: var(--json-search-bg);
+    color: var(--json-bracket-color);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.json-nav-btn:hover:not(:disabled) {
+    background: var(--json-hover-bg);
+    color: var(--json-toggle-hover);
+}
+
+.json-nav-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+

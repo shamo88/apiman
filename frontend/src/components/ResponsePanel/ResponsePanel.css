@@ -98,6 +98,20 @@
   overflow: auto;
 }
 
+.response-json-viewport {
+  height: 100%;
+  padding: 0 !important;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden !important;
+}
+
+.response-json-viewport > * {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden !important;
+}
+
 .response-text pre {
   margin: 0;
   white-space: pre-wrap;
