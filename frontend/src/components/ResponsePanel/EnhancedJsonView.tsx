@@ -336,10 +336,10 @@ const JsonSearch: React.FC<{
                         setValue('');
                         onSearch('');
                     }}
+                    title="清除搜索"
                 >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
                     </svg>
                 </button>
             )}
@@ -393,6 +393,7 @@ export const EnhancedJsonView: React.FC<EnhancedJsonViewProps> = ({ data }) => {
     });
 
     const [searchQuery, setSearchQuery] = useState('');
+    const [allExpanded, setAllExpanded] = useState(true);
 
     const handleToggle = useCallback((path: string) => {
         setExpandedPaths(prev => {
@@ -407,29 +408,33 @@ export const EnhancedJsonView: React.FC<EnhancedJsonViewProps> = ({ data }) => {
     }, []);
 
     // 展开/折叠全部
-    const expandAll = useCallback(() => {
-        const allPaths = new Set<string>();
-        const collectPaths = (obj: unknown, currentPath: string) => {
-            if (obj && typeof obj === 'object') {
-                allPaths.add(currentPath);
-                if (Array.isArray(obj)) {
-                    obj.forEach((item, index) => {
-                        collectPaths(item, `${currentPath}[${index}]`);
-                    });
-                } else {
-                    Object.entries(obj as Record<string, unknown>).forEach(([key, value]) => {
-                        collectPaths(value, `${currentPath}.${key}`);
-                    });
+    const toggleAll = useCallback(() => {
+        if (allExpanded) {
+            // 折叠全部
+            setExpandedPaths(new Set<string>());
+            setAllExpanded(false);
+        } else {
+            // 展开全部
+            const allPaths = new Set<string>();
+            const collectPaths = (obj: unknown, currentPath: string) => {
+                if (obj && typeof obj === 'object') {
+                    allPaths.add(currentPath);
+                    if (Array.isArray(obj)) {
+                        obj.forEach((item, index) => {
+                            collectPaths(item, `${currentPath}[${index}]`);
+                        });
+                    } else {
+                        Object.entries(obj as Record<string, unknown>).forEach(([key, value]) => {
+                            collectPaths(value, `${currentPath}.${key}`);
+                        });
+                    }
                 }
-            }
-        };
-        collectPaths(data, 'root');
-        setExpandedPaths(allPaths);
-    }, [data]);
-
-    const collapseAll = useCallback(() => {
-        setExpandedPaths(new Set<string>());
-    }, []);
+            };
+            collectPaths(data, 'root');
+            setExpandedPaths(allPaths);
+            setAllExpanded(true);
+        }
+    }, [data, allExpanded]);
 
     return (
         <div className="enhanced-json-view">
@@ -439,15 +444,16 @@ export const EnhancedJsonView: React.FC<EnhancedJsonViewProps> = ({ data }) => {
                     placeholder="搜索键名或值..."
                 />
                 <div className="json-toolbar-actions">
-                    <button className="json-toolbar-btn" onClick={expandAll} title="展开全部">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M7 17l5-5 5 5M7 7l5 5 5-5"/>
-                        </svg>
-                    </button>
-                    <button className="json-toolbar-btn" onClick={collapseAll} title="折叠全部">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M7 7l5 5 5-5M7 17l5-5 5 5"/>
-                        </svg>
+                    <button className="json-toolbar-btn" onClick={toggleAll} title={allExpanded ? "折叠全部" : "展开全部"}>
+                        {allExpanded ? (
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M1 12l7-8 7 8H1z"/>
+                            </svg>
+                        ) : (
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M1 4l7 8 7-8H1z"/>
+                            </svg>
+                        )}
                     </button>
                 </div>
             </div>
