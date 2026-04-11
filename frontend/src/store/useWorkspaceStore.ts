@@ -6,7 +6,9 @@ interface WorkspaceState {
   requestTabs: RequestTab[];
   activeRequestTab: string;
   currentRequest: CurlRequest | null;
-  response: any;
+  // 每个 tab 独立的 response 数据，key 为 tabId
+  tabResponses: Record<string, any>;
+  response: any; // 兼容：当前激活 tab 的 response
   selectedKeys: string[];
   apiConfig: ApiConfig;
   selectedEnvironmentId: string;
@@ -64,6 +66,7 @@ export const createEmptyWorkspaceState = (): WorkspaceState => ({
   requestTabs: [],
   activeRequestTab: '',
   currentRequest: null,
+  tabResponses: {},
   response: null,
   selectedKeys: [],
   apiConfig: createDefaultApiConfig(),
@@ -109,13 +112,19 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         const workspace = prev.workspaceStates[projectId] || createEmptyWorkspaceState();
         const existing = workspace.requestTabs.find((t) => t.id === tab.id);
         if (existing) {
+          // 切换到已有 tab 时，恢复该 tab 保存的 response
           return {
             workspaceStates: {
               ...prev.workspaceStates,
-              [projectId]: { ...workspace, activeRequestTab: tab.id }
+              [projectId]: { 
+                ...workspace, 
+                activeRequestTab: tab.id,
+                response: workspace.tabResponses[tab.id] || null,
+              }
             }
           };
         }
+        // 新建 tab，初始化该 tab 的 response 为 null
         return {
           workspaceStates: {
             ...prev.workspaceStates,
@@ -123,6 +132,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               ...workspace,
               requestTabs: [...workspace.requestTabs, tab],
               activeRequestTab: tab.id,
+              tabResponses: { ...workspace.tabResponses, [tab.id]: null },
+              response: null,
             }
           }
         };
@@ -133,14 +144,29 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         if (!workspace) return prev;
         const newTabs = workspace.requestTabs.filter((t) => t.id !== tabId);
         let newActiveTab = workspace.activeRequestTab;
+        let newResponse = workspace.response;
+        let newTabResponses = { ...workspace.tabResponses };
+        
+        // 删除关闭 tab 的 response
+        delete newTabResponses[tabId];
+        
         if (workspace.activeRequestTab === tabId) {
           const closedIndex = workspace.requestTabs.findIndex((t) => t.id === tabId);
           newActiveTab = newTabs[closedIndex - 1]?.id || newTabs[0]?.id || '';
+          // 切换到新 tab 时，恢复该 tab 保存的 response
+          newResponse = newTabResponses[newActiveTab] || null;
         }
+        
         return {
           workspaceStates: {
             ...prev.workspaceStates,
-            [projectId]: { ...workspace, requestTabs: newTabs, activeRequestTab: newActiveTab }
+            [projectId]: { 
+              ...workspace, 
+              requestTabs: newTabs, 
+              activeRequestTab: newActiveTab,
+              tabResponses: newTabResponses,
+              response: newResponse,
+            }
           }
         };
       }),
@@ -148,10 +174,16 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       setActiveRequestTab: (projectId, tabId) => set((prev) => {
         const workspace = prev.workspaceStates[projectId];
         if (!workspace) return prev;
+        // 切换 tab 时，恢复该 tab 保存的 response
+        const tabResponse = workspace.tabResponses[tabId] || null;
         return {
           workspaceStates: {
             ...prev.workspaceStates,
-            [projectId]: { ...workspace, activeRequestTab: tabId }
+            [projectId]: { 
+              ...workspace, 
+              activeRequestTab: tabId,
+              response: tabResponse,
+            }
           }
         };
       }),
@@ -192,10 +224,15 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       setResponse: (projectId, response) => set((prev) => {
         const workspace = prev.workspaceStates[projectId];
         if (!workspace) return prev;
+        // 同时更新当前 tab 独立的 response 存储
+        const newTabResponses = {
+          ...workspace.tabResponses,
+          [workspace.activeRequestTab]: response,
+        };
         return {
           workspaceStates: {
             ...prev.workspaceStates,
-            [projectId]: { ...workspace, response }
+            [projectId]: { ...workspace, response, tabResponses: newTabResponses }
           }
         };
       }),

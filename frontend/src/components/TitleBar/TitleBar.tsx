@@ -62,7 +62,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({ onOpenShortcutsHelp }) => {
 
   const handleTabEdit = (targetKey: React.MouseEvent | React.KeyboardEvent | string, action: 'add' | 'remove') => {
     if (action === 'remove' && targetKey !== 'home') {
-      projectStore.closeProjectTab(targetKey as string);
+      const closingProjectId = targetKey as string;
+      projectStore.closeProjectTab(closingProjectId);
+      // 关闭项目 tab 时清理该项目的 workspace 状态，释放内存
+      workspaceStore.resetWorkspaceState(closingProjectId);
     }
   };
 

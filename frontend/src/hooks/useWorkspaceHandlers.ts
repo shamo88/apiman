@@ -60,6 +60,9 @@ export const useWorkspaceHandlers = (projectId: string) => {
   const handleTreeItemClick = useCallback(async (treeNode: ProjectTree) => {
     if (treeNode.type !== 'request' || !treeNode.path) return;
 
+    // 检查是否是新建 tab
+    const isNewTab = !workspace.requestTabs.find(t => t.id === treeNode.path);
+
     try {
       const request = await GetRequest(treeNode.path);
       // Use request path as tab ID to avoid creating duplicate tabs for the same request
@@ -72,6 +75,12 @@ export const useWorkspaceHandlers = (projectId: string) => {
       workspaceStore.setCurrentRequest(projectId, request as CurlRequest);
       // Clear case selection when clicking on a request
       workspaceStore.setSidebarHighlightedCasePath(projectId, '');
+
+      // 新建 tab 时清空 response（openRequestTab 已经处理了 tabResponses 中的初始化）
+      // 切换到已有 tab 时，openRequestTab 会自动恢复该 tab 的 response
+      if (isNewTab) {
+        workspaceStore.setResponse(projectId, null);
+      }
 
       const cfg = apiConfigFromRequest(request as CurlRequest, request.name || '');
       // When switching to interface, preserve current editor state
@@ -302,7 +311,8 @@ export const useWorkspaceHandlers = (projectId: string) => {
       workspaceStore.setSidebarHighlightedCasePath(projectId, '');
       const request = await GetRequest(path);
       workspaceStore.setCurrentRequest(projectId, request as CurlRequest);
-      hydrateRequestEditor(request as CurlRequest, projectId, workspaceStore, null);
+      // 不调用 hydrateRequestEditor，因为它会清空 response
+      // 切换 tab 时保留原有的 response
     } catch (error) {
       console.error('Failed to load request:', error);
     }
@@ -317,8 +327,30 @@ export const useWorkspaceHandlers = (projectId: string) => {
   }, [projectId, workspace, workspaceStore, loadRequestContent]);
 
   const handleCloseRequestTab = useCallback((tabId: string) => {
+    const workspace = workspaceStore.workspaceStates[projectId];
+    if (!workspace) return;
+
+    const wasActiveTab = workspace.activeRequestTab === tabId;
+    const tabs = workspace.requestTabs;
+    const closedIndex = tabs.findIndex((t) => t.id === tabId);
+
     workspaceStore.closeRequestTab(projectId, tabId);
-  }, [projectId, workspaceStore]);
+
+    // 如果关闭的是当前激活的 tab，关闭后需要加载新 tab 的内容
+    if (wasActiveTab && tabs.length > 1) {
+      // 计算关闭后哪个 tab 会成为新的激活 tab
+      const newActiveTab = tabs[closedIndex - 1] || tabs[0];
+      if (newActiveTab && newActiveTab.id !== tabId) {
+        // 手动触发内容加载
+        const newWorkspace = workspaceStore.workspaceStates[projectId];
+        const newTab = newWorkspace.requestTabs.find((t) => t.id === newActiveTab.id);
+        if (newTab?.path) {
+          workspaceStore.setActiveRequestTab(projectId, newTab.id);
+          loadRequestContent(newTab.path);
+        }
+      }
+    }
+  }, [projectId, workspaceStore, loadRequestContent]);
 
   const handleCreateFolder = useCallback(async (name: string, parentPath: string) => {
     if (!project) return;

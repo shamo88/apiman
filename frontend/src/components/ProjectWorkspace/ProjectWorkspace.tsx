@@ -441,7 +441,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
         )}
 
         <div className="workspace-main">
-          {sidebarMenu === 'apis' ? (
+          {sidebarMenu === 'apis' && requestTabs.length > 0 ? (
             <>
               <div className="workspace-request">
                 <RequestPanel

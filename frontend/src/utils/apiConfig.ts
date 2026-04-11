@@ -80,7 +80,8 @@ export const hydrateRequestEditor = (
   request: CurlRequest | null,
   currentProjectId: string,
   workspaceStore: WorkspaceStore,
-  _scriptStore: ScriptStore | null
+  _scriptStore: ScriptStore | null,
+  clearResponse: boolean = false
 ) => {
   if (!request) return;
 
@@ -136,5 +137,7 @@ export const hydrateRequestEditor = (
     workspaceStore.setRequestEditorSurface(currentProjectId, 'plain');
   }
 
-  workspaceStore.setResponse(currentProjectId, null);
+  if (clearResponse) {
+    workspaceStore.setResponse(currentProjectId, null);
+  }
 };
