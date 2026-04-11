@@ -655,6 +655,11 @@ export const EnhancedJsonView: React.FC<EnhancedJsonViewProps> = ({ data }) => {
         }
     }, [data, allExpanded]);
 
+    const handleCopyJson = useCallback(() => {
+        const jsonStr = JSON.stringify(data, null, 2);
+        copyToClipboard(jsonStr, 'value');
+    }, [data]);
+
     return (
         <div className="enhanced-json-view" style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             <div className="json-toolbar">
@@ -667,6 +672,12 @@ export const EnhancedJsonView: React.FC<EnhancedJsonViewProps> = ({ data }) => {
                     currentIndex={currentMatchIndex}
                 />
                 <div className="json-toolbar-actions">
+                    <button className="json-toolbar-btn" onClick={handleCopyJson} title="复制 JSON">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                    </button>
                     <button className="json-toolbar-btn" onClick={toggleAll} title={allExpanded ? "折叠全部" : "展开全部"}>
                         {allExpanded ? (
                             <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
