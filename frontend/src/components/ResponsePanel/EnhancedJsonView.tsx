@@ -1,6 +1,6 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { message } from 'antd';
-import 'react-json-view-lite/dist/index.css';
+import './EnhancedJsonView.css';
 
 interface EnhancedJsonViewProps {
     data: unknown;
@@ -14,142 +14,95 @@ interface JsonNodeProps {
     onToggle: (path: string) => void;
     isArrayChild: boolean;
     arrayIndex?: number;
+    depth: number;
+    isLast: boolean;
 }
 
-const TYPE_ICONS: Record<string, string> = {
-    string: '"',
-    number: '#',
-    boolean: '◆',
-    null: '∅',
-    object: '{}',
-    array: '[]',
-};
-
-type JsonValueType = 'string' | 'number' | 'boolean' | 'null' | 'object' | 'array' | 'undefined';
+type JsonValueType = 'string' | 'number' | 'boolean' | 'null' | 'undefined' | 'object' | 'array';
 
 const getValueType = (value: unknown): JsonValueType => {
     if (value === null) return 'null';
     if (Array.isArray(value)) return 'array';
     if (typeof value === 'object') return 'object';
+    if (typeof value === 'undefined') return 'undefined';
     return typeof value as JsonValueType;
 };
 
-const copyToClipboard = async (text: string, type: 'path' | 'value') => {
+const copyToClipboard = async (text: string, type: 'path' | 'value' | 'key') => {
     try {
         await navigator.clipboard.writeText(text);
-        message.success(`已复制 ${type === 'path' ? '路径' : '值'}`);
+        const label = type === 'path' ? '路径' : type === 'key' ? '键名' : '值';
+        message.success(`已复制 ${label}`);
     } catch {
         message.error('复制失败');
     }
 };
 
-const JsonValue: React.FC<{
-    value: string | number | boolean | null;
-    path: string;
-}> = ({ value, path }) => {
-    const [showActions, setShowActions] = useState(false);
-    const type = getValueType(value);
-
-    const renderValue = () => {
-        if (type === 'string') {
-            return <span className="json-value json-string">"{value as string}"</span>;
-        }
-        if (type === 'number') {
-            return <span className="json-value json-number">{value}</span>;
-        }
-        if (type === 'boolean') {
-            return <span className="json-value json-boolean">{value ? 'true' : 'false'}</span>;
-        }
-        return <span className="json-value json-null">null</span>;
-    };
+// 复制按钮组件
+const CopyButton: React.FC<{
+    text: string;
+    type: 'path' | 'value' | 'key';
+    title: string;
+}> = ({ text, type, title }) => {
+    const [visible, setVisible] = useState(false);
 
     return (
         <span
-            className="json-value-wrapper"
-            onMouseEnter={() => setShowActions(true)}
-            onMouseLeave={() => setShowActions(false)}
+            className="json-copy-btn"
+            onMouseEnter={() => setVisible(true)}
+            onMouseLeave={() => setVisible(false)}
+            onClick={(e) => {
+                e.stopPropagation();
+                copyToClipboard(text, type);
+            }}
+            title={title}
+            style={{ opacity: visible ? 1 : 0 }}
         >
-            <span className={`json-type-icon json-type-${type}`}>
-                {TYPE_ICONS[type]}
-            </span>
-            {renderValue()}
-            {showActions && (
-                <span className="json-value-actions">
-                    <button
-                        className="json-action-btn"
-                        onClick={() => copyToClipboard(path, 'path')}
-                        title="复制路径"
-                    >
-                        ⧉
-                    </button>
-                    <button
-                        className="json-action-btn"
-                        onClick={() => copyToClipboard(String(value), 'value')}
-                        title="复制值"
-                    >
-                        ⎘
-                    </button>
-                </span>
-            )}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
         </span>
     );
 };
 
-const JsonNode: React.FC<JsonNodeProps> = ({
-    keyName,
-    value,
-    path,
-    expandedPaths,
-    onToggle,
-    isArrayChild,
-    arrayIndex,
-}) => {
+// 叶子节点（值）
+const JsonLeaf: React.FC<{
+    keyName: string | number | null;
+    value: unknown;
+    path: string;
+    isArrayChild: boolean;
+    arrayIndex?: number;
+    isLast: boolean;
+    depth: number;
+}> = ({ keyName, value, path, isArrayChild, arrayIndex, isLast, depth }) => {
     const type = getValueType(value);
-    const isExpandable = type === 'object' || type === 'array';
-    const isExpanded = expandedPaths.has(path);
+    const [hovered, setHovered] = useState(false);
 
-    const toggleExpand = useCallback(() => {
-        onToggle(path);
-    }, [path, onToggle]);
-
-    const handleCopyPath = useCallback(() => {
-        copyToClipboard(path, 'path');
-    }, [path]);
-
-    if (!isExpandable) {
-        return (
-            <div className="json-node json-leaf">
-                {isArrayChild && (
-                    <span className="json-array-index">[{arrayIndex}]</span>
-                )}
-                {keyName !== null && (
-                    <>
-                        <span className="json-key">"{keyName}"</span>
-                        <span className="json-colon">: </span>
-                    </>
-                )}
-                <JsonValue value={value as string | number | boolean | null} path={path} />
-            </div>
-        );
-    }
-
-    const entries: [string | number, unknown][] = type === 'array'
-        ? (value as unknown[]).map((v, i) => [i, v] as [number, unknown])
-        : Object.entries(value as Record<string, unknown>);
-
-    const itemCount = entries.length;
-    const collapsedPreview = type === 'array'
-        ? `Array(${itemCount})`
-        : `Object(${itemCount})`;
+    const renderValue = () => {
+        switch (type) {
+            case 'string':
+                return <span className="json-string">"{value as string}"</span>;
+            case 'number':
+                return <span className="json-number">{String(value)}</span>;
+            case 'boolean':
+                return <span className="json-boolean">{String(value)}</span>;
+            case 'null':
+                return <span className="json-null">null</span>;
+            case 'undefined':
+                return <span className="json-undefined">undefined</span>;
+            default:
+                return <span className="json-value">{String(value)}</span>;
+        }
+    };
 
     return (
-        <div className="json-node json-branch">
-            <span
-                className={`json-expand-icon ${isExpanded ? 'expanded' : 'collapsed'}`}
-                onClick={toggleExpand}
-            >
-                {isExpanded ? '▾' : '▸'}
-            </span>
+        <div
+            className={`json-leaf ${hovered ? 'json-leaf-hovered' : ''}`}
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+            style={{ paddingLeft: `${depth * 16}px` }}
+        >
             {isArrayChild && (
                 <span className="json-array-index">[{arrayIndex}]</span>
             )}
@@ -159,26 +112,136 @@ const JsonNode: React.FC<JsonNodeProps> = ({
                     <span className="json-colon">: </span>
                 </>
             )}
-            <span className="json-bracket">
-                {type === 'array' ? '[' : '{'}
-            </span>
-            {!isExpanded && (
-                <span className="json-collapsed-preview">
-                    {collapsedPreview}
+            {renderValue()}
+            {hovered && (
+                <span className="json-leaf-actions">
+                    <CopyButton text={path} type="path" title="复制路径" />
+                    <CopyButton text={String(value ?? '')} type="value" title="复制值" />
                 </span>
             )}
-            {!isExpanded && (
-                <span className="json-bracket">
-                    {type === 'array' ? ']' : '}'}
-                </span>
-            )}
-            <button
-                className="json-path-btn"
-                onClick={handleCopyPath}
-                title="复制路径"
+            {!isLast && <span className="json-comma">,</span>}
+        </div>
+    );
+};
+
+// 树枝节点（对象/数组）
+const JsonBranch: React.FC<JsonNodeProps> = ({
+    keyName,
+    value,
+    path,
+    expandedPaths,
+    onToggle,
+    isArrayChild,
+    arrayIndex,
+    depth,
+    isLast,
+}) => {
+    const type = getValueType(value);
+    const isExpandable = type === 'object' || type === 'array';
+    const isExpanded = expandedPaths.has(path);
+    const [hovered, setHovered] = useState(false);
+
+    const entries = useMemo(() => {
+        if (type === 'array') {
+            return (value as unknown[]).map((v, i) => [i, v] as [number, unknown]);
+        }
+        return Object.entries(value as Record<string, unknown>);
+    }, [value, type]);
+
+    const itemCount = entries.length;
+
+    const toggleExpand = useCallback(() => {
+        onToggle(path);
+    }, [path, onToggle]);
+
+    if (!isExpandable) {
+        return (
+            <JsonLeaf
+                keyName={keyName}
+                value={value}
+                path={path}
+                isArrayChild={isArrayChild}
+                arrayIndex={arrayIndex}
+                isLast={isLast}
+                depth={depth}
+            />
+        );
+    }
+
+    return (
+        <div
+            className={`json-branch ${hovered ? 'json-branch-hovered' : ''}`}
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+        >
+            <div
+                className="json-branch-header"
+                style={{ paddingLeft: `${depth * 16}px` }}
             >
-                {path.split('.').pop() || path}
-            </button>
+                {/* 缩进线 */}
+                {Array.from({ length: depth }).map((_, i) => (
+                    <span
+                        key={i}
+                        className="json-indent-line"
+                        style={{ left: `${i * 16 + 7}px` }}
+                    />
+                ))}
+
+                {/* 展开/折叠按钮 */}
+                <span className="json-toggle" onClick={toggleExpand}>
+                    {isExpanded ? (
+                        <svg className="json-toggle-icon" viewBox="0 0 16 16" width="12" height="12">
+                            <path fill="currentColor" d="M4 6l4 4 4-4"/>
+                        </svg>
+                    ) : (
+                        <svg className="json-toggle-icon" viewBox="0 0 16 16" width="12" height="12">
+                            <path fill="currentColor" d="M6 4l4 4-4 4"/>
+                        </svg>
+                    )}
+                </span>
+
+                {isArrayChild && (
+                    <span className="json-array-index">[{arrayIndex}]</span>
+                )}
+
+                {keyName !== null && (
+                    <>
+                        <span className="json-key">"{keyName}"</span>
+                        <span className="json-colon">: </span>
+                    </>
+                )}
+
+                {/* 括号 */}
+                <span className="json-bracket">
+                    {type === 'array' ? '[' : '{'}
+                </span>
+
+                {/* 折叠预览 */}
+                {!isExpanded && (
+                    <>
+                        <span className="json-preview">
+                            {type === 'array'
+                                ? `Array(${itemCount})`
+                                : `Object(${itemCount})`}
+                        </span>
+                        <span className="json-bracket">
+                            {type === 'array' ? ']' : '}'}
+                        </span>
+                    </>
+                )}
+
+                {/* 悬停时显示操作按钮 */}
+                {hovered && (
+                    <span className="json-branch-actions">
+                        <CopyButton text={path} type="path" title="复制路径" />
+                        <CopyButton text={keyName !== null ? String(keyName) : path} type="key" title="复制键名" />
+                    </span>
+                )}
+
+                {!isLast && !isExpanded && <span className="json-comma">,</span>}
+            </div>
+
+            {/* 子节点 */}
             {isExpanded && (
                 <div className="json-children">
                     {entries.map(([key, val], idx) => (
@@ -191,50 +254,145 @@ const JsonNode: React.FC<JsonNodeProps> = ({
                             onToggle={onToggle}
                             isArrayChild={type === 'array'}
                             arrayIndex={type === 'array' ? idx : undefined}
+                            depth={depth + 1}
+                            isLast={idx === entries.length - 1}
                         />
                     ))}
-                </div>
-            )}
-            {isExpanded && (
-                <>
-                    <span
-                        className="json-expand-icon expanded"
-                        onClick={toggleExpand}
-                        style={{ visibility: 'hidden' }}
+                    <div
+                        className="json-branch-footer"
+                        style={{ paddingLeft: `${depth * 16}px` }}
                     >
-                        ▾
-                    </span>
-                    <span className="json-bracket">
-                        {type === 'array' ? ']' : '}'}
-                    </span>
-                </>
+                        {Array.from({ length: depth }).map((_, i) => (
+                            <span
+                                key={i}
+                                className="json-indent-line"
+                                style={{ left: `${i * 16 + 7}px` }}
+                            />
+                        ))}
+                        <span className="json-toggle-placeholder" />
+                        <span className="json-bracket">
+                            {type === 'array' ? ']' : '}'}
+                        </span>
+                        {!isLast && <span className="json-comma">,</span>}
+                    </div>
+                </div>
             )}
         </div>
     );
 };
 
-export const EnhancedJsonView: React.FC<EnhancedJsonViewProps> = ({
-    data,
-}) => {
+const JsonNode: React.FC<JsonNodeProps> = (props) => {
+    const type = getValueType(props.value);
+    const isExpandable = type === 'object' || type === 'array';
+
+    if (!isExpandable) {
+        return <JsonLeaf {...props} />;
+    }
+
+    return <JsonBranch {...props} />;
+};
+
+// 搜索组件
+const JsonSearch: React.FC<{
+    onSearch: (query: string) => void;
+    placeholder?: string;
+}> = ({ onSearch, placeholder = '搜索键名或值...' }) => {
+    const [value, setValue] = useState('');
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newValue = e.target.value;
+        setValue(newValue);
+        onSearch(newValue);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Escape') {
+            setValue('');
+            onSearch('');
+            inputRef.current?.blur();
+        }
+    };
+
+    return (
+        <div className="json-search">
+            <svg className="json-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <path d="m21 21-4.35-4.35"></path>
+            </svg>
+            <input
+                ref={inputRef}
+                type="text"
+                className="json-search-input"
+                value={value}
+                onChange={handleChange}
+                onKeyDown={handleKeyDown}
+                placeholder={placeholder}
+            />
+            {value && (
+                <button
+                    className="json-search-clear"
+                    onClick={() => {
+                        setValue('');
+                        onSearch('');
+                    }}
+                >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            )}
+        </div>
+    );
+};
+
+// 统计信息
+const JsonStats: React.FC<{ data: unknown }> = ({ data }) => {
+    const stats = useMemo(() => {
+        const countKeys = (obj: unknown): number => {
+            if (obj === null || typeof obj !== 'object') return 0;
+            if (Array.isArray(obj)) return obj.length;
+            return Object.keys(obj as Record<string, unknown>).length;
+        };
+
+        const type = getValueType(data);
+        if (type === 'array') {
+            return `Array(${countKeys(data)})`;
+        }
+        if (type === 'object') {
+            return `Object(${countKeys(data)})`;
+        }
+        return '';
+    }, [data]);
+
+    if (!stats) return null;
+
+    return <span className="json-stats">{stats}</span>;
+};
+
+export const EnhancedJsonView: React.FC<EnhancedJsonViewProps> = ({ data }) => {
     const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => {
         const initialExpanded = new Set<string>();
-        const collectPaths = (obj: unknown, currentPath: string) => {
-            if (obj && typeof obj === 'object') {
+        const collectPaths = (obj: unknown, currentPath: string, depth: number = 0) => {
+            if (obj && typeof obj === 'object' && depth < 3) {
                 initialExpanded.add(currentPath);
                 if (Array.isArray(obj)) {
-                    obj.forEach((item, index) => {
-                        collectPaths(item, `${currentPath}[${index}]`);
+                    obj.slice(0, 10).forEach((item, index) => {
+                        collectPaths(item, `${currentPath}[${index}]`, depth + 1);
                     });
                 } else {
-                    Object.entries(obj as Record<string, unknown>).forEach(([key, value]) => {
-                        collectPaths(value, `${currentPath}.${key}`);
+                    Object.entries(obj as Record<string, unknown>).slice(0, 10).forEach(([key, value]) => {
+                        collectPaths(value, `${currentPath}.${key}`, depth + 1);
                     });
                 }
             }
         };
-        collectPaths(data, 'root');
+        collectPaths(data, 'root', 0);
         return initialExpanded;
     });
+
+    const [searchQuery, setSearchQuery] = useState('');
 
     const handleToggle = useCallback((path: string) => {
         setExpandedPaths(prev => {
@@ -248,16 +406,63 @@ export const EnhancedJsonView: React.FC<EnhancedJsonViewProps> = ({
         });
     }, []);
 
+    // 展开/折叠全部
+    const expandAll = useCallback(() => {
+        const allPaths = new Set<string>();
+        const collectPaths = (obj: unknown, currentPath: string) => {
+            if (obj && typeof obj === 'object') {
+                allPaths.add(currentPath);
+                if (Array.isArray(obj)) {
+                    obj.forEach((item, index) => {
+                        collectPaths(item, `${currentPath}[${index}]`);
+                    });
+                } else {
+                    Object.entries(obj as Record<string, unknown>).forEach(([key, value]) => {
+                        collectPaths(value, `${currentPath}.${key}`);
+                    });
+                }
+            }
+        };
+        collectPaths(data, 'root');
+        setExpandedPaths(allPaths);
+    }, [data]);
+
+    const collapseAll = useCallback(() => {
+        setExpandedPaths(new Set<string>());
+    }, []);
+
     return (
         <div className="enhanced-json-view">
-            <JsonNode
-                keyName={null}
-                value={data}
-                path="root"
-                expandedPaths={expandedPaths}
-                onToggle={handleToggle}
-                isArrayChild={false}
-            />
+            <div className="json-toolbar">
+                <JsonSearch
+                    onSearch={setSearchQuery}
+                    placeholder="搜索键名或值..."
+                />
+                <div className="json-toolbar-actions">
+                    <button className="json-toolbar-btn" onClick={expandAll} title="展开全部">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M7 17l5-5 5 5M7 7l5 5 5-5"/>
+                        </svg>
+                    </button>
+                    <button className="json-toolbar-btn" onClick={collapseAll} title="折叠全部">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M7 7l5 5 5-5M7 17l5-5 5 5"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div className="json-content">
+                <JsonNode
+                    keyName={null}
+                    value={data}
+                    path="root"
+                    expandedPaths={expandedPaths}
+                    onToggle={handleToggle}
+                    isArrayChild={false}
+                    depth={0}
+                    isLast={true}
+                />
+            </div>
         </div>
     );
 };

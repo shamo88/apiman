@@ -1,0 +1,432 @@
+/* EnhancedJsonView - Whistle/DevTools 风格 */
+
+/* 主题变量 */
+:root {
+    /* 亮色主题 */
+    --json-key-color: #0451a5;
+    --json-string-color: #a31515;
+    --json-number-color: #098658;
+    --json-boolean-color: #0000ff;
+    --json-null-color: #808080;
+    --json-undefined-color: #808080;
+    --json-bracket-color: #666666;
+    --json-preview-color: #888888;
+    --json-index-color: #9b9b9b;
+    --json-comma-color: #666666;
+    --json-toolbar-bg: #f5f5f5;
+    --json-toolbar-border: #e0e0e0;
+    --json-search-bg: #ffffff;
+    --json-search-border: #d1d1d1;
+    --json-indent-line: #d4d4d4;
+    --json-hover-bg: #f0f0f0;
+    --json-toggle-color: #666666;
+    --json-toggle-hover: #333333;
+    --json-stats-color: #888888;
+}
+
+[data-theme="dark"] {
+    /* 暗色主题 */
+    --json-key-color: #9cdcfe;
+    --json-string-color: #ce9178;
+    --json-number-color: #b5cea8;
+    --json-boolean-color: #569cd6;
+    --json-null-color: #808080;
+    --json-undefined-color: #808080;
+    --json-bracket-color: #cccccc;
+    --json-preview-color: #888888;
+    --json-index-color: #6e7681;
+    --json-comma-color: #cccccc;
+    --json-toolbar-bg: #2d2d2d;
+    --json-toolbar-border: #404040;
+    --json-search-bg: #1e1e1e;
+    --json-search-border: #3c3c3c;
+    --json-indent-line: #3c3c3c;
+    --json-hover-bg: #2a2d2e;
+    --json-toggle-color: #6e7681;
+    --json-toggle-hover: #cccccc;
+    --json-stats-color: #6e7681;
+}
+
+/* 覆盖样式 - 适配全局暗色主题 */
+.theme-dark {
+    --json-key-color: #9cdcfe;
+    --json-string-color: #ce9178;
+    --json-number-color: #b5cea8;
+    --json-boolean-color: #569cd6;
+    --json-null-color: #808080;
+    --json-undefined-color: #808080;
+    --json-bracket-color: #cccccc;
+    --json-preview-color: #888888;
+    --json-index-color: #6e7681;
+    --json-comma-color: #cccccc;
+    --json-toolbar-bg: #2d2d2d;
+    --json-toolbar-border: #404040;
+    --json-search-bg: #1e1e1e;
+    --json-search-border: #3c3c3c;
+    --json-indent-line: #3c3c3c;
+    --json-hover-bg: #2a2d2e;
+    --json-toggle-color: #6e7681;
+    --json-toggle-hover: #cccccc;
+    --json-stats-color: #6e7681;
+}
+
+/* 组件容器 */
+.enhanced-json-view {
+    font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--json-bracket-color);
+    background: transparent;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* 工具栏 */
+.json-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--json-toolbar-bg);
+    border-bottom: 1px solid var(--json-toolbar-border);
+    flex-shrink: 0;
+}
+
+.json-toolbar-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.json-toolbar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--json-toolbar-border);
+    border-radius: 4px;
+    background: var(--json-search-bg);
+    color: var(--json-bracket-color);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.json-toolbar-btn:hover {
+    background: var(--json-hover-bg);
+    color: var(--json-toggle-hover);
+    border-color: var(--json-toggle-color);
+}
+
+/* 搜索框 */
+.json-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 1;
+    max-width: 300px;
+}
+
+.json-search-icon {
+    position: absolute;
+    left: 10px;
+    color: var(--json-preview-color);
+    pointer-events: none;
+}
+
+.json-search-input {
+    width: 100%;
+    height: 28px;
+    padding: 0 28px;
+    border: 1px solid var(--json-search-border);
+    border-radius: 4px;
+    background: var(--json-search-bg);
+    color: var(--json-bracket-color);
+    font-family: inherit;
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.json-search-input::placeholder {
+    color: var(--json-preview-color);
+}
+
+.json-search-input:focus {
+    border-color: #4a9eff;
+}
+
+.json-search-clear {
+    position: absolute;
+    right: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--json-preview-color);
+    cursor: pointer;
+}
+
+.json-search-clear:hover {
+    background: var(--json-hover-bg);
+    color: var(--json-toggle-hover);
+}
+
+/* JSON 内容区域 */
+.json-content {
+    flex: 1;
+    overflow: auto;
+    padding: 8px 0;
+}
+
+/* 缩进线 */
+.json-indent-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--json-indent-line);
+    pointer-events: none;
+}
+
+/* 叶子节点 */
+.json-leaf {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 22px;
+    padding-right: 60px;
+    white-space: nowrap;
+}
+
+.json-leaf-hovered {
+    background: var(--json-hover-bg);
+}
+
+.json-leaf .json-key {
+    color: var(--json-key-color);
+}
+
+.json-leaf .json-string {
+    color: var(--json-string-color);
+}
+
+.json-leaf .json-number {
+    color: var(--json-number-color);
+}
+
+.json-leaf .json-boolean {
+    color: var(--json-boolean-color);
+    font-weight: 500;
+}
+
+.json-leaf .json-null,
+.json-leaf .json-undefined {
+    color: var(--json-null-color);
+    font-style: italic;
+}
+
+.json-leaf .json-comma {
+    color: var(--json-comma-color);
+    margin-left: 2px;
+}
+
+/* 数组索引 */
+.json-array-index {
+    color: var(--json-index-color);
+    margin-right: 6px;
+    user-select: none;
+}
+
+/* 键名 */
+.json-key {
+    flex-shrink: 0;
+}
+
+/* 冒号 */
+.json-colon {
+    color: var(--json-bracket-color);
+    margin-right: 4px;
+}
+
+/* 复制按钮 */
+.json-copy-btn {
+    position: absolute;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--json-preview-color);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.json-copy-btn:hover {
+    background: var(--json-toolbar-border);
+    color: var(--json-toggle-hover);
+}
+
+.json-leaf-actions,
+.json-branch-actions {
+    position: absolute;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+}
+
+/* 树枝节点 */
+.json-branch {
+    position: relative;
+}
+
+.json-branch-hovered {
+    background: var(--json-hover-bg);
+}
+
+.json-branch-header {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 24px;
+    padding-right: 80px;
+    white-space: nowrap;
+}
+
+.json-branch-footer {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 24px;
+    white-space: nowrap;
+}
+
+/* 展开/折叠按钮 */
+.json-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    margin-right: 4px;
+    color: var(--json-toggle-color);
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.15s ease;
+    flex-shrink: 0;
+}
+
+.json-toggle:hover {
+    color: var(--json-toggle-hover);
+}
+
+.json-toggle-icon {
+    display: block;
+}
+
+.json-toggle-placeholder {
+    width: 16px;
+    height: 16px;
+    margin-right: 4px;
+    flex-shrink: 0;
+}
+
+/* 括号 */
+.json-bracket {
+    color: var(--json-bracket-color);
+    font-weight: 500;
+}
+
+/* 折叠预览 */
+.json-preview {
+    color: var(--json-preview-color);
+    font-style: italic;
+    margin: 0 4px;
+}
+
+/* 统计信息 */
+.json-stats {
+    color: var(--json-stats-color);
+    font-size: 11px;
+    margin-left: 6px;
+}
+
+/* 子节点容器 */
+.json-children {
+    position: relative;
+}
+
+/* 滚动条样式 */
+.json-content::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.json-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.json-content::-webkit-scrollbar-thumb {
+    background: var(--json-indent-line);
+    border-radius: 5px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+.json-content::-webkit-scrollbar-thumb:hover {
+    background: var(--json-toggle-color);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+/* 动画 */
+@keyframes json-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(-2px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.json-branch-header,
+.json-branch-footer {
+    animation: json-fade-in 0.15s ease;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+    .json-toolbar {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .json-search {
+        max-width: none;
+        order: 1;
+        width: 100%;
+    }
+
+    .json-toolbar-actions {
+        order: 2;
+    }
+
+    .json-leaf,
+    .json-branch-header {
+        padding-right: 100px;
+    }
+}
