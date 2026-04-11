@@ -17,7 +17,8 @@ interface JsonNodeProps {
     depth: number;
     isLast: boolean;
     searchQuery: string;
-    isMatched: boolean;
+    matchedPaths: string[];
+    currentMatchPath: string | null;
     isParentMatched: boolean;
 }
 
@@ -98,7 +99,7 @@ const HighlightText: React.FC<{
 // 叶子节点（值）
 const JsonLeaf: React.FC<JsonNodeProps> = ({
     keyName, value, path, isArrayChild, arrayIndex, isLast, depth,
-    searchQuery, isMatched, isParentMatched
+    searchQuery, matchedPaths, currentMatchPath, isParentMatched
 }) => {
     const type = getValueType(value);
     const [hovered, setHovered] = useState(false);
@@ -113,7 +114,9 @@ const JsonLeaf: React.FC<JsonNodeProps> = ({
     const valueMatch = searchQuery &&
         stringValue.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const isHighlight = isMatched || isParentMatched;
+    const isMatched = matchedPaths.includes(path);
+    const isCurrentMatch = isMatched && currentMatchPath === path;
+    const isHighlight = isMatched;
 
     const renderValue = () => {
         switch (type) {
@@ -152,7 +155,7 @@ const JsonLeaf: React.FC<JsonNodeProps> = ({
 
     return (
         <div
-            className={`json-leaf ${hovered ? 'json-leaf-hovered' : ''} ${isHighlight ? 'json-highlight-row' : ''} ${isMatched ? 'json-current-match' : ''}`}
+            className={`json-leaf ${hovered ? 'json-leaf-hovered' : ''} ${isHighlight ? 'json-highlight-row' : ''} ${isCurrentMatch ? 'json-current-match' : ''}`}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
             style={{ paddingLeft: `${depth * 16}px` }}
@@ -188,7 +191,7 @@ const JsonLeaf: React.FC<JsonNodeProps> = ({
 // 树枝节点（对象/数组）
 const JsonBranch: React.FC<JsonNodeProps> = ({
     keyName, value, path, expandedPaths, onToggle, isArrayChild, arrayIndex,
-    depth, isLast, searchQuery, isMatched, isParentMatched
+    depth, isLast, searchQuery, matchedPaths, currentMatchPath, isParentMatched
 }) => {
     const type = getValueType(value);
     const isExpandable = type === 'object' || type === 'array';
@@ -221,15 +224,16 @@ const JsonBranch: React.FC<JsonNodeProps> = ({
                 depth={depth}
                 isLast={isLast}
                 searchQuery={searchQuery}
-                isMatched={isMatched}
+                matchedPaths={matchedPaths}
+                currentMatchPath={currentMatchPath}
                 isParentMatched={isParentMatched}
             />
         );
     }
 
-    const keyMatch = !!(searchQuery && keyName !== null &&
-        String(keyName).toLowerCase().includes(searchQuery.toLowerCase()));
-    const isHighlight = isMatched || isParentMatched || keyMatch;
+    const isMatched = matchedPaths.includes(path);
+    const isCurrentMatch = isMatched && currentMatchPath === path;
+    const isHighlight = isMatched;
 
     return (
         <div
@@ -239,7 +243,7 @@ const JsonBranch: React.FC<JsonNodeProps> = ({
             data-path={path}
         >
             <div
-                className={`json-branch-header ${isHighlight ? 'json-highlight-row' : ''} ${isMatched ? 'json-current-match' : ''}`}
+                className={`json-branch-header ${isHighlight ? 'json-highlight-row' : ''} ${isCurrentMatch ? 'json-current-match' : ''}`}
                 style={{ paddingLeft: `${depth * 16}px` }}
             >
                 {/* 缩进线 */}
@@ -327,7 +331,8 @@ const JsonBranch: React.FC<JsonNodeProps> = ({
                             depth={depth + 1}
                             isLast={idx === entries.length - 1}
                             searchQuery={searchQuery}
-                            isMatched={false}
+                            matchedPaths={matchedPaths}
+                            currentMatchPath={currentMatchPath}
                             isParentMatched={isHighlight}
                         />
                     ))}
@@ -486,10 +491,11 @@ const collectMatchedPaths = (
     for (const [key, val] of entries) {
         const keyStr = String(key);
         const valType = getValueType(val);
+        const childPath = type === 'array' ? `${path}[${key}]` : `${path}.${key}`;
 
         // 键名匹配
         if (keyStr.toLowerCase().includes(lowerQuery)) {
-            results.add(path);
+            results.add(childPath);
             hasMatch = true;
         }
 
@@ -497,14 +503,13 @@ const collectMatchedPaths = (
         if (valType !== 'object' && valType !== 'array') {
             const valStr = String(val ?? '');
             if (valStr.toLowerCase().includes(lowerQuery)) {
-                results.add(path);
+                results.add(childPath);
                 hasMatch = true;
             }
         }
 
         // 递归检查子节点
         if (valType === 'object' || valType === 'array') {
-            const childPath = type === 'array' ? `${path}[${key}]` : `${path}.${key}`;
             if (collectMatchedPaths(val, childPath, query, results)) {
                 hasMatch = true;
             }
@@ -686,7 +691,8 @@ export const EnhancedJsonView: React.FC<EnhancedJsonViewProps> = ({ data }) => {
                     depth={0}
                     isLast={true}
                     searchQuery={searchQuery}
-                    isMatched={matchedPaths.includes('root')}
+                    matchedPaths={matchedPaths}
+                    currentMatchPath={matchedPaths.length > 0 ? matchedPaths[currentMatchIndex] : null}
                     isParentMatched={false}
                 />
             </div>

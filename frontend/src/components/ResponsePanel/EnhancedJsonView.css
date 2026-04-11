@@ -453,7 +453,7 @@
     }
 }
 
-/* 搜索高亮 */
+/* 搜索高亮 - 普通匹配项 */
 .json-highlight {
     background: #fff3cd;
     color: #856404;
@@ -476,17 +476,33 @@
     background: rgba(255, 193, 7, 0.2);
 }
 
-/* 当前匹配项高亮 */
+/* 当前定位项高亮 - 使用青色区分 */
 .json-current-match {
-    background: rgba(255, 193, 7, 0.4) !important;
-    outline: 2px solid #ffc107;
+    background: rgba(0, 188, 212, 0.25) !important;
+    outline: 2px solid #00bcd4 !important;
     outline-offset: -2px;
+    animation: json-pulse 1s ease-in-out 3;
+}
+
+@keyframes json-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
 }
 
 [data-theme="dark"] .json-current-match,
 .theme-dark .json-current-match {
-    background: rgba(255, 193, 7, 0.3) !important;
-    outline-color: #ffc107;
+    background: rgba(0, 188, 212, 0.3) !important;
+    outline-color: #4dd0e1 !important;
+}
+
+/* 当前定位项的文字颜色也改变 */
+.json-current-match .json-key {
+    color: #00838f !important;
+}
+
+[data-theme="dark"] .json-current-match .json-key,
+.theme-dark .json-current-match .json-key {
+    color: #4dd0e1 !important;
 }
 
 /* 搜索结果计数 */
