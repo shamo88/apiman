@@ -454,24 +454,28 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
                   projectScripts={scripts.map((s) => ({ id: s.id, name: s.name }))}
                 />
               </div>
-              <ResizeSplitter
-                onRatioChange={handleResponseHeightChange}
-                initialRatio={responseHeight}
-                minRatio={100}
-                maxRatio={800}
-              />
-              <div className="workspace-response" style={{ height: responseHeight }}>
-                <ResponsePanel
-                  response={workspace.response as CurlResponse | null}
-                  formattedResponse={formattedResponse}
-                  scriptLogs={scriptLogs}
-                  testResults={testResults}
-                  scriptLogsExpanded={workspaceStore.scriptLogsExpanded}
-                  testResultsExpanded={workspaceStore.testResultsExpanded}
-                  onToggleScriptLogs={() => workspaceStore.setScriptLogsExpanded(!workspaceStore.scriptLogsExpanded)}
-                  onToggleTestResults={() => workspaceStore.setTestResultsExpanded(!workspaceStore.testResultsExpanded)}
-                />
-              </div>
+              {workspace.response && (
+                <>
+                  <ResizeSplitter
+                    onRatioChange={handleResponseHeightChange}
+                    initialRatio={responseHeight}
+                    minRatio={100}
+                    maxRatio={800}
+                  />
+                  <div className="workspace-response" style={{ height: responseHeight }}>
+                    <ResponsePanel
+                      response={workspace.response as CurlResponse | null}
+                      formattedResponse={formattedResponse}
+                      scriptLogs={scriptLogs}
+                      testResults={testResults}
+                      scriptLogsExpanded={workspaceStore.scriptLogsExpanded}
+                      testResultsExpanded={workspaceStore.testResultsExpanded}
+                      onToggleScriptLogs={() => workspaceStore.setScriptLogsExpanded(!workspaceStore.scriptLogsExpanded)}
+                      onToggleTestResults={() => workspaceStore.setTestResultsExpanded(!workspaceStore.testResultsExpanded)}
+                    />
+                  </div>
+                </>
+              )}
             </>
           ) : sidebarMenu === 'environments' ? (
             <EnvironmentEditor
