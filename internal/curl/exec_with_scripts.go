@@ -20,22 +20,6 @@ func NewScriptableExecutor() *ScriptableExecutor {
 	}
 }
 
-func (se *ScriptableExecutor) ExecuteWithScripts(
-	spec *models.HttpRequestSpec,
-	proxyOpts *ProxyOptions,
-	preScriptContents []string,
-	postScriptContents []string,
-	preScriptNames []string,
-	postScriptNames []string,
-	globals map[string]string,
-	environment map[string]string,
-	globalSetter func(key, value string),
-	timeoutSeconds int,
-) (*models.CurlResponse, error) {
-	ctx := context.Background()
-	return se.ExecuteWithScriptsContext(ctx, spec, proxyOpts, preScriptContents, postScriptContents, preScriptNames, postScriptNames, globals, environment, globalSetter, timeoutSeconds)
-}
-
 func (se *ScriptableExecutor) ExecuteWithScriptsContext(
 	ctx context.Context,
 	spec *models.HttpRequestSpec,

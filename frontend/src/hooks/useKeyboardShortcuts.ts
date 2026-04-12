@@ -107,24 +107,19 @@ export const useKeyboardShortcuts = () => {
     workspaceStore.setExecuting(true);
 
     try {
-      const { ExecuteHTTPRequest, ExecuteHTTPRequestWithScripts } = await import('../../wailsjs/go/main/App');
+      const { ExecuteHTTPRequestWithScripts } = await import('../../wailsjs/go/main/App');
       const spec = toWailsHttpSpec(workspaceState.apiConfig);
-      let response;
-
-      if (workspaceState.apiConfig.preScripts.length > 0 || workspaceState.apiConfig.postScripts.length > 0) {
-        response = await ExecuteHTTPRequestWithScripts(
-          project.id,
-          workspaceState.currentRequest?.name || 'api',
-          workspaceState.currentRequest?.name || 'request',
-          workspaceState.currentRequest?.path || '',
-          workspaceState.selectedEnvironmentId,
-          spec,
-          workspaceState.apiConfig.preScripts,
-          workspaceState.apiConfig.postScripts
-        );
-      } else {
-        response = await ExecuteHTTPRequest(spec);
-      }
+      // Always use ExecuteHTTPRequestWithScripts to ensure environment variables and globals are substituted
+      const response = await ExecuteHTTPRequestWithScripts(
+        project.id,
+        workspaceState.currentRequest?.name || 'api',
+        workspaceState.currentRequest?.name || 'request',
+        workspaceState.currentRequest?.path || '',
+        workspaceState.selectedEnvironmentId,
+        spec,
+        workspaceState.apiConfig.preScripts,
+        workspaceState.apiConfig.postScripts
+      );
 
       workspaceStore.setResponse(project.id, response);
 

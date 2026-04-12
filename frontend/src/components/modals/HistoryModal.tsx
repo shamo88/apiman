@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Button, Col, Input, Modal, Row, Select, Table, Tag, Space, message } from 'antd';
 import { SearchOutlined, ReloadOutlined, DeleteOutlined, ClockCircleOutlined, PlayCircleOutlined } from '@ant-design/icons';
-import { ListHistory, GetHistoryEntry, ClearHistory, SearchHistory, DeleteHistory, ExecuteHTTPRequestWithProject } from '../../../wailsjs/go/main/App';
+import { ListHistory, GetHistoryEntry, ClearHistory, SearchHistory, DeleteHistory, ExecuteHTTPRequestWithScripts } from '../../../wailsjs/go/main/App';
 import { models } from '../../../wailsjs/go/models';
 import { useUIStore } from '../../store';
 import { JsonView, allExpanded } from 'react-json-view-lite';
@@ -189,12 +189,15 @@ export const HistoryModal: React.FC = () => {
     try {
       const detail = await GetHistoryEntry(record.id);
       if (detail && detail.spec) {
-        await ExecuteHTTPRequestWithProject(
+        await ExecuteHTTPRequestWithScripts(
           detail.project_id || '',
           detail.project_name || '',
           detail.request_name || '',
           detail.request_path || '',
-          detail.spec
+          '',  // environmentID - empty for re-execute from history
+          detail.spec,
+          [],  // preScripts
+          []   // postScripts
         );
         message.success('请求已重新发送');
       }
@@ -215,12 +218,15 @@ export const HistoryModal: React.FC = () => {
       try {
         const detail = await GetHistoryEntry(entry.id);
         if (detail && detail.spec) {
-          await ExecuteHTTPRequestWithProject(
+          await ExecuteHTTPRequestWithScripts(
             detail.project_id || '',
             detail.project_name || '',
             detail.request_name || '',
             detail.request_path || '',
-            detail.spec
+            '',  // environmentID - empty for re-execute from history
+            detail.spec,
+            [],  // preScripts
+            []   // postScripts
           );
           successCount++;
         }

@@ -54,11 +54,7 @@ export function ExecuteCurl(arg1:string):Promise<models.CurlResponse>;
 
 export function ExecuteHTTPRequest(arg1:models.HttpRequestSpec):Promise<models.CurlResponse>;
 
-export function ExecuteHTTPRequestWithProject(arg1:string,arg2:string,arg3:string,arg4:string,arg5:models.HttpRequestSpec):Promise<models.CurlResponse>;
-
 export function ExecuteHTTPRequestWithScripts(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:models.HttpRequestSpec,arg7:Array<string>,arg8:Array<string>):Promise<models.CurlResponse>;
-
-export function ExecuteHTTPRequestWithScriptsInline(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:models.HttpRequestSpec,arg7:string,arg8:string):Promise<models.CurlResponse>;
 
 export function ExtractVariables(arg1:string):Promise<Array<string>>;
 

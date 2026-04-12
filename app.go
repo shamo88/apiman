@@ -154,10 +154,6 @@ func (a *App) ExecuteHTTPRequest(spec models.HttpRequestSpec) (*models.CurlRespo
 	return a.service.ExecuteHTTPRequest(spec)
 }
 
-func (a *App) ExecuteHTTPRequestWithProject(projectID, projectName, requestName, requestPath string, spec models.HttpRequestSpec) (*models.CurlResponse, error) {
-	return a.service.ExecuteHTTPRequestWithProject(projectID, projectName, requestName, requestPath, spec)
-}
-
 func (a *App) ExtractVariables(text string) []string {
 	return a.service.ExtractVariables(text)
 }
@@ -243,16 +239,6 @@ func (a *App) ExecuteHTTPRequestWithScripts(
 	postScriptIDs []string,
 ) (*models.CurlResponse, error) {
 	return a.service.ExecuteHTTPRequestWithScripts(projectID, projectName, requestName, requestPath, environmentID, spec, preScriptIDs, postScriptIDs)
-}
-
-func (a *App) ExecuteHTTPRequestWithScriptsInline(
-	projectID, projectName, requestName, requestPath string,
-	environmentID string,
-	spec models.HttpRequestSpec,
-	preScript string,
-	postScript string,
-) (*models.CurlResponse, error) {
-	return a.service.ExecuteHTTPRequestWithScriptsInline(projectID, projectName, requestName, requestPath, environmentID, spec, preScript, postScript)
 }
 
 func (a *App) SyncProjectToGit(projectID string) error {

@@ -102,16 +102,8 @@ export function ExecuteHTTPRequest(arg1) {
   return window['go']['main']['App']['ExecuteHTTPRequest'](arg1);
 }
 
-export function ExecuteHTTPRequestWithProject(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['main']['App']['ExecuteHTTPRequestWithProject'](arg1, arg2, arg3, arg4, arg5);
-}
-
 export function ExecuteHTTPRequestWithScripts(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
   return window['go']['main']['App']['ExecuteHTTPRequestWithScripts'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
-}
-
-export function ExecuteHTTPRequestWithScriptsInline(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
-  return window['go']['main']['App']['ExecuteHTTPRequestWithScriptsInline'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 }
 
 export function ExtractVariables(arg1) {

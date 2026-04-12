@@ -10,6 +10,7 @@ import (
 	"apiman/internal/postman"
 	"apiman/internal/project"
 	"apiman/internal/script"
+	"context"
 	"net/url"
 	"path/filepath"
 	"strings"
@@ -331,71 +332,9 @@ func (s *Service) ExecuteCurl(command string) (*models.CurlResponse, error) {
 	return s.CurlExecutor.ExecuteWithProxy(command, proxyOpts, timeout)
 }
 
-func (s *Service) ExecuteHTTPRequest(spec models.HttpRequestSpec) (*models.CurlResponse, error) {
-	// 注入全局 Cookie
+// executeHTTPRequestNoContext 执行无项目上下文的请求（注入Cookie、变量替换、无环境/脚本）
+func (s *Service) executeHTTPRequestNoContext(spec models.HttpRequestSpec) (*models.CurlResponse, error) {
 	spec = s.injectGlobalCookies(spec)
-
-	appCfg, err := s.ConfigManager.LoadAppConfig()
-	if err != nil || appCfg == nil {
-		// 无项目上下文，使用空的环境变量调用脚本执行器（做变量替换）
-		return s.ScriptableExecutor.ExecuteWithScripts(
-			&spec,
-			nil, // 无代理
-			nil, // 无预置脚本
-			nil, // 无后置脚本
-			nil, // 无脚本名
-			nil, // 无脚本名
-			nil, // 无全局变量
-			nil, // 无环境变量
-			nil, // 无全局setter
-			30,  // 默认超时
-		)
-	}
-	proxyOpts := &curl.ProxyOptions{
-		Enabled:    appCfg.Proxy.Enabled,
-		HTTPHost:   appCfg.Proxy.HTTPHost,
-		HTTPPort:   appCfg.Proxy.HTTPPort,
-		HTTPSHost:  appCfg.Proxy.HTTPSHost,
-		HTTPSPort:  appCfg.Proxy.HTTPSPort,
-		SOCKS5Host: appCfg.Proxy.SOCKS5Host,
-		SOCKS5Port: appCfg.Proxy.SOCKS5Port,
-	}
-	timeout := appCfg.HTTP.Timeout
-	if timeout == 0 {
-		timeout = 30
-	}
-	return s.ScriptableExecutor.ExecuteWithScripts(
-		&spec,
-		proxyOpts,
-		nil, // 无预置脚本
-		nil, // 无后置脚本
-		nil, // 无脚本名
-		nil, // 无脚本名
-		nil, // 无全局变量
-		nil, // 无环境变量
-		nil, // 无全局setter
-		timeout,
-	)
-}
-
-// ExecuteHTTPRequestWithProject executes HTTP request and records history with project context.
-func (s *Service) ExecuteHTTPRequestWithProject(projectID, projectName, requestName, requestPath string, spec models.HttpRequestSpec) (*models.CurlResponse, error) {
-	// 注入全局 Cookie
-	spec = s.injectGlobalCookies(spec)
-
-	// 加载项目全局变量用于变量替换
-	var globals map[string]string
-	projectPath, err := s.ProjectMgr.ProjectPathByID(projectID)
-	if err == nil {
-		projectVarsPath := filepath.Join(projectPath, "variables.json")
-		projectVars := script.NewProjectVariables()
-		if err := projectVars.LoadFromFile(projectVarsPath); err == nil {
-			globals = projectVars.GetAll()
-		}
-	}
-	if globals == nil {
-		globals = make(map[string]string)
-	}
 
 	appCfg, err := s.ConfigManager.LoadAppConfig()
 	proxyOpts := &curl.ProxyOptions{}
@@ -414,26 +353,24 @@ func (s *Service) ExecuteHTTPRequestWithProject(projectID, projectName, requestN
 		}
 	}
 
-	// 使用 ScriptableExecutor 执行以支持变量替换
-	resp, err := s.ScriptableExecutor.ExecuteWithScripts(
+	// 无项目上下文，globals和environment都为空，但仍做变量替换（空替换）
+	return s.ScriptableExecutor.ExecuteWithScriptsContext(
+		context.Background(),
 		&spec,
 		proxyOpts,
 		nil, // 无预置脚本
 		nil, // 无后置脚本
 		nil, // 无脚本名
 		nil, // 无脚本名
-		globals,
-		nil, // 无环境变量（ExecuteHTTPRequestWithProject 不支持环境）
+		nil, // 无全局变量
+		nil, // 无环境变量
 		nil, // 无全局setter
 		timeout,
 	)
+}
 
-	// 记录历史
-	if recordErr := s.RecordHistory(projectID, projectName, requestName, requestPath, spec, resp); recordErr != nil {
-		// 历史记录失败不影响主流程
-	}
-
-	return resp, err
+func (s *Service) ExecuteHTTPRequest(spec models.HttpRequestSpec) (*models.CurlResponse, error) {
+	return s.executeHTTPRequestNoContext(spec)
 }
 
 // injectGlobalCookies loads global cookies and injects matching ones into the request spec.
@@ -751,7 +688,8 @@ func (s *Service) ExecuteHTTPRequestWithScriptsWithSource(
 		_ = projectVars.SaveToFile(projectVarsPath)
 	}
 
-	resp, err := s.ScriptableExecutor.ExecuteWithScripts(
+	resp, err := s.ScriptableExecutor.ExecuteWithScriptsContext(
+		context.Background(),
 		&spec,
 		proxyOpts,
 		preScriptContents,
@@ -772,90 +710,6 @@ func (s *Service) ExecuteHTTPRequestWithScriptsWithSource(
 
 	// 记录历史
 	if recordErr := s.RecordHistoryWithSource(projectID, projectName, requestName, requestPath, spec, resp, source, sourceTool); recordErr != nil {
-		// 历史记录失败不影响主流程
-	}
-
-	return resp, nil
-}
-
-func (s *Service) ExecuteHTTPRequestWithScriptsInline(
-	projectID, projectName, requestName, requestPath string,
-	environmentID string,
-	spec models.HttpRequestSpec,
-	preScript string,
-	postScript string,
-) (*models.CurlResponse, error) {
-	projectPath, err := s.ProjectMgr.ProjectPathByID(projectID)
-	if err != nil {
-		return nil, err
-	}
-
-	projectVarsPath := filepath.Join(projectPath, "variables.json")
-	projectVars := script.NewProjectVariables()
-	if err := projectVars.LoadFromFile(projectVarsPath); err != nil {
-		return nil, err
-	}
-	globals := projectVars.GetAll()
-
-	var environment map[string]string
-	if environmentID != "" {
-		envs, err := s.LoadEnvironments(projectID)
-		if err == nil {
-			for _, env := range envs {
-				if env.ID == environmentID {
-					environment = env.Variables
-					break
-				}
-			}
-		}
-	}
-	if environment == nil {
-		environment = make(map[string]string)
-	}
-
-	appCfg, err := s.ConfigManager.LoadAppConfig()
-	proxyOpts := &curl.ProxyOptions{}
-	timeout := 30
-	if err == nil && appCfg != nil {
-		proxyOpts.Enabled = appCfg.Proxy.Enabled
-		proxyOpts.HTTPHost = appCfg.Proxy.HTTPHost
-		proxyOpts.HTTPPort = appCfg.Proxy.HTTPPort
-		proxyOpts.HTTPSHost = appCfg.Proxy.HTTPSHost
-		proxyOpts.HTTPSPort = appCfg.Proxy.HTTPSPort
-		proxyOpts.SOCKS5Host = appCfg.Proxy.SOCKS5Host
-		proxyOpts.SOCKS5Port = appCfg.Proxy.SOCKS5Port
-		timeout = appCfg.HTTP.Timeout
-		if timeout == 0 {
-			timeout = 30
-		}
-	}
-
-	globalSetter := func(key, value string) {
-		projectVars.Set(key, value)
-		_ = projectVars.SaveToFile(projectVarsPath)
-	}
-
-	resp, err := s.ScriptableExecutor.ExecuteWithScripts(
-		&spec,
-		proxyOpts,
-		[]string{preScript},
-		[]string{postScript},
-		[]string{"Inline Pre-Script"},
-		[]string{"Inline Post-Script"},
-		globals,
-		environment,
-		globalSetter,
-		timeout,
-	)
-
-	if err != nil {
-		return &models.CurlResponse{
-			Error: err.Error(),
-		}, err
-	}
-
-	// 记录历史
-	if recordErr := s.RecordHistory(projectID, projectName, requestName, requestPath, spec, resp); recordErr != nil {
 		// 历史记录失败不影响主流程
 	}
 

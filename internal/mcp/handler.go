@@ -3,7 +3,6 @@ package mcp
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 
 	"apiman/internal/models"
@@ -448,42 +447,19 @@ func (h *Handler) executeRaw(args map[string]interface{}, preScriptIDs, postScri
 	// Get project name for history
 	projectName, _ := h.svc.GetProjectName(h.projectID)
 
-	var resp *models.CurlResponse
-	var err error
-
-	// Use ExecuteHTTPRequestWithScriptsWithSource if scripts are provided, otherwise use ExecuteHTTPRequest
-	if len(preScriptIDs) > 0 || len(postScriptIDs) > 0 {
-		resp, err = h.svc.ExecuteHTTPRequestWithScriptsWithSource(
-			h.projectID,
-			projectName,
-			"raw_request",
-			"",
-			h.environmentID,
-			spec,
-			preScriptIDs,
-			postScriptIDs,
-			models.HistorySourceMCP,
-			"mcp_execute_raw",
-		)
-	} else {
-		resp, err = h.svc.ExecuteHTTPRequest(spec)
-		// Record history for raw request without scripts
-		if err == nil {
-			if historyErr := h.svc.RecordHistoryWithSource(
-				h.projectID,
-				projectName,
-				"raw_request",
-				"",
-				spec,
-				resp,
-				models.HistorySourceMCP,
-				"mcp_execute_raw",
-			); historyErr != nil {
-				// Log but don't fail the request for history recording errors
-				log.Printf("[MCP] Warning: failed to record history: %v", historyErr)
-			}
-		}
-	}
+	// Always use ExecuteHTTPRequestWithScriptsWithSource to ensure variable substitution
+	resp, err := h.svc.ExecuteHTTPRequestWithScriptsWithSource(
+		h.projectID,
+		projectName,
+		"raw_request",
+		"",
+		h.environmentID,
+		spec,
+		preScriptIDs,
+		postScriptIDs,
+		models.HistorySourceMCP,
+		"mcp_execute_raw",
+	)
 	if err != nil {
 		return nil, fmt.Errorf("execution failed: %s", err)
 	}
