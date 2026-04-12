@@ -56,17 +56,3 @@
 .context-menu .ant-menu-item .anticon {
   margin-right: 8px;
 }
-
-/* Dark theme support */
-[data-theme='dark'] .context-menu {
-  background: var(--ant-color-bg-container, #1f1f1f);
-  border: 1px solid var(--ant-color-border, #434343);
-}
-
-[data-theme='dark'] .context-menu .ant-menu-item:hover {
-  background: var(--ant-color-bg-spotlight, #262626);
-}
-
-[data-theme='dark'] .context-menu .ant-menu-item-danger:hover {
-  background: rgba(255, 77, 79, 0.15);
-}

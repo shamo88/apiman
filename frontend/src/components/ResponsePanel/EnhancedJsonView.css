@@ -2,7 +2,6 @@
 
 /* 主题变量 */
 :root {
-    /* 亮色主题 */
     --json-key-color: #0451a5;
     --json-string-color: #a31515;
     --json-number-color: #098658;
@@ -22,52 +21,6 @@
     --json-toggle-color: #666666;
     --json-toggle-hover: #333333;
     --json-stats-color: #888888;
-}
-
-[data-theme="dark"] {
-    /* 暗色主题 */
-    --json-key-color: #9cdcfe;
-    --json-string-color: #ce9178;
-    --json-number-color: #b5cea8;
-    --json-boolean-color: #569cd6;
-    --json-null-color: #808080;
-    --json-undefined-color: #808080;
-    --json-bracket-color: #cccccc;
-    --json-preview-color: #888888;
-    --json-index-color: #6e7681;
-    --json-comma-color: #cccccc;
-    --json-toolbar-bg: #2d2d2d;
-    --json-toolbar-border: #404040;
-    --json-search-bg: #1e1e1e;
-    --json-search-border: #3c3c3c;
-    --json-indent-line: #3c3c3c;
-    --json-hover-bg: #2a2d2e;
-    --json-toggle-color: #6e7681;
-    --json-toggle-hover: #cccccc;
-    --json-stats-color: #6e7681;
-}
-
-/* 覆盖样式 - 适配全局暗色主题 */
-.theme-dark {
-    --json-key-color: #9cdcfe;
-    --json-string-color: #ce9178;
-    --json-number-color: #b5cea8;
-    --json-boolean-color: #569cd6;
-    --json-null-color: #808080;
-    --json-undefined-color: #808080;
-    --json-bracket-color: #cccccc;
-    --json-preview-color: #888888;
-    --json-index-color: #6e7681;
-    --json-comma-color: #cccccc;
-    --json-toolbar-bg: #2d2d2d;
-    --json-toolbar-border: #404040;
-    --json-search-bg: #1e1e1e;
-    --json-search-border: #3c3c3c;
-    --json-indent-line: #3c3c3c;
-    --json-hover-bg: #2a2d2e;
-    --json-toggle-color: #6e7681;
-    --json-toggle-hover: #cccccc;
-    --json-stats-color: #6e7681;
 }
 
 /* 组件容器 */
@@ -461,19 +414,8 @@
     border-radius: 2px;
 }
 
-[data-theme="dark"] .json-highlight,
-.theme-dark .json-highlight {
-    background: #664d03;
-    color: #fbbf24;
-}
-
 .json-highlight-row {
     background: rgba(255, 193, 7, 0.15);
-}
-
-[data-theme="dark"] .json-highlight-row,
-.theme-dark .json-highlight-row {
-    background: rgba(255, 193, 7, 0.2);
 }
 
 /* 当前定位项高亮 - 使用青色区分 */
@@ -489,20 +431,9 @@
     50% { opacity: 0.7; }
 }
 
-[data-theme="dark"] .json-current-match,
-.theme-dark .json-current-match {
-    background: rgba(0, 188, 212, 0.3) !important;
-    outline-color: #4dd0e1 !important;
-}
-
 /* 当前定位项的文字颜色也改变 */
 .json-current-match .json-key {
     color: #00838f !important;
-}
-
-[data-theme="dark"] .json-current-match .json-key,
-.theme-dark .json-current-match .json-key {
-    color: #4dd0e1 !important;
 }
 
 /* 搜索结果计数 */

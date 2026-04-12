@@ -54,8 +54,7 @@ interface UIStore {
   sidebarMenu: 'apis' | 'environments' | 'scripts';
   sidebarWidth: number;
 
-  // 主题/动画
-  appTheme: 'light' | 'dark';
+  // 动画
   animationEnabled: boolean;
   forceListAnimation: boolean;
 
@@ -105,10 +104,9 @@ interface UIStore {
   setDraggingGroupName: (name: string | null) => void;
   setGroupSortDropTarget: (group: string | null) => void;
 
-  // Actions - 侧边栏/主题
+  // Actions - 侧边栏/动画
   setSidebarMenu: (menu: 'apis' | 'environments' | 'scripts') => void;
   setSidebarWidth: (width: number) => void;
-  setAppTheme: (theme: 'light' | 'dark') => void;
   setAnimationEnabled: (enabled: boolean) => void;
   setForceListAnimation: (force: boolean) => void;
 }
@@ -163,8 +161,7 @@ export const useUIStore = create<UIStore>()(
       sidebarMenu: 'apis',
       sidebarWidth: parseInt(localStorage.getItem('apiman-sidebar-width') || '280', 10),
 
-      // 主题/动画
-      appTheme: 'light' as 'light' | 'dark',
+      // 动画
       animationEnabled: false,
       forceListAnimation: false,
 
@@ -218,13 +215,12 @@ export const useUIStore = create<UIStore>()(
       setDraggingGroupName: (name) => set({ draggingGroupName: name }),
       setGroupSortDropTarget: (group) => set({ groupSortDropTarget: group }),
 
-      // Actions - 侧边栏/主题
+      // Actions - 侧边栏/动画
       setSidebarMenu: (menu) => set({ sidebarMenu: menu }),
       setSidebarWidth: (width) => {
         localStorage.setItem('apiman-sidebar-width', String(width));
         set({ sidebarWidth: width });
       },
-      setAppTheme: (theme) => set({ appTheme: theme }),
       setAnimationEnabled: (enabled) => set({ animationEnabled: enabled }),
       setForceListAnimation: (force) => set({ forceListAnimation: force }),
     }),
