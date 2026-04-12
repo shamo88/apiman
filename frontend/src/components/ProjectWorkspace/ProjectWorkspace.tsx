@@ -354,7 +354,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
                   }}
                   trigger={['click']}
                 >
-                  <Button size="small" icon={<PlusOutlined />} />
+                  <Button size="small" icon={<PlusOutlined />} onClick={(e) => e.stopPropagation()} />
                 </Dropdown>
               </Space>
             )}
