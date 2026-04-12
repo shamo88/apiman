@@ -118,6 +118,22 @@ export const useWorkspaceHandlers = (projectId: string) => {
 
     try {
       const request = await GetRequest(reqPath);
+
+      // 确保请求已经在 tab 中打开
+      const existingTab = workspace.requestTabs.find(t => t.path === reqPath);
+      if (existingTab) {
+        // tab 已存在，切换到它
+        workspaceStore.setActiveRequestTab(projectId, existingTab.id);
+      } else {
+        // 创建新 tab
+        const tab = {
+          id: reqPath,
+          title: request.name || caseNode.name,
+          path: reqPath,
+        };
+        workspaceStore.openRequestTab(projectId, tab);
+      }
+
       workspaceStore.setSidebarHighlightedCasePath(projectId, caseNode.path);
 
       const reqCases = request.cases as models.HttpRequestCase[] | undefined;
