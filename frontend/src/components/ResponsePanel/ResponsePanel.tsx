@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Tabs, message } from 'antd';
-import { CopyOutlined } from '@ant-design/icons';
 import { ResponseBodyViewer, ResponseCookies, ResponseHeaders, ResponseStatus } from './index';
 import { CurlResponse } from '../../types';
 import './ResponsePanel.css';
+import './EnhancedJsonView.css';
 
 interface ResponsePanelProps {
   response: CurlResponse | null;
@@ -261,13 +261,19 @@ export const ResponsePanel: React.FC<ResponsePanelProps> = ({
                   <>
                     <div style={{ marginBottom: 8, color: '#888', fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span>完整请求命令，可复制到终端执行</span>
-                      <CopyOutlined
-                        style={{ cursor: 'pointer', color: '#1890ff' }}
+                      <span
+                        className="json-copy-btn"
                         onClick={() => {
                           navigator.clipboard.writeText(response.curl_command);
                           message.success('已复制到剪贴板');
                         }}
-                      />
+                        title="复制"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                      </span>
                     </div>
                     <pre style={{
                       background: '#f5f5f5',
