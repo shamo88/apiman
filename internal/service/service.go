@@ -256,6 +256,65 @@ func (s *Service) UpdateRequestScripts(requestPath string, preScripts, postScrip
 	return err
 }
 
+func (s *Service) UpdateProjectScripts(projectID string, preScripts, postScripts []string) error {
+	err := s.ProjectMgr.UpdateProjectScripts(projectID, preScripts, postScripts)
+	if err == nil && s.shouldAutoSync() {
+		go s.SyncProjectToGit(projectID)
+	}
+	return err
+}
+
+func (s *Service) GetProjectScripts(projectID string) (preScripts, postScripts []string, err error) {
+	return s.ProjectMgr.GetProjectScripts(projectID)
+}
+
+func (s *Service) GetProjectScriptsResult(projectID string) (*models.ProjectScriptsResult, error) {
+	preScripts, postScripts, err := s.ProjectMgr.GetProjectScripts(projectID)
+	if err != nil {
+		return nil, err
+	}
+	if preScripts == nil {
+		preScripts = []string{}
+	}
+	if postScripts == nil {
+		postScripts = []string{}
+	}
+	return &models.ProjectScriptsResult{
+		PreScripts:  preScripts,
+		PostScripts: postScripts,
+	}, nil
+}
+
+func (s *Service) GetFolderScripts(folderPath string) (preScripts, postScripts []string, err error) {
+	return s.ProjectMgr.GetFolderScripts(folderPath)
+}
+
+func (s *Service) GetFolderScriptsResult(folderPath string) (*models.FolderScriptsResult, error) {
+	preScripts, postScripts, err := s.ProjectMgr.GetFolderScripts(folderPath)
+	if err != nil {
+		return nil, err
+	}
+	if preScripts == nil {
+		preScripts = []string{}
+	}
+	if postScripts == nil {
+		postScripts = []string{}
+	}
+	return &models.FolderScriptsResult{
+		PreScripts:  preScripts,
+		PostScripts: postScripts,
+	}, nil
+}
+
+func (s *Service) UpdateFolderScripts(folderPath string, preScripts, postScripts []string) error {
+	projectID := s.extractProjectIDFromPath(folderPath)
+	err := s.ProjectMgr.UpdateFolderScripts(folderPath, preScripts, postScripts)
+	if err == nil && projectID != "" && s.shouldAutoSync() {
+		go s.SyncProjectToGit(projectID)
+	}
+	return err
+}
+
 func (s *Service) DeleteRequest(requestPath string) error {
 	projectID := s.extractProjectIDFromPath(requestPath)
 	err := s.ProjectMgr.DeleteRequest(requestPath)
@@ -570,14 +629,35 @@ func (s *Service) ExecuteHTTPRequestWithScriptsWithSource(
 	var preScriptContents, postScriptContents []string
 	var preScriptNames, postScriptNames []string
 
-	if len(preScriptIDs) > 0 {
+	// Get scripts with inheritance priority: request > folders > project
+	// Pre-scripts and post-scripts are INDEPENDENT:
+	// - If preScriptIDs is empty, inherit from parent levels
+	// - If postScriptIDs is empty, inherit from parent levels
+	merged, err := s.ProjectMgr.GetRequestScriptsWithPriority(requestPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Determine which pre-scripts to use
+	scriptsToUse := preScriptIDs
+	if len(preScriptIDs) == 0 && merged != nil {
+		scriptsToUse = merged.PreScripts
+	}
+
+	// Determine which post-scripts to use
+	postScriptsToUse := postScriptIDs
+	if len(postScriptIDs) == 0 && merged != nil {
+		postScriptsToUse = merged.PostScripts
+	}
+
+	if len(scriptsToUse) > 0 {
 		scripts, err := s.ProjectMgr.ListProjectScripts(projectID)
 		if err == nil {
 			scriptMap := make(map[string]string)
 			for _, scr := range scripts {
 				scriptMap[scr.ID] = scr.Content
 			}
-			for _, id := range preScriptIDs {
+			for _, id := range scriptsToUse {
 				if content, ok := scriptMap[id]; ok {
 					preScriptContents = append(preScriptContents, content)
 					// Find script name
@@ -592,14 +672,14 @@ func (s *Service) ExecuteHTTPRequestWithScriptsWithSource(
 		}
 	}
 
-	if len(postScriptIDs) > 0 {
+	if len(postScriptsToUse) > 0 {
 		scripts, err := s.ProjectMgr.ListProjectScripts(projectID)
 		if err == nil {
 			scriptMap := make(map[string]string)
 			for _, scr := range scripts {
 				scriptMap[scr.ID] = scr.Content
 			}
-			for _, id := range postScriptIDs {
+			for _, id := range postScriptsToUse {
 				if content, ok := scriptMap[id]; ok {
 					postScriptContents = append(postScriptContents, content)
 					// Find script name

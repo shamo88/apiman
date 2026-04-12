@@ -8,9 +8,12 @@ import { ResponsePanel } from '../ResponsePanel';
 import { EnvironmentEditor } from './EnvironmentEditor';
 import { EnvironmentListItem } from './EnvironmentListItem';
 import { ScriptEditor } from './ScriptEditor';
+import { ProjectScriptPanel } from './ProjectScriptPanel';
+import { FolderScriptPanel } from './FolderScriptPanel';
 import { ResizeHandle } from './ResizeHandle';
 import { ResizeSplitter } from './ResizeSplitter';
 import { CurlResponse } from '../../types';
+import { GetProjectScriptsResult } from '../../../wailsjs/go/main/App';
 import { Environment, ProjectScript, useEnvironmentStore, useScriptStore, EnvironmentVariableRow } from '../../store';
 import { useWorkspace, useWorkspaceHandlers, useEnvironments, useScripts } from '../../hooks';
 import { useUIStore, useWorkspaceStore, useProjectStore } from '../../store';
@@ -25,7 +28,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
   const workspaceStore = useWorkspaceStore();
   const projectStore = useProjectStore();
   const { sidebarWidth, setSidebarWidth } = uiStore;
-  const [sidebarMenu, setSidebarMenu] = useState<'apis' | 'environments' | 'scripts'>('apis');
+  const [sidebarMenu, setSidebarMenu] = useState<'apis' | 'environments' | 'scripts' | 'project-settings'>('apis');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [filterMethod, setFilterMethod] = useState('ALL');
   const [searchVersion, setSearchVersion] = useState(0);
@@ -33,6 +36,8 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
     const saved = localStorage.getItem('apiman-response-height');
     return saved ? parseInt(saved, 10) : 300;
   });
+  const [selectedFolder, setSelectedFolder] = useState<{ path: string; name: string; preScripts: string[]; postScripts: string[] } | null>(null);
+  const [projectScripts, setProjectScripts] = useState<{ preScripts: string[]; postScripts: string[] }>({ preScripts: [], postScripts: [] });
 
   const { workspace, projectTree } = useWorkspace(projectId);
   const { collapsedFolders } = projectStore;
@@ -65,6 +70,58 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
     editingScriptId,
   } = useScriptStore();
 
+  // Load project scripts when project settings tab is opened
+  useEffect(() => {
+    if (sidebarMenu === 'project-settings' && projectId) {
+      console.log('[DEBUG] Loading project scripts for:', projectId);
+      GetProjectScriptsResult(projectId).then((result: any) => {
+        console.log('[DEBUG] GetProjectScriptsResult result:', JSON.stringify(result, null, 2));
+        if (result) {
+          setProjectScripts({ preScripts: result.preScripts || [], postScripts: result.postScripts || [] });
+        } else {
+          console.log('[DEBUG] GetProjectScriptsResult returned null, setting empty');
+          setProjectScripts({ preScripts: [], postScripts: [] });
+        }
+      }).catch((err: any) => {
+        console.error('[DEBUG] GetProjectScriptsResult error:', err);
+        setProjectScripts({ preScripts: [], postScripts: [] });
+      });
+    }
+  }, [sidebarMenu, projectId]);
+
+  // Handle folder script configuration
+  const handleConfigureFolderScripts = useCallback(async (folderPath: string, folderName: string) => {
+    try {
+      const { GetFolderScriptsResult } = await import('../../../wailsjs/go/main/App');
+      const result: any = await GetFolderScriptsResult(folderPath);
+      if (result) {
+        setSelectedFolder({ path: folderPath, name: folderName, preScripts: result.preScripts || [], postScripts: result.postScripts || [] });
+      } else {
+        setSelectedFolder({ path: folderPath, name: folderName, preScripts: [], postScripts: [] });
+      }
+    } catch (error) {
+      console.error('Failed to load folder scripts:', error);
+      setSelectedFolder({ path: folderPath, name: folderName, preScripts: [], postScripts: [] });
+    }
+  }, []);
+
+  const { environments, loadEnvironments, createEnvironment, updateEnvironment, deleteEnvironment } = useEnvironments();
+  const { scripts, loadScripts, createScript, updateScript, deleteScript } = useScripts();
+
+  // Load data when projectId changes
+  useEffect(() => {
+    if (projectId) {
+      loadEnvironments(projectId);
+    }
+  }, [projectId, loadEnvironments]);
+
+  // Load script list when scripts tab or project settings is opened
+  useEffect(() => {
+    if ((sidebarMenu === 'scripts' || sidebarMenu === 'project-settings') && projectId) {
+      loadScripts(projectId);
+    }
+  }, [sidebarMenu, projectId, loadScripts]);
+
   const {
     handleTreeItemClick,
     handleCaseClick,
@@ -84,17 +141,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
     handleToggleFolder,
     handleToggleRequestCases,
   } = useWorkspaceHandlers(projectId);
-
-  const { environments, loadEnvironments, createEnvironment, updateEnvironment, deleteEnvironment } = useEnvironments();
-  const { scripts, loadScripts, createScript, updateScript, deleteScript } = useScripts();
-
-  // Load data when projectId changes
-  useEffect(() => {
-    if (projectId) {
-      loadEnvironments(projectId);
-      loadScripts(projectId);
-    }
-  }, [projectId, loadEnvironments, loadScripts]);
 
   const handleUpdateWorkspace = (updates: any) => {
     workspaceStore.setWorkspaceState(projectId, updates);
@@ -267,6 +313,12 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
             >
               脚本
             </button>
+            <button
+              className={`sidebar-menu-item ${sidebarMenu === 'project-settings' ? 'active' : ''}`}
+              onClick={() => setSidebarMenu('project-settings')}
+            >
+              项目设置
+            </button>
           </div>
           {sidebarMenu === 'apis' ? (
             <Space size="small">
@@ -348,6 +400,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
                   onDuplicateCase={handleDuplicateCase}
                   onRenameCase={handleRenameCase}
                   onDeleteCase={handleDeleteCase}
+                  onConfigureFolderScripts={handleConfigureFolderScripts}
                   searchKeyword={searchKeyword}
                   onSearchChange={setSearchKeyword}
                   filterMethod={filterMethod}
@@ -472,11 +525,38 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
               onSave={handleSaveEnvironment}
               onDelete={handleDeleteEnvironment}
             />
+          ) : sidebarMenu === 'project-settings' ? (
+            <ProjectScriptPanel
+              projectId={projectId}
+              projectName={projectTree?.name || '项目'}
+              preScripts={projectScripts.preScripts}
+              postScripts={projectScripts.postScripts}
+              projectScripts={scripts.map((s) => ({ id: s.id, name: s.name }))}
+              onSave={(pre, post) => setProjectScripts({ preScripts: pre, postScripts: post })}
+            />
           ) : (
             <ScriptEditor />
           )}
         </div>
       </div>
+
+      {/* Folder script configuration panel (shown when a folder is selected) */}
+      {selectedFolder && (
+        <div className="workspace-main">
+          <FolderScriptPanel
+            folderPath={selectedFolder.path}
+            folderName={selectedFolder.name}
+            preScripts={selectedFolder.preScripts}
+            postScripts={selectedFolder.postScripts}
+            projectScripts={scripts.map((s) => ({ id: s.id, name: s.name }))}
+            onSave={(pre, post) => {
+              // Update the selected folder state with new scripts
+              setSelectedFolder({ ...selectedFolder, preScripts: pre, postScripts: post });
+            }}
+            onClose={() => setSelectedFolder(null)}
+          />
+        </div>
+      )}
     </div>
   );
 };

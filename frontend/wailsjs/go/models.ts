@@ -511,6 +511,20 @@ export namespace models {
 		    return a;
 		}
 	}
+	export class FolderScriptsResult {
+	    preScripts: string[];
+	    postScripts: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new FolderScriptsResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.preScripts = source["preScripts"];
+	        this.postScripts = source["postScripts"];
+	    }
+	}
 	export class HistoryEntry {
 	    id: string;
 	    source: string;
@@ -675,6 +689,20 @@ export namespace models {
 		    }
 		    return a;
 		}
+	}
+	export class ProjectScriptsResult {
+	    preScripts: string[];
+	    postScripts: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ProjectScriptsResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.preScripts = source["preScripts"];
+	        this.postScripts = source["postScripts"];
+	    }
 	}
 	export class RequestHistory {
 	    id: string;

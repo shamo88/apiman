@@ -14,8 +14,10 @@ import (
 const CollectionFileName = "collection.postman.json"
 
 type Collection struct {
-	Info PostmanInfo      `json:"info"`
-	Item []CollectionItem `json:"item"`
+	Info        PostmanInfo      `json:"info"`
+	Item        []CollectionItem `json:"item"`
+	PreScripts  []string         `json:"_apiman_pre_scripts,omitempty"`
+	PostScripts []string         `json:"_apiman_post_scripts,omitempty"`
 }
 
 type CollectionItem struct {
@@ -39,11 +41,11 @@ type PostmanInfo struct {
 }
 
 type CollectionRequest struct {
-	Method           string          `json:"method"`
-	Header           []PostmanHeader `json:"header,omitempty"`
-	URL              *PostmanURL     `json:"url"`
-	Body             *PostmanBody    `json:"body,omitempty"`
-	ApimanBodyType   string          `json:"_apiman_body_type,omitempty"`
+	Method         string          `json:"method"`
+	Header         []PostmanHeader `json:"header,omitempty"`
+	URL            *PostmanURL     `json:"url"`
+	Body           *PostmanBody    `json:"body,omitempty"`
+	ApimanBodyType string          `json:"_apiman_body_type,omitempty"`
 }
 
 type PostmanURL struct {
@@ -252,6 +254,7 @@ func insertSiblingBefore(siblings []CollectionItem, item CollectionItem, beforeI
 	return append(siblings, item)
 }
 
+// FindItemRef finds an item by ID in the collection tree.
 func FindItemRef(items []CollectionItem, id string) *CollectionItem {
 	for i := range items {
 		if items[i].ID == id {
@@ -259,6 +262,39 @@ func FindItemRef(items []CollectionItem, id string) *CollectionItem {
 		}
 		if found := FindItemRef(items[i].Item, id); found != nil {
 			return found
+		}
+	}
+	return nil
+}
+
+// ItemWithParentChain holds an item and its parent folder IDs (from immediate parent to root).
+type ItemWithParentChain struct {
+	Item      *CollectionItem
+	ParentIDs []string // Parent folder IDs from immediate to root
+	IsRequest bool     // True if this is a request (has Request field)
+	IsFolder  bool     // True if this is a folder (no Request field)
+}
+
+// FindItemWithParentChain finds an item by ID and returns it along with its parent folder chain.
+// ParentIDs are ordered from immediate parent to root (project level is not included in ParentIDs).
+func FindItemWithParentChain(items []CollectionItem, id string, parentChain []string) *ItemWithParentChain {
+	for i := range items {
+		if items[i].ID == id {
+			isRequest := items[i].Request != nil
+			isFolder := items[i].Item != nil && items[i].Request == nil
+			return &ItemWithParentChain{
+				Item:      &items[i],
+				ParentIDs: parentChain,
+				IsRequest: isRequest,
+				IsFolder:  isFolder,
+			}
+		}
+		// Search children (for nested folders/requests)
+		if len(items[i].Item) > 0 {
+			newChain := append(parentChain, items[i].ID)
+			if found := FindItemWithParentChain(items[i].Item, id, newChain); found != nil {
+				return found
+			}
 		}
 	}
 	return nil

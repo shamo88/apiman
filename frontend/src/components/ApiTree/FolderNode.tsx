@@ -1,6 +1,6 @@
 import React, { DragEvent, useCallback } from 'react';
 import { Dropdown } from 'antd';
-import { FolderOutlined, RightOutlined, DownOutlined, PlusOutlined, MoreOutlined, EditOutlined, CloseOutlined, CopyOutlined } from '@ant-design/icons';
+import { FolderOutlined, RightOutlined, DownOutlined, PlusOutlined, MoreOutlined, EditOutlined, CloseOutlined, CopyOutlined, CodeOutlined } from '@ant-design/icons';
 import { ProjectTree } from '../../store';
 import { useUIStore } from '../../store/useUIStore';
 import { ApiTreeItem } from './ApiTreeItem';
@@ -29,6 +29,7 @@ interface FolderNodeProps {
   onDuplicateCase: (casePath: string) => void;
   onRenameCase: (casePath: string, currentName: string) => void;
   onDeleteCase: (casePath: string, name: string) => void;
+  onConfigureFolderScripts?: (folderPath: string, folderName: string) => void;
   onDragOver?: (e: DragEvent, folderPath: string) => void;
   onDragLeave?: () => void;
   onDrop?: (e: DragEvent, folderPath: string) => void;
@@ -56,6 +57,7 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
   onDuplicateCase,
   onRenameCase,
   onDeleteCase,
+  onConfigureFolderScripts,
   onDragOver,
   onDragLeave,
   onDrop,
@@ -81,6 +83,13 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
         icon: <FolderOutlined />,
         label: '新建文件夹',
         onClick: () => onAddFolder(folderPath),
+      },
+      { type: 'divider' as const },
+      {
+        key: 'configure-scripts',
+        icon: <CodeOutlined />,
+        label: '配置脚本',
+        onClick: () => onConfigureFolderScripts?.(folderPath, folder.name),
       },
       { type: 'divider' as const },
       {
@@ -239,6 +248,7 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
                 onDuplicateCase={onDuplicateCase}
                 onRenameCase={onRenameCase}
                 onDeleteCase={onDeleteCase}
+                onConfigureFolderScripts={onConfigureFolderScripts}
                 onDragOver={onDragOver}
                 onDragLeave={onDragLeave}
                 onDrop={onDrop}

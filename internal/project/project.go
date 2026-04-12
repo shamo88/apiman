@@ -845,6 +845,102 @@ func (pm *ProjectManager) UpdateRequestScripts(requestPath string, preScripts, p
 	return postman.SaveCollection(projectPath, coll)
 }
 
+// UpdateProjectScripts updates the project-level pre/post scripts.
+func (pm *ProjectManager) UpdateProjectScripts(projectID string, preScripts, postScripts []string) error {
+	projectPath, err := pm.findProjectPathByID(projectID)
+	if err != nil {
+		return err
+	}
+	coll, err := postman.LoadCollection(projectPath)
+	if err != nil {
+		return err
+	}
+	coll.PreScripts = preScripts
+	coll.PostScripts = postScripts
+	return postman.SaveCollection(projectPath, coll)
+}
+
+// UpdateFolderScripts updates the folder-level pre/post scripts.
+func (pm *ProjectManager) UpdateFolderScripts(folderPath string, preScripts, postScripts []string) error {
+	projectID, folderID, ok := postman.ParseFolderRef(folderPath)
+	if !ok {
+		return os.ErrInvalid
+	}
+	projectPath, err := pm.findProjectPathByID(projectID)
+	if err != nil {
+		return err
+	}
+	coll, err := postman.LoadCollection(projectPath)
+	if err != nil {
+		return err
+	}
+	item := postman.FindItemRef(coll.Item, folderID)
+	if item == nil {
+		return os.ErrNotExist
+	}
+	if item.Request != nil {
+		return fmt.Errorf("item is not a folder")
+	}
+	item.PreScripts = preScripts
+	item.PostScripts = postScripts
+	return postman.SaveCollection(projectPath, coll)
+}
+
+// GetProjectScripts returns the project-level scripts directly from collection.
+func (pm *ProjectManager) GetProjectScripts(projectID string) (preScripts, postScripts []string, err error) {
+	projectPath, err := pm.findProjectPathByID(projectID)
+	if err != nil {
+		return nil, nil, err
+	}
+	coll, err := postman.LoadCollection(projectPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	// Ensure we return empty slices instead of nil so Wails serializes as arrays
+	preScripts = coll.PreScripts
+	postScripts = coll.PostScripts
+	if preScripts == nil {
+		preScripts = []string{}
+	}
+	if postScripts == nil {
+		postScripts = []string{}
+	}
+	return preScripts, postScripts, nil
+}
+
+// GetFolderScripts returns the folder-level scripts.
+func (pm *ProjectManager) GetFolderScripts(folderPath string) (preScripts, postScripts []string, err error) {
+	projectID, folderID, ok := postman.ParseFolderRef(folderPath)
+	if !ok {
+		return nil, nil, os.ErrInvalid
+	}
+	projectPath, err := pm.findProjectPathByID(projectID)
+	if err != nil {
+		return nil, nil, err
+	}
+	coll, err := postman.LoadCollection(projectPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	item := postman.FindItemRef(coll.Item, folderID)
+	if item == nil {
+		return nil, nil, os.ErrNotExist
+	}
+	if item.Request != nil {
+		return nil, nil, fmt.Errorf("item is not a folder")
+	}
+	// Ensure we return empty slices instead of nil so Wails serializes as arrays
+	preScripts = item.PreScripts
+	postScripts = item.PostScripts
+	if preScripts == nil {
+		preScripts = []string{}
+	}
+	if postScripts == nil {
+		postScripts = []string{}
+	}
+	return preScripts, postScripts, nil
+}
+
 func (pm *ProjectManager) DeleteRequest(requestPath string) error {
 	projectID, requestID, ok := postman.ParseRequestRef(requestPath)
 	if !ok {
@@ -1268,6 +1364,140 @@ func (pm *ProjectManager) ListProjectScripts(projectID string) ([]models.Project
 	}
 	sort.Slice(scripts, func(i, j int) bool { return scripts[i].UpdatedAt.After(scripts[j].UpdatedAt) })
 	return scripts, nil
+}
+
+// MergedScripts holds pre/post scripts with inheritance priority.
+// This implements OVERRIDE logic: the first level with configured scripts wins.
+// Pre and post scripts are INDEPENDENT - each has its own override chain.
+type MergedScripts struct {
+	PreScripts  []string // Pre-script IDs from the first level that has them configured
+	PostScripts []string // Post-script IDs from the first level that has them configured
+}
+
+// getScriptsWithOverride checks the override chain for scripts.
+// Returns the first non-empty scripts found, searching in order: items[0], items[1], ..., items[n-1]
+// Each item is a level (request, folder, project) with potentially configured scripts
+func getScriptsWithOverride(levels [][]string) []string {
+	for _, levelScripts := range levels {
+		if len(levelScripts) > 0 {
+			return levelScripts
+		}
+	}
+	return nil
+}
+
+// GetRequestScriptsWithPriority returns scripts with inheritance override priority:
+// - Pre-scripts: request > parent folders (immediate to root) > project
+// - Post-scripts: request > parent folders (immediate to root) > project
+// Pre and post scripts are INDEPENDENT - each follows its own override chain.
+func (pm *ProjectManager) GetRequestScriptsWithPriority(requestPath string) (*MergedScripts, error) {
+	projectID, requestID, ok := postman.ParseRequestRef(requestPath)
+	if !ok {
+		return nil, os.ErrInvalid
+	}
+	projectPath, err := pm.findProjectPathByID(projectID)
+	if err != nil {
+		return nil, err
+	}
+	coll, err := postman.LoadCollection(projectPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Find request with its parent chain (parent IDs from immediate to root)
+	result := postman.FindItemWithParentChain(coll.Item, requestID, nil)
+	if result == nil || result.Item == nil {
+		return nil, os.ErrNotExist
+	}
+	if !result.IsRequest {
+		return nil, fmt.Errorf("item is not a request")
+	}
+
+	// Build override chain for pre-scripts: request -> parent folders -> project
+	var preChain [][]string
+	preChain = append(preChain, result.Item.PreScripts)
+	for i := len(result.ParentIDs) - 1; i >= 0; i-- {
+		folderID := result.ParentIDs[i]
+		folder := postman.FindItemRef(coll.Item, folderID)
+		if folder != nil {
+			preChain = append(preChain, folder.PreScripts)
+		}
+	}
+	preChain = append(preChain, coll.PreScripts)
+
+	// Build override chain for post-scripts: request -> parent folders -> project
+	var postChain [][]string
+	postChain = append(postChain, result.Item.PostScripts)
+	for i := len(result.ParentIDs) - 1; i >= 0; i-- {
+		folderID := result.ParentIDs[i]
+		folder := postman.FindItemRef(coll.Item, folderID)
+		if folder != nil {
+			postChain = append(postChain, folder.PostScripts)
+		}
+	}
+	postChain = append(postChain, coll.PostScripts)
+
+	return &MergedScripts{
+		PreScripts:  getScriptsWithOverride(preChain),
+		PostScripts: getScriptsWithOverride(postChain),
+	}, nil
+}
+
+// GetFolderScriptsWithPriority returns scripts with inheritance override priority for a folder.
+// Used when executing a folder's requests that don't have their own scripts.
+// Override logic: folder > parent folders > project
+// Pre and post scripts are INDEPENDENT.
+func (pm *ProjectManager) GetFolderScriptsWithPriority(folderPath string) (*MergedScripts, error) {
+	projectID, folderID, ok := postman.ParseFolderRef(folderPath)
+	if !ok {
+		return nil, os.ErrInvalid
+	}
+	projectPath, err := pm.findProjectPathByID(projectID)
+	if err != nil {
+		return nil, err
+	}
+	coll, err := postman.LoadCollection(projectPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Find folder with its parent chain
+	result := postman.FindItemWithParentChain(coll.Item, folderID, nil)
+	if result == nil || result.Item == nil {
+		return nil, os.ErrNotExist
+	}
+	if !result.IsFolder {
+		return nil, fmt.Errorf("item is not a folder")
+	}
+
+	// Build override chain for pre-scripts: folder -> parent folders -> project
+	var preChain [][]string
+	preChain = append(preChain, result.Item.PreScripts)
+	for i := len(result.ParentIDs) - 1; i >= 0; i-- {
+		parentID := result.ParentIDs[i]
+		folder := postman.FindItemRef(coll.Item, parentID)
+		if folder != nil {
+			preChain = append(preChain, folder.PreScripts)
+		}
+	}
+	preChain = append(preChain, coll.PreScripts)
+
+	// Build override chain for post-scripts: folder -> parent folders -> project
+	var postChain [][]string
+	postChain = append(postChain, result.Item.PostScripts)
+	for i := len(result.ParentIDs) - 1; i >= 0; i-- {
+		parentID := result.ParentIDs[i]
+		folder := postman.FindItemRef(coll.Item, parentID)
+		if folder != nil {
+			postChain = append(postChain, folder.PostScripts)
+		}
+	}
+	postChain = append(postChain, coll.PostScripts)
+
+	return &MergedScripts{
+		PreScripts:  getScriptsWithOverride(preChain),
+		PostScripts: getScriptsWithOverride(postChain),
+	}, nil
 }
 
 func (pm *ProjectManager) CreateProjectScript(projectID, name, description, content string) (*models.ProjectScript, error) {

@@ -28,6 +28,7 @@ interface ApiTreeProps {
   onDuplicateCase: (casePath: string) => void;
   onRenameCase: (casePath: string, currentName: string) => void;
   onDeleteCase: (casePath: string) => void;
+  onConfigureFolderScripts?: (folderPath: string, folderName: string) => void;
   searchKeyword: string;
   onSearchChange: (keyword: string) => void;
   filterMethod: string;
@@ -59,6 +60,7 @@ export const ApiTree: React.FC<ApiTreeProps> = ({
   onDuplicateCase,
   onRenameCase,
   onDeleteCase,
+  onConfigureFolderScripts,
   searchKeyword,
   onSearchChange,
   filterMethod,
@@ -210,6 +212,7 @@ export const ApiTree: React.FC<ApiTreeProps> = ({
         onDuplicateCase={onDuplicateCase}
         onRenameCase={onRenameCase}
         onDeleteCase={(path, name) => handleDeleteCase(path, name)}
+        onConfigureFolderScripts={onConfigureFolderScripts}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}

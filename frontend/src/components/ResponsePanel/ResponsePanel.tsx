@@ -264,7 +264,7 @@ export const ResponsePanel: React.FC<ResponsePanelProps> = ({
                       <span
                         className="json-copy-btn"
                         onClick={() => {
-                          navigator.clipboard.writeText(response.curl_command);
+                          navigator.clipboard.writeText(response.curl_command || '');
                           message.success('已复制到剪贴板');
                         }}
                         title="复制"

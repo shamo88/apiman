@@ -28,6 +28,18 @@ type Project struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// ProjectScriptsResult holds the result of GetProjectScripts
+type ProjectScriptsResult struct {
+	PreScripts  []string `json:"preScripts"`
+	PostScripts []string `json:"postScripts"`
+}
+
+// FolderScriptsResult holds the result of GetFolderScripts
+type FolderScriptsResult struct {
+	PreScripts  []string `json:"preScripts"`
+	PostScripts []string `json:"postScripts"`
+}
+
 type Folder struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`

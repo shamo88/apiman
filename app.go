@@ -118,6 +118,30 @@ func (a *App) UpdateRequestScripts(requestPath string, preScripts, postScripts [
 	return a.service.UpdateRequestScripts(requestPath, preScripts, postScripts)
 }
 
+func (a *App) UpdateProjectScripts(projectID string, preScripts, postScripts []string) error {
+	return a.service.UpdateProjectScripts(projectID, preScripts, postScripts)
+}
+
+func (a *App) GetProjectScripts(projectID string) (preScripts, postScripts []string, err error) {
+	return a.service.GetProjectScripts(projectID)
+}
+
+func (a *App) GetProjectScriptsResult(projectID string) (*models.ProjectScriptsResult, error) {
+	return a.service.GetProjectScriptsResult(projectID)
+}
+
+func (a *App) GetFolderScripts(folderPath string) (preScripts, postScripts []string, err error) {
+	return a.service.GetFolderScripts(folderPath)
+}
+
+func (a *App) GetFolderScriptsResult(folderPath string) (*models.FolderScriptsResult, error) {
+	return a.service.GetFolderScriptsResult(folderPath)
+}
+
+func (a *App) UpdateFolderScripts(folderPath string, preScripts, postScripts []string) error {
+	return a.service.UpdateFolderScripts(folderPath, preScripts, postScripts)
+}
+
 func (a *App) DeleteRequest(requestPath string) error {
 	return a.service.DeleteRequest(requestPath)
 }

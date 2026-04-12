@@ -118,6 +118,14 @@ export function GetCurrentGitBranch() {
   return window['go']['main']['App']['GetCurrentGitBranch']();
 }
 
+export function GetFolderScripts(arg1) {
+  return window['go']['main']['App']['GetFolderScripts'](arg1);
+}
+
+export function GetFolderScriptsResult(arg1) {
+  return window['go']['main']['App']['GetFolderScriptsResult'](arg1);
+}
+
 export function GetGlobalVariables() {
   return window['go']['main']['App']['GetGlobalVariables']();
 }
@@ -128,6 +136,14 @@ export function GetHistoryEntry(arg1) {
 
 export function GetMCPStatus() {
   return window['go']['main']['App']['GetMCPStatus']();
+}
+
+export function GetProjectScripts(arg1) {
+  return window['go']['main']['App']['GetProjectScripts'](arg1);
+}
+
+export function GetProjectScriptsResult(arg1) {
+  return window['go']['main']['App']['GetProjectScriptsResult'](arg1);
 }
 
 export function GetProjectTree(arg1) {
@@ -282,8 +298,16 @@ export function UpdateEnvironment(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['UpdateEnvironment'](arg1, arg2, arg3, arg4);
 }
 
+export function UpdateFolderScripts(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UpdateFolderScripts'](arg1, arg2, arg3);
+}
+
 export function UpdateProjectScript(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['UpdateProjectScript'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function UpdateProjectScripts(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UpdateProjectScripts'](arg1, arg2, arg3);
 }
 
 export function UpdateRequest(arg1, arg2, arg3, arg4) {

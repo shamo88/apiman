@@ -62,11 +62,19 @@ export function GetConfigDir():Promise<string>;
 
 export function GetCurrentGitBranch():Promise<string>;
 
+export function GetFolderScripts(arg1:string):Promise<Array<string>>;
+
+export function GetFolderScriptsResult(arg1:string):Promise<models.FolderScriptsResult>;
+
 export function GetGlobalVariables():Promise<Record<string, string>>;
 
 export function GetHistoryEntry(arg1:string):Promise<models.RequestHistory>;
 
 export function GetMCPStatus():Promise<string>;
+
+export function GetProjectScripts(arg1:string):Promise<Array<string>>;
+
+export function GetProjectScriptsResult(arg1:string):Promise<models.ProjectScriptsResult>;
 
 export function GetProjectTree(arg1:string):Promise<project.ProjectTree>;
 
@@ -144,7 +152,11 @@ export function SyncProjectToGit(arg1:string):Promise<void>;
 
 export function UpdateEnvironment(arg1:string,arg2:string,arg3:string,arg4:Record<string, string>):Promise<void>;
 
+export function UpdateFolderScripts(arg1:string,arg2:Array<string>,arg3:Array<string>):Promise<void>;
+
 export function UpdateProjectScript(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<models.ProjectScript>;
+
+export function UpdateProjectScripts(arg1:string,arg2:Array<string>,arg3:Array<string>):Promise<void>;
 
 export function UpdateRequest(arg1:string,arg2:models.HttpRequestSpec,arg3:Array<models.HttpRequestCase>,arg4:string):Promise<void>;
 
