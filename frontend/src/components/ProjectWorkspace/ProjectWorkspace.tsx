@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button, Dropdown, Input, message, Select, Space, Tabs } from 'antd';
 import { ApiOutlined, EnvironmentOutlined, FileOutlined, FolderOutlined, PlusOutlined, SearchOutlined, CodeOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 
@@ -100,11 +100,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
       loadScripts(projectId);
     }
   }, [projectId, loadEnvironments, loadScripts]);
-
-  const selectedEnvironment = environments.find((e) => e.id === workspace.selectedEnvironmentId);
-  const environmentVariables = selectedEnvironment?.variables || {};
-  const scriptLogs = workspace.response?.script_logs || [];
-  const testResults = workspace.response?.tests || [];
 
   const handleUpdateWorkspace = (updates: any) => {
     workspaceStore.setWorkspaceState(projectId, updates);
@@ -235,10 +230,17 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
     localStorage.setItem('apiman-response-height', height.toString());
   };
 
-  const requestTabs = workspace.requestTabs || [];
-  const activeRequestTab = workspace.activeRequestTab || '';
-  const activeTab = requestTabs.find(t => t.id === activeRequestTab);
-  const activeRequestPath = activeTab?.path || '';
+  // 使用 useMemo 缓存计算结果，避免每次渲染重新计算
+  const requestTabs = useMemo(() => workspace.requestTabs || [], [workspace.requestTabs]);
+  const activeRequestTab = useMemo(() => workspace.activeRequestTab || '', [workspace.activeRequestTab]);
+  const activeTab = useMemo(() => requestTabs.find(t => t.id === activeRequestTab), [requestTabs, activeRequestTab]);
+  const activeRequestPath = useMemo(() => activeTab?.path || '', [activeTab]);
+
+  // 缓存环境和脚本相关数据
+  const selectedEnvironment = useMemo(() => environments.find((e) => e.id === workspace.selectedEnvironmentId), [environments, workspace.selectedEnvironmentId]);
+  const environmentVariables = useMemo(() => selectedEnvironment?.variables || {}, [selectedEnvironment]);
+  const scriptLogs = useMemo(() => workspace.response?.script_logs || [], [workspace.response]);
+  const testResults = useMemo(() => workspace.response?.tests || [], [workspace.response]);
 
   return (
     <div className="project-workspace">

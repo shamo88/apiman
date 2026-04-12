@@ -1449,3 +1449,27 @@ func buildSlugUUIDName(name, id string) string {
 
 	return slug + "__" + id
 }
+
+// ExtractProjectIDFromPath extracts project ID from paths like projectsDir/projectID/... or request|projectID|requestID
+// This is a utility function that doesn't depend on ProjectManager state
+func ExtractProjectIDFromPath(projectsDir string, requestPath string) string {
+	// Handle request|projectID|requestID format
+	if strings.HasPrefix(requestPath, "request|") {
+		parts := strings.Split(requestPath, "|")
+		if len(parts) >= 2 {
+			return parts[1]
+		}
+		return ""
+	}
+
+	// Handle filesystem path
+	relPath, err := filepath.Rel(projectsDir, requestPath)
+	if err != nil {
+		return ""
+	}
+	parts := strings.SplitN(relPath, string(filepath.Separator), 2)
+	if len(parts) > 0 {
+		return parts[0]
+	}
+	return ""
+}

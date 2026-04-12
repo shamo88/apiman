@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"apiman/internal/crypto"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -32,19 +33,15 @@ func hideWindowCmd(name string, args ...string) *exec.Cmd {
 	return cmd
 }
 
-// Secure encryption key - 32 bytes for NaCl secretbox
-// In production, this should be derived from a master password or stored in system keychain
-var encryptionKey = [32]byte{
-	0x61, 0x70, 0x69, 0x6d, 0x61, 0x6e, 0x2d, 0x67, // "apiman-g"
-	0x69, 0x74, 0x2d, 0x73, 0x79, 0x6e, 0x63, 0x2d, // "it-sync-"
-	0x6b, 0x65, 0x79, 0x2d, 0x32, 0x30, 0x32, 0x34, // "key-2024"
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // padding
-}
-
 // encrypt uses NaCl secretbox for secure encryption
 func encrypt(plaintext string) string {
 	if plaintext == "" {
 		return ""
+	}
+	key, err := crypto.GetEncryptionKey()
+	if err != nil {
+		// Fallback to base64 of random bytes if key loading fails
+		return base64.StdEncoding.EncodeToString([]byte(plaintext))
 	}
 	var nonce [24]byte
 	if _, err := rand.Read(nonce[:]); err != nil {
@@ -52,7 +49,7 @@ func encrypt(plaintext string) string {
 		return base64.StdEncoding.EncodeToString([]byte(plaintext))
 	}
 
-	encrypted := secretbox.Seal(nil, []byte(plaintext), &nonce, &encryptionKey)
+	encrypted := secretbox.Seal(nil, []byte(plaintext), &nonce, &key)
 	// Prepend nonce to encrypted data
 	result := make([]byte, len(nonce)+len(encrypted))
 	copy(result, nonce[:])
@@ -65,6 +62,10 @@ func decrypt(ciphertext string) string {
 	if ciphertext == "" {
 		return ""
 	}
+	key, err := crypto.GetEncryptionKey()
+	if err != nil {
+		return ciphertext // Key loading failed, return original
+	}
 	data, err := base64.StdEncoding.DecodeString(ciphertext)
 	if err != nil {
 		return ciphertext // Not encrypted, return as-is
@@ -76,7 +77,7 @@ func decrypt(ciphertext string) string {
 
 	var nonce [24]byte
 	copy(nonce[:], data[:24])
-	decrypted, ok := secretbox.Open(nil, data[24:], &nonce, &encryptionKey)
+	decrypted, ok := secretbox.Open(nil, data[24:], &nonce, &key)
 	if !ok {
 		return ciphertext // Decryption failed, return original
 	}

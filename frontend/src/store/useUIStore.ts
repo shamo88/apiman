@@ -2,8 +2,12 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { ProjectTree } from './useProjectStore';
 
+// UIStore - 核心 UI 状态管理
+// 注意：模态框状态已移至 useModalStore，拖拽状态已移至 useDragStore
+// 为保持向后兼容，此文件仍保留所有状态，但新代码应使用对应的专门 store
+
 interface UIStore {
-  // 模态框状态
+  // 模态框状态（保留向后兼容）
   createProjectModal: boolean;
   createFolderModal: boolean;
   createRequestModal: boolean;
@@ -28,15 +32,15 @@ interface UIStore {
   renameProjectModal: boolean;
   renameProjectId: string;
   renameProjectValue: string;
-      renameGroupModal: boolean;
-      renameGroupValue: string;
-      globalSearchVisible: boolean;
+  renameGroupModal: boolean;
+  renameGroupValue: string;
+  globalSearchVisible: boolean;
 
-      // 批量执行
-      batchExecuteModalVisible: boolean;
-      batchExecuteSelectedItems: ProjectTree[];
+  // 批量执行
+  batchExecuteModalVisible: boolean;
+  batchExecuteSelectedItems: ProjectTree[];
 
-      // 拖拽状态
+  // 拖拽状态
   draggingNode: { type: 'request' | 'folder'; path: string } | null;
   dropTargetFolderPath: string | null;
   invalidDropHint: { message: string; x: number; y: number } | null;
@@ -59,7 +63,7 @@ interface UIStore {
   mcpStatus: 'stopped' | 'running' | 'error';
   setMcpStatus: (status: 'stopped' | 'running' | 'error') => void;
 
-  // Actions
+  // Actions - 模态框
   openCreateProjectModal: () => void;
   closeCreateProjectModal: () => void;
   openCreateFolderModal: (parentPath?: string) => void;
@@ -68,16 +72,6 @@ interface UIStore {
   closeCreateRequestModal: () => void;
   openRenameModal: (type: 'request' | 'folder', path: string, currentValue: string) => void;
   closeRenameModal: () => void;
-  setDraggingNode: (node: { type: 'request' | 'folder'; path: string } | null) => void;
-  setDropTarget: (path: string | null) => void;
-  setInvalidDropHint: (hint: { message: string; x: number; y: number } | null) => void;
-  setMovedHighlightPath: (path: string | null) => void;
-  clearDragState: () => void;
-  setAppTheme: (theme: 'light' | 'dark') => void;
-  setAnimationEnabled: (enabled: boolean) => void;
-  setForceListAnimation: (force: boolean) => void;
-  setSidebarMenu: (menu: 'apis' | 'environments' | 'scripts') => void;
-  setSidebarWidth: (width: number) => void;
   setCookieModalVisible: (visible: boolean) => void;
   setHistoryModalVisible: (visible: boolean) => void;
   setMcpModalVisible: (visible: boolean) => void;
@@ -88,21 +82,35 @@ interface UIStore {
   closeCaseRenameModal: () => void;
   openCreateGroupModal: () => void;
   closeCreateGroupModal: () => void;
+  setNewGroupName: (name: string) => void;
   openRenameProjectModal: (id: string, currentValue: string) => void;
   closeRenameProjectModal: () => void;
+  setRenameProjectValue: (value: string) => void;
   openRenameGroupModal: (currentValue: string) => void;
   closeRenameGroupModal: () => void;
-  setNewGroupName: (name: string) => void;
-  setRenameProjectValue: (value: string) => void;
   setRenameGroupValue: (value: string) => void;
-  setDraggingProjectId: (id: string | null) => void;
-  setProjectDropTargetGroup: (group: string | null) => void;
-  setDraggingGroupName: (name: string | null) => void;
-  setGroupSortDropTarget: (group: string | null) => void;
   openGlobalSearch: () => void;
   closeGlobalSearch: () => void;
   openBatchExecuteModal: (items: ProjectTree[]) => void;
   closeBatchExecuteModal: () => void;
+
+  // Actions - 拖拽
+  setDraggingNode: (node: { type: 'request' | 'folder'; path: string } | null) => void;
+  setDropTarget: (path: string | null) => void;
+  setInvalidDropHint: (hint: { message: string; x: number; y: number } | null) => void;
+  setMovedHighlightPath: (path: string | null) => void;
+  clearDragState: () => void;
+  setDraggingProjectId: (id: string | null) => void;
+  setProjectDropTargetGroup: (group: string | null) => void;
+  setDraggingGroupName: (name: string | null) => void;
+  setGroupSortDropTarget: (group: string | null) => void;
+
+  // Actions - 侧边栏/主题
+  setSidebarMenu: (menu: 'apis' | 'environments' | 'scripts') => void;
+  setSidebarWidth: (width: number) => void;
+  setAppTheme: (theme: 'light' | 'dark') => void;
+  setAnimationEnabled: (enabled: boolean) => void;
+  setForceListAnimation: (force: boolean) => void;
 }
 
 export const useUIStore = create<UIStore>()(
@@ -164,7 +172,7 @@ export const useUIStore = create<UIStore>()(
       mcpStatus: 'stopped',
       setMcpStatus: (status) => set({ mcpStatus: status }),
 
-      // Actions
+      // Actions - 模态框
       openCreateProjectModal: () => set({ createProjectModal: true }),
       closeCreateProjectModal: () => set({ createProjectModal: false }),
       openCreateFolderModal: (parentPath = '') => set({ createFolderModal: true, createParentPath: parentPath }),
@@ -173,23 +181,6 @@ export const useUIStore = create<UIStore>()(
       closeCreateRequestModal: () => set({ createRequestModal: false, createParentPath: '' }),
       openRenameModal: (type, path, currentValue) => set({ renameModal: true, renameType: type, renamePath: path, renameValue: currentValue }),
       closeRenameModal: () => set({ renameModal: false, renamePath: '', renameValue: '' }),
-      setDraggingNode: (node) => set({ draggingNode: node }),
-      setDropTarget: (path) => set({ dropTargetFolderPath: path }),
-      setInvalidDropHint: (hint) => set({ invalidDropHint: hint }),
-      setMovedHighlightPath: (path) => set({ movedHighlightPath: path }),
-      clearDragState: () => set({
-        draggingNode: null,
-        dropTargetFolderPath: null,
-        invalidDropHint: null,
-      }),
-      setAppTheme: (theme) => set({ appTheme: theme }),
-      setAnimationEnabled: (enabled) => set({ animationEnabled: enabled }),
-      setForceListAnimation: (force) => set({ forceListAnimation: force }),
-      setSidebarMenu: (menu) => set({ sidebarMenu: menu }),
-      setSidebarWidth: (width) => {
-        localStorage.setItem('apiman-sidebar-width', String(width));
-        set({ sidebarWidth: width });
-      },
       setCookieModalVisible: (visible) => set({ cookieModalVisible: visible }),
       setHistoryModalVisible: (visible) => set({ historyModalVisible: visible }),
       setMcpModalVisible: (visible) => set({ mcpModalVisible: visible }),
@@ -200,21 +191,42 @@ export const useUIStore = create<UIStore>()(
       closeCaseRenameModal: () => set({ caseRenameModalOpen: false, caseRenameCasePath: '', caseRenameInput: '', renamingCaseId: null }),
       openCreateGroupModal: () => set({ createGroupModal: true }),
       closeCreateGroupModal: () => set({ createGroupModal: false, newGroupName: '' }),
+      setNewGroupName: (name) => set({ newGroupName: name }),
       openRenameProjectModal: (id, currentValue) => set({ renameProjectModal: true, renameProjectId: id, renameProjectValue: currentValue }),
       closeRenameProjectModal: () => set({ renameProjectModal: false, renameProjectId: '', renameProjectValue: '' }),
+      setRenameProjectValue: (value) => set({ renameProjectValue: value }),
       openRenameGroupModal: (currentValue) => set({ renameGroupModal: true, renameGroupValue: currentValue }),
       closeRenameGroupModal: () => set({ renameGroupModal: false, renameGroupValue: '' }),
-      setNewGroupName: (name) => set({ newGroupName: name }),
-      setRenameProjectValue: (value) => set({ renameProjectValue: value }),
       setRenameGroupValue: (value) => set({ renameGroupValue: value }),
+      openGlobalSearch: () => set({ globalSearchVisible: true }),
+      closeGlobalSearch: () => set({ globalSearchVisible: false }),
+      openBatchExecuteModal: (items) => set({ batchExecuteModalVisible: true, batchExecuteSelectedItems: items }),
+      closeBatchExecuteModal: () => set({ batchExecuteModalVisible: false, batchExecuteSelectedItems: [] }),
+
+      // Actions - 拖拽
+      setDraggingNode: (node) => set({ draggingNode: node }),
+      setDropTarget: (path) => set({ dropTargetFolderPath: path }),
+      setInvalidDropHint: (hint) => set({ invalidDropHint: hint }),
+      setMovedHighlightPath: (path) => set({ movedHighlightPath: path }),
+      clearDragState: () => set({
+        draggingNode: null,
+        dropTargetFolderPath: null,
+        invalidDropHint: null,
+      }),
       setDraggingProjectId: (id) => set({ draggingProjectId: id }),
       setProjectDropTargetGroup: (group) => set({ projectDropTargetGroup: group }),
       setDraggingGroupName: (name) => set({ draggingGroupName: name }),
       setGroupSortDropTarget: (group) => set({ groupSortDropTarget: group }),
-      openGlobalSearch: () => set({ globalSearchVisible: true }),
-      closeGlobalSearch: () => set({ globalSearchVisible: false }),
-      openBatchExecuteModal: (items: ProjectTree[]) => set({ batchExecuteModalVisible: true, batchExecuteSelectedItems: items }),
-      closeBatchExecuteModal: () => set({ batchExecuteModalVisible: false, batchExecuteSelectedItems: [] }),
+
+      // Actions - 侧边栏/主题
+      setSidebarMenu: (menu) => set({ sidebarMenu: menu }),
+      setSidebarWidth: (width) => {
+        localStorage.setItem('apiman-sidebar-width', String(width));
+        set({ sidebarWidth: width });
+      },
+      setAppTheme: (theme) => set({ appTheme: theme }),
+      setAnimationEnabled: (enabled) => set({ animationEnabled: enabled }),
+      setForceListAnimation: (force) => set({ forceListAnimation: force }),
     }),
     { name: 'UIStore' }
   )

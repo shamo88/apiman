@@ -21,10 +21,45 @@ import (
 	xproxy "golang.org/x/net/proxy"
 )
 
+// 预编译的正则表达式，避免每次调用时重新编译
+var (
+	curlMethodPattern   = regexp.MustCompile(`-X\s+(\S+)`)
+	curlHeaderPattern   = regexp.MustCompile(`-H\s+['"]([^'"]+)['"]`)
+	curlUserPattern     = regexp.MustCompile(`-u\s+['"]([^'"]+)['"]`)
+	curlURLPattern      = regexp.MustCompile(`['"]?(https?://[^\s'"]+)['"]?`)
+	curlFallbackURL     = regexp.MustCompile(`\s+([^\s]+)$`)
+	curlDataSingleQuote = regexp.MustCompile(`(?:^|\s)-d\s+'([^']*)'`)
+	curlDataDoubleQuote = regexp.MustCompile(`(?:^|\s)-d\s+"((?:[^"\\]|\\.)*)"`)
+	curlDataUnquoted    = regexp.MustCompile(`(?:^|\s)-d\s+([^\s]+)`)
+)
+
+// HTTP 客户端池，避免每次请求创建新客户端
+var (
+	httpClientPool = sync.Pool{
+		New: func() interface{} {
+			return &http.Client{Timeout: 30 * time.Second}
+		},
+	}
+)
+
 type CurlExecutor struct{}
 
 func NewCurlExecutor() *CurlExecutor {
 	return &CurlExecutor{}
+}
+
+// getHTTPClient 从池中获取 HTTP 客户端
+func getHTTPClient(timeout time.Duration) *http.Client {
+	client := httpClientPool.Get().(*http.Client)
+	client.Timeout = timeout
+	return client
+}
+
+// putHTTPClient 将 HTTP 客户端归还到池中
+func putHTTPClient(client *http.Client) {
+	// 重置 Transport 以便复用
+	client.Transport = nil
+	httpClientPool.Put(client)
 }
 
 type ProxyOptions struct {
@@ -93,12 +128,16 @@ func (c *CurlExecutor) ExecuteWithProxy(curlCommand string, proxyOpts *ProxyOpti
 		req.Header.Set("Authorization", parts.Auth)
 	}
 
-	client := &http.Client{Timeout: time.Duration(timeoutSeconds) * time.Second}
+	// 使用 HTTP 客户端池
+	client := getHTTPClient(time.Duration(timeoutSeconds) * time.Second)
 	if proxyOpts != nil && proxyOpts.Enabled {
 		client.Transport = buildTransportWithProxy(proxyOpts)
 	}
 
 	resp, err := client.Do(req)
+	// 归还客户端到池中
+	putHTTPClient(client)
+
 	if err != nil {
 		return &models.CurlResponse{
 			Error: fmt.Sprintf("Request failed: %v", err),
@@ -255,18 +294,12 @@ func (c *CurlExecutor) parseCurlCommand(command string) (*ParsedCurl, error) {
 	command = strings.TrimSpace(command)
 	command = strings.TrimPrefix(command, "curl ")
 
-	patterns := map[string]*regexp.Regexp{
-		"method": regexp.MustCompile(`-X\s+(\S+)`),
-		"header": regexp.MustCompile(`-H\s+['"]([^'"]+)['"]`),
-		"user":   regexp.MustCompile(`-u\s+['"]([^'"]+)['"]`),
-		"url":    regexp.MustCompile(`['"]?(https?://[^\s'"]+)['"]?`),
-	}
-
-	if matches := patterns["method"].FindStringSubmatch(command); len(matches) > 1 {
+	// 使用预编译的正则表达式
+	if matches := curlMethodPattern.FindStringSubmatch(command); len(matches) > 1 {
 		parts.Method = strings.ToUpper(matches[1])
 	}
 
-	for _, match := range patterns["header"].FindAllStringSubmatch(command, -1) {
+	for _, match := range curlHeaderPattern.FindAllStringSubmatch(command, -1) {
 		if len(match) > 1 {
 			headerParts := strings.SplitN(match[1], ":", 2)
 			if len(headerParts) == 2 {
@@ -280,19 +313,18 @@ func (c *CurlExecutor) parseCurlCommand(command string) (*ParsedCurl, error) {
 	parts.Data = extractDataArgument(command)
 	parts.FormFields = extractFormFields(command)
 
-	if matches := patterns["user"].FindStringSubmatch(command); len(matches) > 1 {
+	if matches := curlUserPattern.FindStringSubmatch(command); len(matches) > 1 {
 		auth := matches[1]
 		parts.Auth = "Basic " + base64Encode(auth)
 	}
 
-	urlMatch := patterns["url"].FindStringSubmatch(command)
+	urlMatch := curlURLPattern.FindStringSubmatch(command)
 	if len(urlMatch) > 1 {
 		parts.URL = urlMatch[1]
 	}
 
 	if parts.URL == "" {
-		urlPattern := regexp.MustCompile(`\s+([^\s]+)$`)
-		if matches := urlPattern.FindStringSubmatch(command); len(matches) > 1 {
+		if matches := curlFallbackURL.FindStringSubmatch(command); len(matches) > 1 {
 			parts.URL = strings.Trim(matches[1], "'\"")
 		}
 	}
@@ -303,15 +335,13 @@ func (c *CurlExecutor) parseCurlCommand(command string) (*ParsedCurl, error) {
 func extractDataArgument(command string) string {
 	// Prefer single-quoted payload first, as JSON bodies are usually wrapped by single quotes.
 	// Example: -d '{"test":1}'
-	singleQuoted := regexp.MustCompile(`(?:^|\s)-d\s+'([^']*)'`)
-	if matches := singleQuoted.FindStringSubmatch(command); len(matches) > 1 {
+	if matches := curlDataSingleQuote.FindStringSubmatch(command); len(matches) > 1 {
 		return matches[1]
 	}
 
 	// Handle double-quoted payload with possible escaped quotes.
 	// Example: -d "{\"test\":1}"
-	doubleQuoted := regexp.MustCompile(`(?:^|\s)-d\s+"((?:[^"\\]|\\.)*)"`)
-	if matches := doubleQuoted.FindStringSubmatch(command); len(matches) > 1 {
+	if matches := curlDataDoubleQuote.FindStringSubmatch(command); len(matches) > 1 {
 		value := matches[1]
 		value = strings.ReplaceAll(value, `\"`, `"`)
 		value = strings.ReplaceAll(value, `\\`, `\`)
@@ -319,8 +349,7 @@ func extractDataArgument(command string) string {
 	}
 
 	// Fallback for unquoted payload.
-	unquoted := regexp.MustCompile(`(?:^|\s)-d\s+([^\s]+)`)
-	if matches := unquoted.FindStringSubmatch(command); len(matches) > 1 {
+	if matches := curlDataUnquoted.FindStringSubmatch(command); len(matches) > 1 {
 		return matches[1]
 	}
 

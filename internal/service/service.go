@@ -27,6 +27,7 @@ type Service struct {
 	ScriptableExecutor *curl.ScriptableExecutor
 	GlobalVarStore     *script.GlobalVariableStore
 	GitSyncMgr         *git.GitSyncManager
+	GitSyncService     *GitSyncService // 分离的 Git Sync 服务
 	HistoryMgr         *history.HistoryManager
 	gitSyncMu          sync.Mutex // 防止并发 Git 操作
 }
@@ -50,6 +51,9 @@ func NewService() (*Service, error) {
 	gitSyncMgr := git.NewGitSyncManager(cfgMgr.GetConfigDir())
 	historyMgr, _ := history.NewHistoryManager(cfgMgr.GetConfigDir())
 
+	// 初始化 GitSyncService
+	gitSyncService := NewGitSyncService(cfgMgr, projectMgr, gitSyncMgr)
+
 	return &Service{
 		ConfigManager:      cfgMgr,
 		ProjectMgr:         projectMgr,
@@ -59,6 +63,7 @@ func NewService() (*Service, error) {
 		ScriptableExecutor: scriptExec,
 		GlobalVarStore:     globalVarStore,
 		GitSyncMgr:         gitSyncMgr,
+		GitSyncService:     gitSyncService,
 		HistoryMgr:         historyMgr,
 	}, nil
 }
@@ -315,49 +320,20 @@ func (s *Service) ExecuteCurl(command string) (*models.CurlResponse, error) {
 		return s.CurlExecutor.Execute(command)
 	}
 
-	proxyOpts := &curl.ProxyOptions{
-		Enabled:    appCfg.Proxy.Enabled,
-		HTTPHost:   appCfg.Proxy.HTTPHost,
-		HTTPPort:   appCfg.Proxy.HTTPPort,
-		HTTPSHost:  appCfg.Proxy.HTTPSHost,
-		HTTPSPort:  appCfg.Proxy.HTTPSPort,
-		SOCKS5Host: appCfg.Proxy.SOCKS5Host,
-		SOCKS5Port: appCfg.Proxy.SOCKS5Port,
-	}
-
-	timeout := appCfg.HTTP.Timeout
-	if timeout == 0 {
-		timeout = 30
-	}
-	return s.CurlExecutor.ExecuteWithProxy(command, proxyOpts, timeout)
+	return s.CurlExecutor.ExecuteWithProxy(command, buildProxyOptions(appCfg), getTimeout(appCfg))
 }
 
 // executeHTTPRequestNoContext 执行无项目上下文的请求（注入Cookie、变量替换、无环境/脚本）
 func (s *Service) executeHTTPRequestNoContext(spec models.HttpRequestSpec) (*models.CurlResponse, error) {
 	spec = s.injectGlobalCookies(spec)
 
-	appCfg, err := s.ConfigManager.LoadAppConfig()
-	proxyOpts := &curl.ProxyOptions{}
-	timeout := 30
-	if err == nil && appCfg != nil {
-		proxyOpts.Enabled = appCfg.Proxy.Enabled
-		proxyOpts.HTTPHost = appCfg.Proxy.HTTPHost
-		proxyOpts.HTTPPort = appCfg.Proxy.HTTPPort
-		proxyOpts.HTTPSHost = appCfg.Proxy.HTTPSHost
-		proxyOpts.HTTPSPort = appCfg.Proxy.HTTPSPort
-		proxyOpts.SOCKS5Host = appCfg.Proxy.SOCKS5Host
-		proxyOpts.SOCKS5Port = appCfg.Proxy.SOCKS5Port
-		timeout = appCfg.HTTP.Timeout
-		if timeout == 0 {
-			timeout = 30
-		}
-	}
+	appCfg, _ := s.ConfigManager.LoadAppConfig()
 
 	// 无项目上下文，globals和environment都为空，但仍做变量替换（空替换）
 	return s.ScriptableExecutor.ExecuteWithScriptsContext(
 		context.Background(),
 		&spec,
-		proxyOpts,
+		buildProxyOptions(appCfg),
 		nil, // 无预置脚本
 		nil, // 无后置脚本
 		nil, // 无脚本名
@@ -365,7 +341,7 @@ func (s *Service) executeHTTPRequestNoContext(spec models.HttpRequestSpec) (*mod
 		nil, // 无全局变量
 		nil, // 无环境变量
 		nil, // 无全局setter
-		timeout,
+		getTimeout(appCfg),
 	)
 }
 
@@ -666,22 +642,9 @@ func (s *Service) ExecuteHTTPRequestWithScriptsWithSource(
 		environment = make(map[string]string)
 	}
 
-	appCfg, err := s.ConfigManager.LoadAppConfig()
-	proxyOpts := &curl.ProxyOptions{}
-	timeout := 30
-	if err == nil && appCfg != nil {
-		proxyOpts.Enabled = appCfg.Proxy.Enabled
-		proxyOpts.HTTPHost = appCfg.Proxy.HTTPHost
-		proxyOpts.HTTPPort = appCfg.Proxy.HTTPPort
-		proxyOpts.HTTPSHost = appCfg.Proxy.HTTPSHost
-		proxyOpts.HTTPSPort = appCfg.Proxy.HTTPSPort
-		proxyOpts.SOCKS5Host = appCfg.Proxy.SOCKS5Host
-		proxyOpts.SOCKS5Port = appCfg.Proxy.SOCKS5Port
-		timeout = appCfg.HTTP.Timeout
-		if timeout == 0 {
-			timeout = 30
-		}
-	}
+	appCfg, _ := s.ConfigManager.LoadAppConfig()
+	proxyOpts := buildProxyOptions(appCfg)
+	timeout := getTimeout(appCfg)
 
 	globalSetter := func(key, value string) {
 		projectVars.Set(key, value)
@@ -748,26 +711,7 @@ func (s *Service) shouldAutoSync() bool {
 
 // extractProjectIDFromPath extracts project ID from paths like projectsDir/projectID/... or request|projectID|requestID
 func (s *Service) extractProjectIDFromPath(requestPath string) string {
-	// Handle request|projectID|requestID format
-	if strings.HasPrefix(requestPath, "request|") {
-		parts := strings.Split(requestPath, "|")
-		if len(parts) >= 2 {
-			return parts[1]
-		}
-		return ""
-	}
-
-	// Handle filesystem path
-	projectsDir := s.ConfigManager.GetProjectsDir()
-	relPath, err := filepath.Rel(projectsDir, requestPath)
-	if err != nil {
-		return ""
-	}
-	parts := strings.SplitN(relPath, string(filepath.Separator), 2)
-	if len(parts) > 0 {
-		return parts[0]
-	}
-	return ""
+	return project.ExtractProjectIDFromPath(s.ConfigManager.GetProjectsDir(), requestPath)
 }
 
 // SyncAllProjectsToGit syncs all projects to Git repository
@@ -1013,22 +957,9 @@ func (s *Service) BatchExecuteHTTPRequests(
 	parallel bool,
 	concurrency int,
 ) (*curl.BatchExecuteResponse, error) {
-	appCfg, err := s.ConfigManager.LoadAppConfig()
-	proxyOpts := &curl.ProxyOptions{}
-	timeout := 30
-	if err == nil && appCfg != nil {
-		proxyOpts.Enabled = appCfg.Proxy.Enabled
-		proxyOpts.HTTPHost = appCfg.Proxy.HTTPHost
-		proxyOpts.HTTPPort = appCfg.Proxy.HTTPPort
-		proxyOpts.HTTPSHost = appCfg.Proxy.HTTPSHost
-		proxyOpts.HTTPSPort = appCfg.Proxy.HTTPSPort
-		proxyOpts.SOCKS5Host = appCfg.Proxy.SOCKS5Host
-		proxyOpts.SOCKS5Port = appCfg.Proxy.SOCKS5Port
-		timeout = appCfg.HTTP.Timeout
-		if timeout == 0 {
-			timeout = 30
-		}
-	}
+	appCfg, _ := s.ConfigManager.LoadAppConfig()
+	proxyOpts := buildProxyOptions(appCfg)
+	timeout := getTimeout(appCfg)
 
 	if concurrency <= 0 {
 		concurrency = 5
