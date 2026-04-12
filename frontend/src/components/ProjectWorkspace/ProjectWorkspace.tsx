@@ -14,7 +14,7 @@ import { ResizeHandle } from './ResizeHandle';
 import { ResizeSplitter } from './ResizeSplitter';
 import { CurlResponse } from '../../types';
 import { GetProjectScriptsResult } from '../../../wailsjs/go/main/App';
-import { Environment, ProjectScript, useEnvironmentStore, useScriptStore, EnvironmentVariableRow } from '../../store';
+import { Environment, ProjectScript, useEnvironmentStore, useScriptStore, EnvironmentVariableRow, ProjectTree } from '../../store';
 import { useWorkspace, useWorkspaceHandlers, useEnvironments, useScripts } from '../../hooks';
 import { useUIStore, useWorkspaceStore, useProjectStore } from '../../store';
 import './ProjectWorkspace.css';
@@ -238,14 +238,14 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
   }, [projectId, scripts.length, createScript, loadScripts, selectScript]);
 
   // ApiTree handlers - 带模块激活
-  const handleApiTreeRequestClick = useCallback((path: string, method: string) => {
+  const handleApiTreeRequestClick = useCallback((treeNode: ProjectTree) => {
     activateModule('apis');
-    handleTreeItemClick(path, method);
+    handleTreeItemClick(treeNode);
   }, [handleTreeItemClick]);
 
-  const handleApiTreeCaseClick = useCallback((casePath: string) => {
+  const handleApiTreeCaseClick = useCallback((caseNode: ProjectTree) => {
     activateModule('apis');
-    handleCaseClick(casePath);
+    handleCaseClick(caseNode);
   }, [handleCaseClick]);
 
   const handleSaveScript = useCallback(async () => {

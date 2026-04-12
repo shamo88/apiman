@@ -389,7 +389,7 @@ func (s *Service) executeHTTPRequestNoContext(spec models.HttpRequestSpec) (*mod
 	appCfg, _ := s.ConfigManager.LoadAppConfig()
 
 	// 无项目上下文，globals和environment都为空，但仍做变量替换（空替换）
-	return s.ScriptableExecutor.ExecuteWithScriptsContext(
+	resp, _, err := s.ScriptableExecutor.ExecuteWithScriptsContext(
 		context.Background(),
 		&spec,
 		buildProxyOptions(appCfg),
@@ -402,6 +402,7 @@ func (s *Service) executeHTTPRequestNoContext(spec models.HttpRequestSpec) (*mod
 		nil, // 无全局setter
 		getTimeout(appCfg),
 	)
+	return resp, err
 }
 
 func (s *Service) ExecuteHTTPRequest(spec models.HttpRequestSpec) (*models.CurlResponse, error) {
@@ -731,7 +732,7 @@ func (s *Service) ExecuteHTTPRequestWithScriptsWithSource(
 		_ = projectVars.SaveToFile(projectVarsPath)
 	}
 
-	resp, err := s.ScriptableExecutor.ExecuteWithScriptsContext(
+	resp, replacedURL, err := s.ScriptableExecutor.ExecuteWithScriptsContext(
 		context.Background(),
 		&spec,
 		proxyOpts,
@@ -750,6 +751,9 @@ func (s *Service) ExecuteHTTPRequestWithScriptsWithSource(
 			Error: err.Error(),
 		}, err
 	}
+
+	// 使用替换后的 URL 更新 spec，确保历史记录存储实际发送的 URL
+	spec.HttpURL = replacedURL
 
 	// 记录历史
 	if recordErr := s.RecordHistoryWithSource(projectID, projectName, requestName, requestPath, spec, resp, source, sourceTool); recordErr != nil {

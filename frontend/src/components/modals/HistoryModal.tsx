@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Button, Col, Input, Modal, Row, Select, Table, Tag, Space, message } from 'antd';
-import { SearchOutlined, ReloadOutlined, DeleteOutlined, ClockCircleOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, DeleteOutlined, ClockCircleOutlined, PlayCircleOutlined, CopyOutlined, LinkOutlined, FileTextOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { ListHistory, GetHistoryEntry, ClearHistory, SearchHistory, DeleteHistory, ExecuteHTTPRequestWithScripts } from '../../../wailsjs/go/main/App';
 import { models } from '../../../wailsjs/go/models';
 import { useUIStore } from '../../store';
 import { JsonView, allExpanded } from 'react-json-view-lite';
+import { buildCurlCommand } from '../../utils/curlUtils';
 import 'react-json-view-lite/dist/index.css';
 import './modals.css';
 
@@ -48,7 +49,7 @@ const getStatusColor = (code?: number) => {
 const getTimeRange = (range: TimeRange): { from: string; to: string } => {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  
+
   switch (range) {
     case 'today':
       return {
@@ -73,6 +74,34 @@ const getTimeRange = (range: TimeRange): { from: string; to: string } => {
     default:
       return { from: '', to: '' };
   }
+};
+
+/** 从 HttpRequestSpec 构建 curl 命令 */
+const buildCurlFromSpec = (spec: unknown): string => {
+  if (!spec) return '';
+  const s = spec as {
+    method?: string;
+    http_url?: string;
+    headers?: Array<{ key: string; value: string; enabled?: boolean }>;
+    params?: Array<{ key: string; value: string; enabled?: boolean }>;
+    body?: string;
+    body_type?: string;
+    form_data?: Array<{ key: string; value: string; enabled?: boolean }>;
+    url_encoded?: Array<{ key: string; value: string; enabled?: boolean }>;
+  };
+  return buildCurlCommand({
+    name: '',
+    method: s.method || 'GET',
+    url: s.http_url || '',
+    headers: (s.headers || []).map(h => ({ key: h.key, value: h.value, enabled: h.enabled ?? true })),
+    params: (s.params || []).map(p => ({ key: p.key, value: p.value, enabled: p.enabled ?? true })),
+    body: s.body || '',
+    bodyType: (s.body_type || 'none') as 'none' | 'form-data' | 'x-www-form-urlencoded' | 'json' | 'xml' | 'raw' | 'binary',
+    formData: (s.form_data || []).map(f => ({ key: f.key, value: f.value, enabled: f.enabled ?? true })),
+    urlencoded: (s.url_encoded || []).map(u => ({ key: u.key, value: u.value, enabled: u.enabled ?? true })),
+    preScripts: [],
+    postScripts: [],
+  });
 };
 
 export const HistoryModal: React.FC = () => {
@@ -115,7 +144,7 @@ export const HistoryModal: React.FC = () => {
       if (methodFilter) params.method = methodFilter.toUpperCase();
       if (timeRange.from) params.from = timeRange.from;
       if (timeRange.to) params.to = timeRange.to;
-      
+
       const list = await SearchHistory(params, 100);
       setHistoryList(list || []);
     } catch (e) {
@@ -185,6 +214,111 @@ export const HistoryModal: React.FC = () => {
     }
   };
 
+  // 右键菜单处理 - 使用自定义跟随鼠标的菜单
+  const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; record: HistoryEntry | null }>({
+    visible: false,
+    x: 0,
+    y: 0,
+    record: null,
+  });
+
+  const handleContextMenu = (e: React.MouseEvent, record: HistoryEntry) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ visible: true, x: e.clientX, y: e.clientY, record });
+  };
+
+  const closeContextMenu = () => {
+    setContextMenu({ ...contextMenu, visible: false });
+  };
+
+  const handleCopyUrl = async () => {
+    const record = contextMenu.record;
+    if (!record) return;
+    try {
+      const detail = await GetHistoryEntry(record.id);
+      let url = record.url; // 默认使用原始 URL
+
+      if (detail?.response?.curl_command) {
+        // 从 curl_command 中解析最终 URL - URL 在最后，单引号包裹
+        const curlCmd = detail.response.curl_command;
+        const urlMatch = curlCmd.match(/'((?:https?:\/\/|\$\{)[^']+)'$/m);
+        if (urlMatch) {
+          url = urlMatch[1];
+        }
+      } else if (detail?.spec) {
+        // 降级：使用 spec 中的 URL
+        url = (detail.spec as any).http_url || record.url;
+      }
+
+      await navigator.clipboard.writeText(url);
+      message.success('URL 已复制');
+    } catch (e) {
+      message.error('复制失败');
+    }
+    closeContextMenu();
+  };
+
+  const handleCopyCurl = async () => {
+    const record = contextMenu.record;
+    if (!record) return;
+    try {
+      const detail = await GetHistoryEntry(record.id);
+      if (detail?.response?.curl_command) {
+        // 使用后端实际执行的 curl 命令（已替换变量）
+        await navigator.clipboard.writeText(detail.response.curl_command);
+        message.success('Curl 命令已复制');
+      } else if (detail?.spec) {
+        // 降级：从前端 spec 构建
+        const curl = buildCurlFromSpec(detail.spec);
+        await navigator.clipboard.writeText(curl);
+        message.success('Curl 命令已复制');
+      }
+    } catch (e) {
+      message.error('复制失败');
+    }
+    closeContextMenu();
+  };
+
+  const handleCopyResponse = async () => {
+    const record = contextMenu.record;
+    if (!record) return;
+    try {
+      const detail = await GetHistoryEntry(record.id);
+      if (detail?.response) {
+        await navigator.clipboard.writeText(JSON.stringify(detail.response, null, 2));
+        message.success('响应已复制');
+      }
+    } catch (e) {
+      message.error('复制失败');
+    }
+    closeContextMenu();
+  };
+
+  const handleCopyRequest = async () => {
+    const record = contextMenu.record;
+    if (!record) return;
+    try {
+      const detail = await GetHistoryEntry(record.id);
+      if (detail?.spec) {
+        await navigator.clipboard.writeText(JSON.stringify(detail.spec, null, 2));
+        message.success('请求已复制');
+      }
+    } catch (e) {
+      message.error('复制失败');
+    }
+    closeContextMenu();
+  };
+
+  // 点击其他地方关闭右键菜单
+  useEffect(() => {
+    const handleClick = () => closeContextMenu();
+    if (contextMenu.visible) {
+      document.addEventListener('click', handleClick);
+      return () => document.removeEventListener('click', handleClick);
+    }
+  }, [contextMenu.visible]);
+
   const handleReExecute = async (record: HistoryEntry) => {
     try {
       const detail = await GetHistoryEntry(record.id);
@@ -210,10 +344,10 @@ export const HistoryModal: React.FC = () => {
   const handleBatchReExecute = async () => {
     if (selectedRowKeys.length === 0) return;
     message.loading('正在批量执行...');
-    
+
     const selectedEntries = historyList.filter(e => selectedRowKeys.includes(e.id));
     let successCount = 0;
-    
+
     for (const entry of selectedEntries) {
       try {
         const detail = await GetHistoryEntry(entry.id);
@@ -234,7 +368,7 @@ export const HistoryModal: React.FC = () => {
         console.error('Failed to re-execute:', e);
       }
     }
-    
+
     message.success(`已执行 ${successCount}/${selectedRowKeys.length} 个请求`);
   };
 
@@ -458,10 +592,58 @@ export const HistoryModal: React.FC = () => {
             pagination={{ pageSize: 10, showTotal: (total: number) => `共 ${total} 条` }}
             onRow={(record) => ({
               onClick: () => handleRowClick(record),
+              onContextMenu: (e) => handleContextMenu(e, record),
               style: { cursor: 'pointer' },
             })}
             columns={columns}
           />
+
+          {/* 自定义右键菜单 - 跟随鼠标 */}
+          {contextMenu.visible && contextMenu.record && (
+            <div
+              style={{
+                position: 'fixed',
+                left: contextMenu.x,
+                top: contextMenu.y,
+                zIndex: 10000,
+                background: 'white',
+                borderRadius: 8,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                padding: '4px 0',
+                minWidth: 160,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                className="context-menu-item"
+                onClick={() => {
+                  handleReExecute(contextMenu.record!);
+                  closeContextMenu();
+                }}
+              >
+                <PlayCircleOutlined /> <span>重新执行</span>
+              </div>
+              <div className="context-menu-divider" />
+              <div className="context-menu-item" onClick={handleCopyUrl}>
+                <LinkOutlined /> <span>复制 URL</span>
+              </div>
+              <div className="context-menu-item" onClick={handleCopyCurl}>
+                <CopyOutlined /> <span>复制 Curl</span>
+              </div>
+              <div className="context-menu-divider" />
+              <div
+                className="context-menu-item context-menu-item-danger"
+                onClick={async () => {
+                  await DeleteHistory(contextMenu.record!.id);
+                  searchHistory();
+                  message.success('已删除');
+                  closeContextMenu();
+                }}
+              >
+                <DeleteOutlined /> <span>删除</span>
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
 

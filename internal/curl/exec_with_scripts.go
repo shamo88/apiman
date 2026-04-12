@@ -32,9 +32,9 @@ func (se *ScriptableExecutor) ExecuteWithScriptsContext(
 	environment map[string]string,
 	globalSetter func(key, value string),
 	timeoutSeconds int,
-) (*models.CurlResponse, error) {
+) (*models.CurlResponse, string, error) {
 	if spec == nil {
-		return &models.CurlResponse{Error: "request is nil"}, nil
+		return &models.CurlResponse{Error: "request is nil"}, "", nil
 	}
 
 	specCopy := &models.HttpRequestSpec{
@@ -51,8 +51,8 @@ func (se *ScriptableExecutor) ExecuteWithScriptsContext(
 	// Merge globals and environment for variable replacement
 	allVars := mergeVariables(globals, environment)
 
-	// Replace variables in specCopy before execution
-	se.replaceVariablesInSpec(specCopy, allVars)
+	// Replace variables in specCopy before execution and get the final URL
+	replacedURL := se.replaceVariablesInSpec(specCopy, allVars)
 
 	var allLogs []string
 	var allGlobalUpdates map[string]string
@@ -94,7 +94,7 @@ func (se *ScriptableExecutor) ExecuteWithScriptsContext(
 					Duration: t.Duration,
 				})
 			}
-			return resp, nil
+			return resp, "", nil
 		}
 
 		allLogs = append(allLogs, fmt.Sprintf("[%s] ✓ SUCCESS", scriptName))
@@ -105,14 +105,14 @@ func (se *ScriptableExecutor) ExecuteWithScriptsContext(
 
 	curlResp, err := se.CurlExecutor.ExecuteHTTPRequestWithProxy(specCopy, proxyOpts, timeoutSeconds)
 	if err != nil {
-		return &models.CurlResponse{Error: err.Error()}, err
+		return &models.CurlResponse{Error: err.Error()}, replacedURL, err
 	}
 
 	if curlResp.Error != "" {
 		if len(allLogs) > 0 {
 			curlResp.ScriptLogs = allLogs
 		}
-		return curlResp, nil
+		return curlResp, replacedURL, nil
 	}
 
 	curlResp.ScriptLogs = allLogs
@@ -159,7 +159,7 @@ func (se *ScriptableExecutor) ExecuteWithScriptsContext(
 		}
 	}
 
-	return curlResp, nil
+	return curlResp, replacedURL, nil
 }
 
 func (se *ScriptableExecutor) buildExecutionContext(spec *models.HttpRequestSpec, globals, environment map[string]string) *script.ExecutionContext {
@@ -321,7 +321,8 @@ func mergeVariables(globals, environment map[string]string) map[string]string {
 	return allVars
 }
 
-func (se *ScriptableExecutor) replaceVariablesInSpec(spec *models.HttpRequestSpec, variables map[string]string) {
+// replaceVariablesInSpec replaces all variables in the spec and returns the final URL
+func (se *ScriptableExecutor) replaceVariablesInSpec(spec *models.HttpRequestSpec, variables map[string]string) string {
 	spec.HttpURL = se.CurlExecutor.ReplaceVariables(spec.HttpURL, variables)
 	for i := range spec.Headers {
 		spec.Headers[i].Value = se.CurlExecutor.ReplaceVariables(spec.Headers[i].Value, variables)
@@ -338,4 +339,5 @@ func (se *ScriptableExecutor) replaceVariablesInSpec(spec *models.HttpRequestSpe
 	for i := range spec.UrlEncoded {
 		spec.UrlEncoded[i].Value = se.CurlExecutor.ReplaceVariables(spec.UrlEncoded[i].Value, variables)
 	}
+	return spec.HttpURL
 }
