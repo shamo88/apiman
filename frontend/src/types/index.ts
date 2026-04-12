@@ -64,6 +64,7 @@ export interface CurlResponse {
     error?: string;
     script_logs?: string[];
     tests?: TestResult[];
+    curl_command?: string;
 }
 
 export interface TestResult {

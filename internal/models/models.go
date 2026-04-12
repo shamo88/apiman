@@ -92,16 +92,16 @@ type HttpRequestCase struct {
 }
 
 type CurlRequest struct {
-	ID           string    `json:"id"`
-	Name         string    `json:"name"`
-	ProjectID    string    `json:"project_id"`
-	FolderID     string    `json:"folder_id"`
-	Path         string    `json:"path"`
-	Content      string    `json:"content,omitempty"`
-	PreScripts   []string  `json:"pre_scripts,omitempty"`
-	PostScripts  []string  `json:"post_scripts,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	ProjectID   string    `json:"project_id"`
+	FolderID    string    `json:"folder_id"`
+	Path        string    `json:"path"`
+	Content     string    `json:"content,omitempty"`
+	PreScripts  []string  `json:"pre_scripts,omitempty"`
+	PostScripts []string  `json:"post_scripts,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 
 	Method     string          `json:"method,omitempty"`
 	HttpURL    string          `json:"http_url,omitempty"`
@@ -112,7 +112,7 @@ type CurlRequest struct {
 	FormData   []RequestPair   `json:"form_data,omitempty"`
 	UrlEncoded []RequestPair   `json:"url_encoded,omitempty"`
 
-	Cases        []HttpRequestCase `json:"cases,omitempty"`
+	Cases []HttpRequestCase `json:"cases,omitempty"`
 	// InterfaceSpec is the collection item's root request (item.Request) when the item has cases.
 	InterfaceSpec *HttpRequestSpec `json:"interface_spec,omitempty"`
 }
@@ -157,14 +157,15 @@ type ResponseCookie struct {
 }
 
 type CurlResponse struct {
-	StatusCode int               `json:"status_code"`
-	Headers    map[string][]string `json:"headers"`
-	Body       string            `json:"body"`
-	Duration   int64             `json:"duration"`
-	Error      string            `json:"error"`
-	ScriptLogs []string          `json:"script_logs,omitempty"`
-	Tests      []TestResult      `json:"tests,omitempty"`
-	Cookies    []ResponseCookie  `json:"cookies,omitempty"`
+	StatusCode  int                 `json:"status_code"`
+	Headers     map[string][]string `json:"headers"`
+	Body        string              `json:"body"`
+	Duration    int64               `json:"duration"`
+	Error       string              `json:"error"`
+	ScriptLogs  []string            `json:"script_logs,omitempty"`
+	Tests       []TestResult        `json:"tests,omitempty"`
+	Cookies     []ResponseCookie    `json:"cookies,omitempty"`
+	CurlCommand string              `json:"curl_command,omitempty"`
 }
 
 type TestResult struct {
@@ -176,12 +177,12 @@ type TestResult struct {
 
 // MCPAPIInfo represents an API item in the project tree (for MCP).
 type MCPAPIInfo struct {
-	ID       string         `json:"id"`
-	Name     string         `json:"name"`
-	Method   string         `json:"method,omitempty"`
-	URL      string         `json:"url,omitempty"`
-	Path     string         `json:"path,omitempty"`
-	Children []*MCPAPIInfo  `json:"children,omitempty"`
+	ID       string        `json:"id"`
+	Name     string        `json:"name"`
+	Method   string        `json:"method,omitempty"`
+	URL      string        `json:"url,omitempty"`
+	Path     string        `json:"path,omitempty"`
+	Children []*MCPAPIInfo `json:"children,omitempty"`
 }
 
 // MCPScriptInfo represents a script's metadata (for MCP list_scripts).
@@ -193,23 +194,23 @@ type MCPScriptInfo struct {
 
 // MCPRequestDetail represents full request details (for MCP get_request).
 type MCPRequestDetail struct {
-	ID          string               `json:"id"`
-	Name        string               `json:"name"`
-	Method      string               `json:"method"`
-	URL         string               `json:"url"`
-	Headers     []RequestKeyVal      `json:"headers"`
-	Params      []RequestKeyVal      `json:"params"`
-	Body        string               `json:"body"`
-	BodyType    string               `json:"body_type"`
-	PreScripts  []string             `json:"pre_scripts"`
-	PostScripts []string             `json:"post_scripts"`
-	Cases       []HttpRequestCase    `json:"cases"`
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Method      string            `json:"method"`
+	URL         string            `json:"url"`
+	Headers     []RequestKeyVal   `json:"headers"`
+	Params      []RequestKeyVal   `json:"params"`
+	Body        string            `json:"body"`
+	BodyType    string            `json:"body_type"`
+	PreScripts  []string          `json:"pre_scripts"`
+	PostScripts []string          `json:"post_scripts"`
+	Cases       []HttpRequestCase `json:"cases"`
 }
 
 // MCPCaseData represents case creation input (for MCP create_case).
 type MCPCaseData struct {
-	Name string            `json:"name"`
-	Spec HttpRequestSpec  `json:"spec"`
+	Name string          `json:"name"`
+	Spec HttpRequestSpec `json:"spec"`
 }
 
 // RequestHistory records a single HTTP request execution.
@@ -262,14 +263,14 @@ type HistoryIndex struct {
 
 // HistorySearchParams defines search/filter parameters for history.
 type HistorySearchParams struct {
-	Project  string `json:"project"`  // project name fuzzy search
-	Name     string `json:"name"`     // request name fuzzy search
-	URL      string `json:"url"`      // URL fuzzy search
-	Method   string `json:"method"`   // HTTP method exact match
-	Status   int    `json:"status"`   // status code exact match
-	Source   string `json:"source"`   // source exact match (GUI/MCP)
-	Tool     string `json:"tool"`     // MCP tool name exact match
-	From     string `json:"from"`     // start time (YYYY-MM-DD)
-	To       string `json:"to"`       // end time (YYYY-MM-DD)
-	Keyword  string `json:"keyword"`  // comprehensive search (URL + request name)
+	Project string `json:"project"` // project name fuzzy search
+	Name    string `json:"name"`    // request name fuzzy search
+	URL     string `json:"url"`     // URL fuzzy search
+	Method  string `json:"method"`  // HTTP method exact match
+	Status  int    `json:"status"`  // status code exact match
+	Source  string `json:"source"`  // source exact match (GUI/MCP)
+	Tool    string `json:"tool"`    // MCP tool name exact match
+	From    string `json:"from"`    // start time (YYYY-MM-DD)
+	To      string `json:"to"`      // end time (YYYY-MM-DD)
+	Keyword string `json:"keyword"` // comprehensive search (URL + request name)
 }

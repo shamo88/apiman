@@ -393,6 +393,7 @@ export namespace models {
 	    script_logs?: string[];
 	    tests?: TestResult[];
 	    cookies?: ResponseCookie[];
+	    curl_command?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new CurlResponse(source);
@@ -408,6 +409,7 @@ export namespace models {
 	        this.script_logs = source["script_logs"];
 	        this.tests = this.convertValues(source["tests"], TestResult);
 	        this.cookies = this.convertValues(source["cookies"], ResponseCookie);
+	        this.curl_command = source["curl_command"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

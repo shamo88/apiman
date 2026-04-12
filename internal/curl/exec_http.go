@@ -141,11 +141,12 @@ func (c *CurlExecutor) ExecuteHTTPRequestWithProxy(spec *models.HttpRequestSpec,
 	}
 
 	return &models.CurlResponse{
-		StatusCode: resp.StatusCode,
-		Headers:    headers,
-		Body:       bodyStr,
-		Duration:   duration,
-		Cookies:    cookies,
+		StatusCode:  resp.StatusCode,
+		Headers:     headers,
+		Body:        bodyStr,
+		Duration:    duration,
+		Cookies:     cookies,
+		CurlCommand: buildCurlCommand(method, fullURL, headerMap, spec.Body, proxyOpts),
 	}, nil
 }
 
@@ -181,4 +182,62 @@ func stripContentType(h map[string]string) {
 			return
 		}
 	}
+}
+
+// buildCurlCommand 生成完整的 curl 命令
+func buildCurlCommand(method, url string, headers map[string]string, body string, proxyOpts *ProxyOptions) string {
+	var sb strings.Builder
+	sb.WriteString("curl")
+
+	// Proxy
+	if proxyOpts != nil && proxyOpts.Enabled {
+		proxyStr := buildCurlProxyString(proxyOpts)
+		if proxyStr != "" {
+			sb.WriteString(fmt.Sprintf(" -x '%s'", proxyStr))
+		}
+	}
+
+	// Method
+	if method != "GET" {
+		sb.WriteString(fmt.Sprintf(" -X %s", method))
+	}
+
+	// Headers
+	for key, value := range headers {
+		sb.WriteString(fmt.Sprintf(" -H '%s: %s'", key, value))
+	}
+
+	// Body
+	if body != "" {
+		// 转义单引号
+		escapedBody := strings.ReplaceAll(body, "'", "'\\''")
+		sb.WriteString(fmt.Sprintf(" -d '%s'", escapedBody))
+	}
+
+	// URL
+	sb.WriteString(fmt.Sprintf(" '%s'", url))
+
+	return sb.String()
+}
+
+// buildCurlProxyString 根据代理配置生成 curl 的代理参数字符串
+func buildCurlProxyString(proxyOpts *ProxyOptions) string {
+	if proxyOpts == nil || !proxyOpts.Enabled {
+		return ""
+	}
+
+	// SOCKS5 代理优先
+	if proxyOpts.SOCKS5Host != "" && proxyOpts.SOCKS5Port > 0 {
+		return fmt.Sprintf("socks5h://%s:%d", proxyOpts.SOCKS5Host, proxyOpts.SOCKS5Port)
+	}
+
+	// HTTP/HTTPS 代理
+	if proxyOpts.HTTPSHost != "" && proxyOpts.HTTPSPort > 0 {
+		return fmt.Sprintf("http://%s:%d", proxyOpts.HTTPSHost, proxyOpts.HTTPSPort)
+	}
+	if proxyOpts.HTTPHost != "" && proxyOpts.HTTPPort > 0 {
+		return fmt.Sprintf("http://%s:%d", proxyOpts.HTTPHost, proxyOpts.HTTPPort)
+	}
+
+	return ""
 }

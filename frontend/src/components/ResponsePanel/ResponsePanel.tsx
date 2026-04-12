@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Tabs } from 'antd';
+import { Tabs, message } from 'antd';
+import { CopyOutlined } from '@ant-design/icons';
 import { ResponseBodyViewer, ResponseCookies, ResponseHeaders, ResponseStatus } from './index';
 import { CurlResponse } from '../../types';
 import './ResponsePanel.css';
@@ -251,6 +252,45 @@ export const ResponsePanel: React.FC<ResponsePanelProps> = ({
             ),
           },
           ...scriptTabItems,
+          {
+            key: 'curl',
+            label: 'Curl',
+            children: (
+              <div style={{ padding: '12px', height: responseBodyHeight, overflow: 'auto' }}>
+                {response?.curl_command ? (
+                  <>
+                    <div style={{ marginBottom: 8, color: '#888', fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>完整请求命令，可复制到终端执行</span>
+                      <CopyOutlined
+                        style={{ cursor: 'pointer', color: '#1890ff' }}
+                        onClick={() => {
+                          navigator.clipboard.writeText(response.curl_command);
+                          message.success('已复制到剪贴板');
+                        }}
+                      />
+                    </div>
+                    <pre style={{
+                      background: '#f5f5f5',
+                      padding: '12px',
+                      borderRadius: 4,
+                      overflow: 'auto',
+                      fontSize: 12,
+                      margin: 0,
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-all',
+                      textAlign: 'left'
+                    }}>
+                      {response.curl_command}
+                    </pre>
+                  </>
+                ) : (
+                  <div style={{ color: '#888', textAlign: 'center', marginTop: 40 }}>
+                    暂无请求记录
+                  </div>
+                )}
+              </div>
+            ),
+          },
         ]}
       />
     </div>
