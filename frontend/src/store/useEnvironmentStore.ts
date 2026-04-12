@@ -15,13 +15,6 @@ export interface EnvironmentVariableRow {
   value: string;
 }
 
-export interface EnvironmentEditorTab {
-  key: string;
-  title: string;
-  environmentId?: string;
-  isNew?: boolean;
-}
-
 interface EnvironmentStore {
   environments: Environment[];
   selectedEnvironmentId: string;
@@ -29,8 +22,6 @@ interface EnvironmentStore {
   editingEnvironmentId: string;
   environmentFormName: string;
   environmentFormVariables: EnvironmentVariableRow[];
-  environmentTabs: EnvironmentEditorTab[];
-  activeEnvironmentTab: string;
   loading: boolean;
   saving: boolean;
 
@@ -41,13 +32,10 @@ interface EnvironmentStore {
   setEditingEnvironmentId: (id: string) => void;
   setEnvironmentFormName: (name: string) => void;
   setEnvironmentFormVariables: (variables: EnvironmentVariableRow[]) => void;
-  setEnvironmentTabs: (tabs: EnvironmentEditorTab[]) => void;
-  setActiveEnvironmentTab: (tab: string) => void;
   setLoading: (loading: boolean) => void;
   setSaving: (saving: boolean) => void;
-  openEnvironmentTab: (env: Environment) => void;
-  openCreateEnvironmentTab: (projectEnvCount: number) => void;
-  closeEnvironmentTab: (tabKey: string) => void;
+  openEnvironmentEditor: (env: Environment) => void;
+  openCreateEnvironmentEditor: (projectEnvCount: number) => void;
   resetEnvironmentEditor: () => void;
   environmentToRows: (variables: Record<string, string>) => EnvironmentVariableRow[];
   rowsToEnvironmentVariables: (rows: EnvironmentVariableRow[]) => Record<string, string>;
@@ -61,15 +49,13 @@ export const createEnvironmentVariableRow = (key: string = '', value: string = '
 
 export const useEnvironmentStore = create<EnvironmentStore>()(
   devtools(
-    (set, get) => ({
+    (set) => ({
       environments: [],
       selectedEnvironmentId: '',
       environmentsInitiallyLoaded: false,
       editingEnvironmentId: '',
       environmentFormName: '',
       environmentFormVariables: [createEnvironmentVariableRow()],
-      environmentTabs: [],
-      activeEnvironmentTab: '',
       loading: false,
       saving: false,
 
@@ -79,51 +65,19 @@ export const useEnvironmentStore = create<EnvironmentStore>()(
       setEditingEnvironmentId: (id) => set({ editingEnvironmentId: id }),
       setEnvironmentFormName: (name) => set({ environmentFormName: name }),
       setEnvironmentFormVariables: (variables) => set({ environmentFormVariables: variables }),
-      setEnvironmentTabs: (tabs) => set({ environmentTabs: tabs }),
-      setActiveEnvironmentTab: (tab) => set({ activeEnvironmentTab: tab }),
       setLoading: (loading) => set({ loading }),
       setSaving: (saving) => set({ saving }),
 
-      openEnvironmentTab: (env) => set((state) => {
-        const tabKey = `env-${env.id}`;
-        if (state.environmentTabs.some((tab) => tab.key === tabKey)) {
-          return {
-            activeEnvironmentTab: tabKey,
-            editingEnvironmentId: env.id,
-            environmentFormName: env.name,
-            environmentFormVariables: get().environmentToRows(env.variables),
-          };
-        }
-        return {
-          environmentTabs: [...state.environmentTabs, { key: tabKey, title: env.name, environmentId: env.id }],
-          activeEnvironmentTab: tabKey,
-          editingEnvironmentId: env.id,
-          environmentFormName: env.name,
-          environmentFormVariables: get().environmentToRows(env.variables),
-        };
+      openEnvironmentEditor: (env) => set({
+        editingEnvironmentId: env.id,
+        environmentFormName: env.name,
+        environmentFormVariables: environmentToRows(env.variables),
       }),
 
-      openCreateEnvironmentTab: (projectEnvCount) => set((state) => {
-        const tabKey = `new-env-${Date.now()}`;
-        return {
-          environmentTabs: [...state.environmentTabs, { key: tabKey, title: '新建环境', isNew: true }],
-          activeEnvironmentTab: tabKey,
-          editingEnvironmentId: '',
-          environmentFormName: `环境${projectEnvCount + 1}`,
-          environmentFormVariables: [createEnvironmentVariableRow()],
-        };
-      }),
-
-      closeEnvironmentTab: (tabKey) => set((state) => {
-        const next = state.environmentTabs.filter((tab) => tab.key !== tabKey);
-        if (state.activeEnvironmentTab === tabKey) {
-          if (next.length === 0) {
-            get().resetEnvironmentEditor();
-          } else {
-            return { environmentTabs: next, activeEnvironmentTab: next[0]?.key || '' };
-          }
-        }
-        return { environmentTabs: next };
+      openCreateEnvironmentEditor: (projectEnvCount) => set({
+        editingEnvironmentId: '',
+        environmentFormName: `环境${projectEnvCount + 1}`,
+        environmentFormVariables: [createEnvironmentVariableRow()],
       }),
 
       resetEnvironmentEditor: () => set({
@@ -149,3 +103,9 @@ export const useEnvironmentStore = create<EnvironmentStore>()(
     { name: 'EnvironmentStore' }
   )
 );
+
+// Helper function for useEnvironmentStore
+function environmentToRows(variables: Record<string, string>): EnvironmentVariableRow[] {
+  const rows = Object.entries(variables || {}).map(([key, value]) => createEnvironmentVariableRow(key, value));
+  return rows.length > 0 ? rows : [createEnvironmentVariableRow()];
+}

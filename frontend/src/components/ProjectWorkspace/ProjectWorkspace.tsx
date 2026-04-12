@@ -43,18 +43,12 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
     environmentFormVariables,
     setEnvironmentFormName,
     setEnvironmentFormVariables,
-    openEnvironmentTab,
-    openCreateEnvironmentTab,
-    closeEnvironmentTab,
+    openEnvironmentEditor,
+    openCreateEnvironmentEditor,
     resetEnvironmentEditor,
-    environmentToRows,
     rowsToEnvironmentVariables,
-    environmentTabs,
-    activeEnvironmentTab,
-    setActiveEnvironmentTab,
-    setEditingEnvironmentId,
-    setEnvironmentTabs,
     editingEnvironmentId,
+    setEditingEnvironmentId,
   } = useEnvironmentStore();
 
   // Script store state
@@ -107,17 +101,13 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
 
   // Environment handlers
   const handleOpenEnvironmentEditor = useCallback((env: Environment) => {
-    openEnvironmentTab(env);
-  }, [openEnvironmentTab]);
+    openEnvironmentEditor(env);
+  }, [openEnvironmentEditor]);
 
   const handleCreateEnvironment = useCallback(() => {
-    openCreateEnvironmentTab(environments.length);
+    openCreateEnvironmentEditor(environments.length);
     setSidebarMenu('environments');
-  }, [openCreateEnvironmentTab, environments.length]);
-
-  const handleCloseEnvironmentTab = useCallback((tabKey: string) => {
-    closeEnvironmentTab(tabKey);
-  }, [closeEnvironmentTab]);
+  }, [openCreateEnvironmentEditor, environments.length]);
 
   const handleSaveEnvironment = useCallback(async () => {
     if (!projectId) {
@@ -133,24 +123,17 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
     try {
       if (editingEnvironmentId) {
         await updateEnvironment(projectId, editingEnvironmentId, name, variables);
-        message.success('环境已更新');
+        setEditingEnvironmentId('');
+        await loadEnvironments(projectId);
       } else {
-        const created = await createEnvironment(projectId, name, variables);
-        message.success('环境已创建');
-        // Update the tab to use the real env ID
-        setEnvironmentTabs(environmentTabs.map(tab =>
-          tab.key === activeEnvironmentTab
-            ? { key: `env-${created.id}`, title: created.name, environmentId: created.id }
-            : tab
-        ));
-        setActiveEnvironmentTab(`env-${created.id}`);
-        setEditingEnvironmentId(created.id);
+        await createEnvironment(projectId, name, variables);
+        setEditingEnvironmentId('');
         await loadEnvironments(projectId);
       }
     } catch (error) {
       console.error('Failed to save environment:', error);
     }
-  }, [projectId, editingEnvironmentId, environmentFormName, environmentFormVariables, createEnvironment, updateEnvironment, rowsToEnvironmentVariables, environmentTabs, activeEnvironmentTab, setEnvironmentTabs, setActiveEnvironmentTab, setEditingEnvironmentId, loadEnvironments]);
+  }, [projectId, editingEnvironmentId, environmentFormName, environmentFormVariables, createEnvironment, updateEnvironment, rowsToEnvironmentVariables, setEditingEnvironmentId, loadEnvironments]);
 
   const handleDeleteEnvironment = useCallback(async () => {
     if (!editingEnvironmentId) return;
@@ -471,7 +454,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
             <EnvironmentEditor
               onSave={handleSaveEnvironment}
               onDelete={handleDeleteEnvironment}
-              onCloseTab={handleCloseEnvironmentTab}
             />
           ) : (
             <ScriptEditor />

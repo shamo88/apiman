@@ -233,6 +233,7 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
                 onRename={onRename}
                 onRenameFolder={onRenameFolder}
                 onDeleteFolder={onDeleteFolder}
+                onDeleteRequest={onDeleteRequest}
                 onCopyRequest={onCopyRequest}
                 onAddCase={onAddCase}
                 onDuplicateCase={onDuplicateCase}
