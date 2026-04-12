@@ -4,7 +4,6 @@ import { useWorkspaceStore } from '../store';
 import { ApiConfig } from '../constants/defaults';
 import { toWailsHttpSpec } from '../utils/curlUtils';
 import {
-  ExecuteHTTPRequest,
   ExecuteHTTPRequestWithScripts,
   ExecuteCurl,
 } from '../../wailsjs/go/main/App';
@@ -26,20 +25,17 @@ export function useRequest() {
       const spec = toWailsHttpSpec(apiConfig);
 
       let response;
-      if (preScriptIds.length > 0 || postScriptIds.length > 0) {
-        response = await ExecuteHTTPRequestWithScripts(
-          projectId,
-          requestName || 'api',
-          requestName || 'request',
-          requestPath,
-          envId,
-          spec,
-          preScriptIds,
-          postScriptIds
-        );
-      } else {
-        response = await ExecuteHTTPRequest(spec);
-      }
+      // Always use ExecuteHTTPRequestWithScripts to ensure environment variables and globals are substituted
+      response = await ExecuteHTTPRequestWithScripts(
+        projectId,
+        requestName || 'api',
+        requestName || 'request',
+        requestPath,
+        envId,
+        spec,
+        preScriptIds,
+        postScriptIds
+      );
 
       setResponse(projectId, response);
 

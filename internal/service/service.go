@@ -337,7 +337,19 @@ func (s *Service) ExecuteHTTPRequest(spec models.HttpRequestSpec) (*models.CurlR
 
 	appCfg, err := s.ConfigManager.LoadAppConfig()
 	if err != nil || appCfg == nil {
-		return s.CurlExecutor.ExecuteHTTPRequest(&spec)
+		// 无项目上下文，使用空的环境变量调用脚本执行器（做变量替换）
+		return s.ScriptableExecutor.ExecuteWithScripts(
+			&spec,
+			nil, // 无代理
+			nil, // 无预置脚本
+			nil, // 无后置脚本
+			nil, // 无脚本名
+			nil, // 无脚本名
+			nil, // 无全局变量
+			nil, // 无环境变量
+			nil, // 无全局setter
+			30,  // 默认超时
+		)
 	}
 	proxyOpts := &curl.ProxyOptions{
 		Enabled:    appCfg.Proxy.Enabled,
@@ -352,7 +364,18 @@ func (s *Service) ExecuteHTTPRequest(spec models.HttpRequestSpec) (*models.CurlR
 	if timeout == 0 {
 		timeout = 30
 	}
-	return s.CurlExecutor.ExecuteHTTPRequestWithProxy(&spec, proxyOpts, timeout)
+	return s.ScriptableExecutor.ExecuteWithScripts(
+		&spec,
+		proxyOpts,
+		nil, // 无预置脚本
+		nil, // 无后置脚本
+		nil, // 无脚本名
+		nil, // 无脚本名
+		nil, // 无全局变量
+		nil, // 无环境变量
+		nil, // 无全局setter
+		timeout,
+	)
 }
 
 // ExecuteHTTPRequestWithProject executes HTTP request and records history with project context.
@@ -360,26 +383,50 @@ func (s *Service) ExecuteHTTPRequestWithProject(projectID, projectName, requestN
 	// 注入全局 Cookie
 	spec = s.injectGlobalCookies(spec)
 
-	appCfg, err := s.ConfigManager.LoadAppConfig()
-	var resp *models.CurlResponse
-	if err != nil || appCfg == nil {
-		resp, err = s.CurlExecutor.ExecuteHTTPRequest(&spec)
-	} else {
-		proxyOpts := &curl.ProxyOptions{
-			Enabled:    appCfg.Proxy.Enabled,
-			HTTPHost:   appCfg.Proxy.HTTPHost,
-			HTTPPort:   appCfg.Proxy.HTTPPort,
-			HTTPSHost:  appCfg.Proxy.HTTPSHost,
-			HTTPSPort:  appCfg.Proxy.HTTPSPort,
-			SOCKS5Host: appCfg.Proxy.SOCKS5Host,
-			SOCKS5Port: appCfg.Proxy.SOCKS5Port,
+	// 加载项目全局变量用于变量替换
+	var globals map[string]string
+	projectPath, err := s.ProjectMgr.ProjectPathByID(projectID)
+	if err == nil {
+		projectVarsPath := filepath.Join(projectPath, "variables.json")
+		projectVars := script.NewProjectVariables()
+		if err := projectVars.LoadFromFile(projectVarsPath); err == nil {
+			globals = projectVars.GetAll()
 		}
-		timeout := appCfg.HTTP.Timeout
+	}
+	if globals == nil {
+		globals = make(map[string]string)
+	}
+
+	appCfg, err := s.ConfigManager.LoadAppConfig()
+	proxyOpts := &curl.ProxyOptions{}
+	timeout := 30
+	if err == nil && appCfg != nil {
+		proxyOpts.Enabled = appCfg.Proxy.Enabled
+		proxyOpts.HTTPHost = appCfg.Proxy.HTTPHost
+		proxyOpts.HTTPPort = appCfg.Proxy.HTTPPort
+		proxyOpts.HTTPSHost = appCfg.Proxy.HTTPSHost
+		proxyOpts.HTTPSPort = appCfg.Proxy.HTTPSPort
+		proxyOpts.SOCKS5Host = appCfg.Proxy.SOCKS5Host
+		proxyOpts.SOCKS5Port = appCfg.Proxy.SOCKS5Port
+		timeout = appCfg.HTTP.Timeout
 		if timeout == 0 {
 			timeout = 30
 		}
-		resp, err = s.CurlExecutor.ExecuteHTTPRequestWithProxy(&spec, proxyOpts, timeout)
 	}
+
+	// 使用 ScriptableExecutor 执行以支持变量替换
+	resp, err := s.ScriptableExecutor.ExecuteWithScripts(
+		&spec,
+		proxyOpts,
+		nil, // 无预置脚本
+		nil, // 无后置脚本
+		nil, // 无脚本名
+		nil, // 无脚本名
+		globals,
+		nil, // 无环境变量（ExecuteHTTPRequestWithProject 不支持环境）
+		nil, // 无全局setter
+		timeout,
+	)
 
 	// 记录历史
 	if recordErr := s.RecordHistory(projectID, projectName, requestName, requestPath, spec, resp); recordErr != nil {
