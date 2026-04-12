@@ -425,18 +425,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
                 style={{ marginBottom: 0 }}
               />
             </div>
-            <div className="request-tabs-environment-select">
-              <Select
-                size="small"
-                value={workspace.selectedEnvironmentId || '__none__'}
-                onChange={(value) => handleUpdateWorkspace({ selectedEnvironmentId: value === '__none__' ? '' : value })}
-                options={[
-                  { label: '不使用环境', value: '__none__' },
-                  ...environments.map(env => ({ label: env.name, value: env.id }))
-                ]}
-                style={{ width: 133 }}
-              />
-            </div>
           </div>
         )}
 

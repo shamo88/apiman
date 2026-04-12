@@ -312,11 +312,28 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       setScriptResultsHeight: (height) => set({ scriptResultsHeight: height }),
       setScriptLogsExpanded: (expanded) => set({ scriptLogsExpanded: expanded }),
       setTestResultsExpanded: (expanded) => set({ testResultsExpanded: expanded }),
-      setActiveProjectId: (id) => set({ activeProjectId: id }),
+      setActiveProjectId: (id) => set((prev) => {
+        // 尝试从 localStorage 加载保存的环境选择
+        const savedEnvId = localStorage.getItem(`apiman-env-${id}`);
+        const workspace = prev.workspaceStates[id];
+        // 只有在 workspace 已存在且 localStorage 中有保存的环境选择时才更新
+        if (workspace && savedEnvId !== null) {
+          return {
+            activeProjectId: id,
+            workspaceStates: {
+              ...prev.workspaceStates,
+              [id]: { ...workspace, selectedEnvironmentId: savedEnvId }
+            }
+          };
+        }
+        return { activeProjectId: id };
+      }),
 
       setSelectedEnvironmentId: (projectId, envId) => set((prev) => {
         const workspace = prev.workspaceStates[projectId];
         if (!workspace) return prev;
+        // 同时持久化到 localStorage
+        localStorage.setItem(`apiman-env-${projectId}`, envId);
         return {
           workspaceStates: {
             ...prev.workspaceStates,

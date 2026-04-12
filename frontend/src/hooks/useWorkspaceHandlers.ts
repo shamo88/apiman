@@ -15,7 +15,12 @@ export const useWorkspace = (projectId: string) => {
   const workspaceStore = useWorkspaceStore();
   const projectStore = useProjectStore();
 
-  const workspace = workspaceStore.workspaceStates[projectId] || createEmptyWorkspaceState();
+  const existingWorkspace = workspaceStore.workspaceStates[projectId];
+  // 如果 workspace 不存在，创建时加载保存的环境选择
+  const workspace = existingWorkspace || {
+    ...createEmptyWorkspaceState(),
+    selectedEnvironmentId: localStorage.getItem(`apiman-env-${projectId}`) || '',
+  };
   const projectTree = projectStore.projectTrees[projectId] || null;
 
   return {
