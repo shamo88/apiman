@@ -136,6 +136,9 @@ export const useWorkspaceHandlers = (projectId: string) => {
 
       workspaceStore.setSidebarHighlightedCasePath(projectId, caseNode.path);
 
+      // 设置 currentRequest，这是保存时需要的
+      workspaceStore.setCurrentRequest(projectId, request as CurlRequest);
+
       const reqCases = request.cases as models.HttpRequestCase[] | undefined;
       if (reqCases && reqCases.length > 0) {
         // Check if requestCases already exists for this request - if so, preserve it (switching within same request)
@@ -144,12 +147,19 @@ export const useWorkspaceHandlers = (projectId: string) => {
           existingCases[0].config.name === request.name;
 
         if (isSameRequest) {
-          // Switching cases within same request - only update activeCaseId and apiConfig
+          // Switching cases within same request - update activeCaseId, apiConfig, and requestCases
           const activeCase = reqCases.find(c => c.id === caseId);
           if (activeCase) {
             const caseConfig = apiConfigFromHttpSpec(activeCase.spec, activeCase.name);
+            // Update requestCases with latest data from server
+            const rows = reqCases.map(c => ({
+              id: c.id,
+              name: c.name,
+              config: apiConfigFromHttpSpec(c.spec, c.name),
+            }));
             // Preserve current apiConfig (may contain unsaved interface changes)
             workspaceStore.setWorkspaceState(projectId, {
+              requestCases: rows,
               activeCaseId: caseId,
               interfaceApiConfig: { ...workspace.apiConfig },
             });
