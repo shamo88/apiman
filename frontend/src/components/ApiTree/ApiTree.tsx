@@ -1,5 +1,5 @@
 import React, { useCallback, DragEvent } from 'react';
-import { Empty } from 'antd';
+import { Empty, Modal } from 'antd';
 import { ProjectTree } from '../../store';
 import { useUIStore } from '../../store/useUIStore';
 import { getMethodColor, formatSidebarMethodLabel } from '../../constants/httpMethods';
@@ -69,6 +69,31 @@ export const ApiTree: React.FC<ApiTreeProps> = ({
   onDrop,
 }) => {
   const { dropTargetFolderPath, draggingNode } = useUIStore();
+
+  // 统一包装删除操作，添加二次确认
+  const withDeleteConfirm = useCallback((typeLabel: string, name: string, onOk: () => void) => {
+    Modal.confirm({
+      title: '确认删除',
+      content: `确定要删除${typeLabel}「${name}」吗？${typeLabel === '文件夹' ? '文件夹内的所有内容都将被删除。' : ''}`,
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk,
+    });
+  }, []);
+
+  const handleDeleteRequest = useCallback((path: string, name: string) => {
+    withDeleteConfirm('请求', name, () => onDeleteRequest(path));
+  }, [onDeleteRequest, withDeleteConfirm]);
+
+  const handleDeleteFolder = useCallback((path: string, name: string) => {
+    withDeleteConfirm('文件夹', name, () => onDeleteFolder(path));
+  }, [onDeleteFolder, withDeleteConfirm]);
+
+  const handleDeleteCase = useCallback((casePath: string, caseName: string) => {
+    withDeleteConfirm('用例', caseName, () => onDeleteCase(casePath));
+  }, [onDeleteCase, withDeleteConfirm]);
+
   const filterTreeNodes = useCallback((node: ProjectTree | null, keyword: string, method: string): ProjectTree | null => {
     if (!node) return null;
     const normalizedKeyword = keyword.trim().toLowerCase();
@@ -154,11 +179,11 @@ export const ApiTree: React.FC<ApiTreeProps> = ({
           onAddCase={() => child.path && onAddCase(child.path)}
           onCopy={() => child.path && onCopyRequest(child.path)}
           onRename={() => child.path && onRename('request', child.path, child.name)}
-          onDelete={() => child.path && onDeleteRequest(child.path)}
+          onDelete={(path, name) => child.path && handleDeleteRequest(path, name)}
           onCaseClick={onCaseClick}
           onDuplicateCase={onDuplicateCase}
           onRenameCase={onRenameCase}
-          onDeleteCase={onDeleteCase}
+          onDeleteCase={(path, name) => handleDeleteCase(path, name)}
         />
       );
     }
@@ -178,12 +203,13 @@ export const ApiTree: React.FC<ApiTreeProps> = ({
         onAddFolder={() => child.path && onAddFolder(child.path)}
         onRename={onRename}
         onRenameFolder={() => child.path && onRename('folder', child.path, child.name)}
-        onDeleteFolder={() => child.path && onDeleteFolder(child.path)}
+        onDeleteFolder={(path, name) => child.path && handleDeleteFolder(path, name)}
+        onDeleteRequest={onDeleteRequest}
         onCopyRequest={onCopyRequest}
         onAddCase={onAddCase}
         onDuplicateCase={onDuplicateCase}
         onRenameCase={onRenameCase}
-        onDeleteCase={onDeleteCase}
+        onDeleteCase={(path, name) => handleDeleteCase(path, name)}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}

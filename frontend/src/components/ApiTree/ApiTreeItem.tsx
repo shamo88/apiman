@@ -1,9 +1,10 @@
-import React, { DragEvent } from 'react';
-import { Dropdown, Button } from 'antd';
+import React, { DragEvent, useCallback } from 'react';
+import { Dropdown } from 'antd';
 import { DownOutlined, RightOutlined, MoreOutlined, PlusOutlined, CopyOutlined, EditOutlined, CloseOutlined, ExperimentOutlined } from '@ant-design/icons';
 import { ProjectTree } from '../../store';
 import { useUIStore } from '../../store/useUIStore';
 import { getMethodColor, formatSidebarMethodLabel } from '../../constants/httpMethods';
+import { ContextMenu, useContextMenu } from '../ContextMenu';
 import './ApiTree.css';
 
 interface ApiTreeItemProps {
@@ -17,16 +18,120 @@ interface ApiTreeItemProps {
   onAddCase: (requestPath: string) => void;
   onCopy: () => void;
   onRename: () => void;
-  onDelete: () => void;
+  onDelete: (path: string, name: string) => void;
   onCaseClick: (c: ProjectTree) => void;
   onDuplicateCase: (casePath: string) => void;
   onRenameCase: (casePath: string, currentName: string) => void;
-  onDeleteCase: (casePath: string) => void;
+  onDeleteCase: (casePath: string, name: string) => void;
   onDragStart?: (e: DragEvent, node: ProjectTree) => void;
   onDragOver?: (e: DragEvent, nodePath: string) => void;
   onDragLeave?: () => void;
   onDrop?: (e: DragEvent, nodePath: string) => void;
 }
+
+// Case item with its own context menu
+interface CaseItemProps {
+  caseItem: ProjectTree;
+  isActive: boolean;
+  movedHighlightPath: string | null;
+  onCaseClick: () => void;
+  onDuplicateCase: () => void;
+  onRenameCase: () => void;
+  onDeleteCase: (casePath: string, name: string) => void;
+}
+
+const CaseItem: React.FC<CaseItemProps> = ({
+  caseItem,
+  isActive,
+  movedHighlightPath,
+  onCaseClick,
+  onDuplicateCase,
+  onRenameCase,
+  onDeleteCase,
+}) => {
+  const { contextMenuProps, contextMenu } = useContextMenu({
+    items: [
+      {
+        key: 'duplicate',
+        icon: <CopyOutlined />,
+        label: '复制',
+        onClick: onDuplicateCase,
+      },
+      {
+        key: 'rename',
+        icon: <EditOutlined />,
+        label: '重命名',
+        onClick: onRenameCase,
+      },
+      { type: 'divider' as const },
+      {
+        key: 'delete',
+        icon: <CloseOutlined />,
+        label: '删除',
+        danger: true,
+        onClick: () => onDeleteCase(caseItem.path || '', caseItem.name || ''),
+      },
+    ],
+  });
+
+  return (
+    <>
+      {contextMenu}
+      <div
+        className={`api-case-item ${isActive ? 'active' : ''} ${movedHighlightPath === caseItem.path ? 'moved-highlight' : ''}`}
+        onClick={onCaseClick}
+        onContextMenu={(e) => {
+          e.stopPropagation();
+          contextMenuProps.onContextMenu(e);
+        }}
+      >
+        <div className="api-request-expand-cell">
+          <span className="api-request-expand-placeholder" />
+        </div>
+        <div className="api-item-main">
+          <span className="api-method-col api-method-col--case-icon" title="用例">
+            <ExperimentOutlined className="api-case-type-icon" />
+          </span>
+          <span className="api-case-name">{caseItem.name}</span>
+        </div>
+        <Dropdown
+          menu={{
+            items: [
+              {
+                key: 'dup',
+                icon: <CopyOutlined />,
+                label: '复制',
+                onClick: (e) => { e.domEvent.stopPropagation(); onDuplicateCase(); },
+              },
+              {
+                key: 'ren',
+                icon: <EditOutlined />,
+                label: '重命名',
+                onClick: (e) => { e.domEvent.stopPropagation(); onRenameCase(); },
+              },
+              { type: 'divider' as const },
+              {
+                key: 'del',
+                icon: <CloseOutlined />,
+                label: '删除',
+                danger: true,
+                onClick: (e) => {
+                  e.domEvent.stopPropagation();
+                  onDeleteCase(caseItem.path || '', caseItem.name || '');
+                },
+              },
+            ],
+          }}
+          trigger={['click']}
+        >
+          <button type="button" className="api-action-btn" onClick={(e) => e.stopPropagation()}>
+            <MoreOutlined />
+          </button>
+        </Dropdown>
+      </div>
+    </>
+  );
+};
 
 export const ApiTreeItem: React.FC<ApiTreeItemProps> = ({
   request,
@@ -56,6 +161,39 @@ export const ApiTreeItem: React.FC<ApiTreeItemProps> = ({
   const mc = getMethodColor(request.method || 'GET');
   const isDragging = draggingNode?.path === request.path;
 
+  // Request item context menu
+  const { contextMenuProps, contextMenu } = useContextMenu({
+    items: [
+      {
+        key: 'add-case',
+        icon: <PlusOutlined />,
+        label: '新增用例',
+        onClick: () => onAddCase(request.path || ''),
+      },
+      { type: 'divider' as const },
+      {
+        key: 'copy',
+        icon: <CopyOutlined />,
+        label: '复制',
+        onClick: onCopy,
+      },
+      {
+        key: 'rename',
+        icon: <EditOutlined />,
+        label: '重命名',
+        onClick: onRename,
+      },
+      { type: 'divider' as const },
+      {
+        key: 'delete',
+        icon: <CloseOutlined />,
+        label: '删除',
+        danger: true,
+        onClick: () => onDelete(request.path || '', request.name || ''),
+      },
+    ],
+  });
+
   const handleDragStart = (e: DragEvent<HTMLDivElement>) => {
     e.stopPropagation();
     onDragStart?.(e, request);
@@ -79,8 +217,14 @@ export const ApiTreeItem: React.FC<ApiTreeItemProps> = ({
     onDrop?.(e, request.path || '');
   };
 
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    contextMenuProps.onContextMenu(e);
+  }, [contextMenuProps]);
+
   return (
     <div className="api-request-block">
+      {contextMenu}
       <div
         className={`api-item ${isActive ? 'active' : ''} ${movedHighlightPath === request.path ? 'moved-highlight' : ''} ${isDragging ? 'dragging' : ''}`}
         onClick={onClick}
@@ -89,6 +233,7 @@ export const ApiTreeItem: React.FC<ApiTreeItemProps> = ({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        onContextMenu={handleContextMenu}
       >
         <div className="api-request-expand-cell">
           {hasCases ? (
@@ -145,7 +290,10 @@ export const ApiTreeItem: React.FC<ApiTreeItemProps> = ({
                 icon: <CloseOutlined />,
                 label: '删除',
                 danger: true,
-                onClick: (e) => { e.domEvent.stopPropagation(); onDelete(); },
+                onClick: (e) => {
+                  e.domEvent.stopPropagation();
+                  onDelete(request.path || '', request.name || '');
+                },
               },
             ],
           }}
@@ -159,52 +307,16 @@ export const ApiTreeItem: React.FC<ApiTreeItemProps> = ({
       {hasCases && isExpanded && (
         <div className="api-case-list">
           {caseKids.map((c) => (
-            <div
+            <CaseItem
               key={c.path}
-              className={`api-case-item ${sidebarHighlightedCasePath !== '' && sidebarHighlightedCasePath === c.path ? 'active' : ''} ${movedHighlightPath === c.path ? 'moved-highlight' : ''}`}
-              onClick={() => onCaseClick(c)}
-            >
-              <div className="api-request-expand-cell">
-                <span className="api-request-expand-placeholder" />
-              </div>
-              <div className="api-item-main">
-                <span className="api-method-col api-method-col--case-icon" title="用例">
-                  <ExperimentOutlined className="api-case-type-icon" />
-                </span>
-                <span className="api-case-name">{c.name}</span>
-              </div>
-              <Dropdown
-                menu={{
-                  items: [
-                    {
-                      key: 'dup',
-                      icon: <CopyOutlined />,
-                      label: '复制',
-                      onClick: (e) => { e.domEvent.stopPropagation(); onDuplicateCase(c.path!); },
-                    },
-                    {
-                      key: 'ren',
-                      icon: <EditOutlined />,
-                      label: '重命名',
-                      onClick: (e) => { e.domEvent.stopPropagation(); onRenameCase(c.path!, c.name); },
-                    },
-                    { type: 'divider' as const },
-                    {
-                      key: 'del',
-                      icon: <CloseOutlined />,
-                      label: '删除',
-                      danger: true,
-                      onClick: (e) => { e.domEvent.stopPropagation(); onDeleteCase(c.path!); },
-                    },
-                  ],
-                }}
-                trigger={['click']}
-              >
-                <button type="button" className="api-action-btn" onClick={(e) => e.stopPropagation()}>
-                  <MoreOutlined />
-                </button>
-              </Dropdown>
-            </div>
+              caseItem={c}
+              isActive={sidebarHighlightedCasePath !== '' && sidebarHighlightedCasePath === c.path}
+              movedHighlightPath={movedHighlightPath}
+              onCaseClick={() => onCaseClick(c)}
+              onDuplicateCase={() => onDuplicateCase(c.path!)}
+              onRenameCase={() => onRenameCase(c.path!, c.name || '')}
+              onDeleteCase={() => onDeleteCase(c.path!, c.name || '')}
+            />
           ))}
         </div>
       )}

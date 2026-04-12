@@ -1,9 +1,10 @@
-import React, { DragEvent } from 'react';
+import React, { DragEvent, useCallback } from 'react';
 import { Card, Button, Dropdown, Select } from 'antd';
 import type { MenuProps } from 'antd';
-import { ApiOutlined, EditOutlined, DeleteOutlined, EllipsisOutlined } from '@ant-design/icons';
+import { ApiOutlined, EditOutlined, DeleteOutlined, EllipsisOutlined, CopyOutlined } from '@ant-design/icons';
 import { useProjectStore, Project } from '../../store';
 import { useUIStore } from '../../store/useUIStore';
+import { ContextMenu, useContextMenu } from '../ContextMenu';
 import './HomePage.css';
 
 interface ProjectCardProps {
@@ -57,15 +58,54 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
     },
   ];
 
+  // Right-click context menu
+  const { contextMenuProps, contextMenu } = useContextMenu({
+    items: [
+      {
+        key: 'copy',
+        icon: <CopyOutlined />,
+        label: '复制项目',
+        onClick: () => {
+          // TODO: 实现复制功能
+        },
+      },
+      {
+        key: 'rename',
+        icon: <EditOutlined />,
+        label: '重命名',
+        onClick: () => {
+          setRenameProject({ id: project.id, name: project.name });
+          setRenameModal(true);
+        },
+      },
+      { type: 'divider' as const },
+      {
+        key: 'delete',
+        icon: <DeleteOutlined />,
+        label: '删除',
+        danger: true,
+        onClick: () => handleDeleteProject(project.id),
+      },
+    ],
+  });
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    contextMenuProps.onContextMenu(e);
+  }, [contextMenuProps]);
+
   return (
-    <Card
-      key={project.id}
-      className={`project-card ${isDragging ? 'dragging' : ''}`}
-      size="small"
-      draggable
-      onClick={() => onProjectOpen(project)}
-      onDragStart={(e) => handleDragStart(e, project.id)}
-    >
+    <>
+      {contextMenu}
+      <Card
+        key={project.id}
+        className={`project-card ${isDragging ? 'dragging' : ''}`}
+        size="small"
+        draggable
+        onClick={() => onProjectOpen(project)}
+        onDragStart={(e) => handleDragStart(e, project.id)}
+        onContextMenu={handleContextMenu}
+      >
       <div className="project-card-content">
         <div className="project-card-header">
           <div className="project-card-icon">
@@ -99,5 +139,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
         </div>
       </div>
     </Card>
+    </>
   );
 };

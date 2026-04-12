@@ -1,9 +1,10 @@
-import React, { DragEvent } from 'react';
+import React, { DragEvent, useCallback } from 'react';
 import { Dropdown } from 'antd';
-import { FolderOutlined, RightOutlined, DownOutlined, PlusOutlined, MoreOutlined, EditOutlined, CloseOutlined } from '@ant-design/icons';
+import { FolderOutlined, RightOutlined, DownOutlined, PlusOutlined, MoreOutlined, EditOutlined, CloseOutlined, CopyOutlined } from '@ant-design/icons';
 import { ProjectTree } from '../../store';
 import { useUIStore } from '../../store/useUIStore';
 import { ApiTreeItem } from './ApiTreeItem';
+import { ContextMenu, useContextMenu } from '../ContextMenu';
 import './ApiTree.css';
 
 interface FolderNodeProps {
@@ -21,12 +22,13 @@ interface FolderNodeProps {
   onAddFolder: (parentPath: string) => void;
   onRename: (type: 'request' | 'folder', path: string, currentName: string) => void;
   onRenameFolder: (path: string, currentName: string) => void;
-  onDeleteFolder: (path: string) => void;
+  onDeleteFolder: (path: string, name: string) => void;
+  onDeleteRequest: (path: string) => void;
   onCopyRequest: (path: string) => void;
   onAddCase: (requestPath: string) => void;
   onDuplicateCase: (casePath: string) => void;
   onRenameCase: (casePath: string, currentName: string) => void;
-  onDeleteCase: (casePath: string) => void;
+  onDeleteCase: (casePath: string, name: string) => void;
   onDragOver?: (e: DragEvent, folderPath: string) => void;
   onDragLeave?: () => void;
   onDrop?: (e: DragEvent, folderPath: string) => void;
@@ -48,6 +50,7 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
   onRename,
   onRenameFolder,
   onDeleteFolder,
+  onDeleteRequest,
   onCopyRequest,
   onAddCase,
   onDuplicateCase,
@@ -63,6 +66,44 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
   const orderedKids = folderChildren.filter((child: ProjectTree) => child.type === 'folder' || child.type === 'request');
   const totalCount = folderChildren.length;
   const isDropTarget = dropTargetFolderPath === folderPath;
+
+  // Right-click context menu for folder
+  const { contextMenuProps, contextMenu } = useContextMenu({
+    items: [
+      {
+        key: 'add-request',
+        icon: <PlusOutlined />,
+        label: '新建请求',
+        onClick: () => onAddRequest(folderPath),
+      },
+      {
+        key: 'add-folder',
+        icon: <FolderOutlined />,
+        label: '新建文件夹',
+        onClick: () => onAddFolder(folderPath),
+      },
+      { type: 'divider' as const },
+      {
+        key: 'rename',
+        icon: <EditOutlined />,
+        label: '重命名',
+        onClick: () => onRenameFolder(folderPath, folder.name),
+      },
+      { type: 'divider' as const },
+      {
+        key: 'delete',
+        icon: <CloseOutlined />,
+        label: '删除文件夹',
+        danger: true,
+        onClick: () => onDeleteFolder(folderPath, folder.name),
+      },
+    ],
+  });
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    contextMenuProps.onContextMenu(e);
+  }, [contextMenuProps]);
 
   const handleDragOver = (e: DragEvent) => {
     e.preventDefault();
@@ -95,12 +136,14 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
 
   return (
     <div className="api-folder">
+      {contextMenu}
       <div
         className={`api-folder-header ${movedHighlightPath === (folder.path || folder.id) ? 'moved-highlight' : ''} ${isDropTarget ? 'drop-target-active' : ''}`}
         onClick={handleHeaderClick}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        onContextMenu={handleContextMenu}
       >
         <span className="folder-toggle-icon">
           {isCollapsed ? <RightOutlined /> : <DownOutlined />}
@@ -135,7 +178,10 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
                 icon: <CloseOutlined />,
                 label: '删除文件夹',
                 danger: true,
-                onClick: (e) => { e.domEvent.stopPropagation(); onDeleteFolder(folderPath); },
+                onClick: (e) => {
+                  e.domEvent.stopPropagation();
+                  onDeleteFolder(folderPath, folder.name);
+                },
               },
             ],
           }}
@@ -163,11 +209,11 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
                 onAddCase={() => child.path && onAddCase(child.path)}
                 onCopy={() => child.path && onCopyRequest(child.path)}
                 onRename={() => child.path && onRename('request', child.path, child.name)}
-                onDelete={() => child.path && onDeleteCase(child.path)}
+                onDelete={() => child.path && onDeleteRequest(child.path)}
                 onCaseClick={onCaseClick}
                 onDuplicateCase={onDuplicateCase}
                 onRenameCase={onRenameCase}
-                onDeleteCase={onDeleteCase}
+                onDeleteCase={(path, name) => onDeleteCase(path, name)}
               />
             ) : (
               <FolderNode
