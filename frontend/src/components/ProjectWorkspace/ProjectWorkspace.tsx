@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button, Dropdown, Input, message, Select, Space, Tabs } from 'antd';
-import { ApiOutlined, EnvironmentOutlined, FileOutlined, FolderOutlined, PlusOutlined, SearchOutlined, CodeOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import { ApiOutlined, EnvironmentOutlined, FileOutlined, FolderOutlined, PlusOutlined, SearchOutlined, CodeOutlined, QuestionCircleOutlined, EditOutlined, DeleteOutlined, CopyOutlined } from '@ant-design/icons';
 
 import { ApiTree } from '../ApiTree';
 import { RequestPanel } from '../RequestPanel';
 import { ResponsePanel } from '../ResponsePanel';
 import { EnvironmentEditor } from './EnvironmentEditor';
+import { EnvironmentListItem } from './EnvironmentListItem';
 import { ScriptEditor } from './ScriptEditor';
 import { ResizeHandle } from './ResizeHandle';
 import { ResizeSplitter } from './ResizeSplitter';
@@ -144,6 +145,24 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
       console.error('Failed to delete environment:', error);
     }
   }, [projectId, editingEnvironmentId, deleteEnvironment, resetEnvironmentEditor]);
+
+  const handleDeleteEnvironmentById = useCallback(async (envId: string) => {
+    try {
+      await deleteEnvironment(projectId, envId);
+      resetEnvironmentEditor();
+    } catch (error) {
+      console.error('Failed to delete environment:', error);
+    }
+  }, [projectId, deleteEnvironment, resetEnvironmentEditor]);
+
+  const handleDuplicateEnvironment = useCallback(async (env: Environment) => {
+    try {
+      await createEnvironment(projectId, `${env.name} (副本)`, env.variables);
+      await loadEnvironments(projectId);
+    } catch (error) {
+      console.error('Failed to duplicate environment:', error);
+    }
+  }, [projectId, createEnvironment, loadEnvironments]);
 
   // Script handlers
   const handleSelectScript = useCallback((script: ProjectScript) => {
@@ -346,16 +365,14 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
                 <div className="empty-sidebar">暂无环境，点击右上角"新建"创建</div>
               ) : (
                 environments.map(env => (
-                  <button
+                  <EnvironmentListItem
                     key={env.id}
-                    className={`environment-list-item ${editingEnvironmentId === env.id ? 'active' : ''}`}
-                    onClick={() => handleOpenEnvironmentEditor(env)}
-                  >
-                    <span className="environment-list-item-icon">
-                      <EnvironmentOutlined />
-                    </span>
-                    <span className="environment-list-item-name">{env.name}</span>
-                  </button>
+                    env={env}
+                    isActive={editingEnvironmentId === env.id}
+                    onClick={handleOpenEnvironmentEditor}
+                    onDelete={handleDeleteEnvironmentById}
+                    onDuplicate={handleDuplicateEnvironment}
+                  />
                 ))
               )}
             </div>
