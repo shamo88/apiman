@@ -448,19 +448,6 @@ export const GlobalSearchModal: React.FC = () => {
           ))}
         </div>
 
-        <div
-          style={{
-            marginTop: 8,
-            fontSize: 11,
-            color: 'var(--text-muted)',
-            display: 'flex',
-            gap: 16,
-          }}
-        >
-          <span>↑↓ 导航</span>
-          <span>Enter 打开</span>
-          <span>Esc 关闭</span>
-        </div>
       </div>
     </Modal>
   );

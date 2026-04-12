@@ -153,7 +153,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({ onOpenShortcutsHelp }) => {
             <button
               className="title-bar-button settings"
               onClick={onOpenShortcutsHelp}
-              title="快捷键 (Ctrl+Shift+?)"
+              title="快捷键"
               style={{ '--wails-draggable': 'no-drag' } as React.CSSProperties}
             >
               <KeyOutlined />

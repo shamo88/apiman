@@ -39,11 +39,6 @@ export const AppFooter: React.FC<AppFooterProps> = ({ onOpenShortcutsHelp }) => 
       <Button icon={<FileTextOutlined />} onClick={handleLogClick}>
         Log
       </Button>
-      {onOpenShortcutsHelp && (
-        <Button icon={<KeyOutlined />} onClick={onOpenShortcutsHelp}>
-          快捷键
-        </Button>
-      )}
     </div>
   );
 };

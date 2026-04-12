@@ -75,7 +75,7 @@ export const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({ vi
           {isMac ? 'Mac 环境下 ⌘ 等同于 Ctrl' : 'Windows/Linux 环境下 Ctrl 为主快捷键'}
         </p>
         <Table
-          dataSource={SHORTCUTS_LIST.map(item => ({ ...item, key: item.id }))}
+          dataSource={SHORTCUTS_LIST}
           columns={columns}
           pagination={false}
           size="small"
