@@ -283,7 +283,6 @@ export const GlobalSearchModal: React.FC = () => {
       footer={null}
       width={680}
       className="global-search-modal"
-      destroyOnClose
       maskClosable
     >
       <div style={{ padding: '8px 0' }}>

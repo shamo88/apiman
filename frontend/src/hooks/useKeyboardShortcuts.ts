@@ -230,10 +230,11 @@ export const useKeyboardShortcuts = () => {
   }, [isInWorkspace, isModalOpen, showShortcutFeedback]);
 
   const handleGlobalSearch = useCallback(() => {
-    if (isModalOpen()) return;
+    // GlobalSearchModal 是全局组件，直接打开，不受 isModalOpen() 检查限制
+    // 否则关闭后再按 Ctrl+F 会无效（因为 uiStoreRef.current 可能还是旧状态）
     showShortcutFeedback('search');
     uiStoreRef.current.openGlobalSearch();
-  }, [isModalOpen, showShortcutFeedback]);
+  }, [showShortcutFeedback]);
 
   const handleTabSwitch = useCallback(() => {
     if (!isInWorkspace() || isModalOpen()) return;
@@ -290,12 +291,6 @@ export const useKeyboardShortcuts = () => {
         return;
       }
 
-      if (modifierKey && key.toLowerCase() === 'f') {
-        event.preventDefault();
-        handleGlobalSearch();
-        return;
-      }
-
       if (modifierKey && key === 'Tab') {
         event.preventDefault();
         handleTabSwitch();
@@ -306,6 +301,23 @@ export const useKeyboardShortcuts = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isModalOpen, isInWorkspace, handleSendRequest, handleNewRequest, handleSave, handleNewFolder, handleEnvironmentSwitch, handleGlobalSearch, handleTabSwitch]);
+
+  // 全局搜索快捷键 - 独立于 isInWorkspace() 检查
+  useEffect(() => {
+    const handleGlobalSearchKeyDown = (event: KeyboardEvent) => {
+      const { key, ctrlKey, metaKey } = event;
+      const isMacPlatform = isMac;
+      const modifierKey = isMacPlatform ? metaKey : ctrlKey;
+
+      if (modifierKey && key.toLowerCase() === 'f') {
+        event.preventDefault();
+        handleGlobalSearch();
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalSearchKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalSearchKeyDown);
+  }, [handleGlobalSearch]);
 
   return {
     activeShortcut,
