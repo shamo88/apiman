@@ -108,7 +108,6 @@ export const FolderScriptPanel: React.FC<FolderScriptPanelProps> = ({
                     <span className="script-badge">脚本配置</span>
                 </div>
                 <div className="folder-script-panel-actions">
-                    <Button onClick={onClose}>取消</Button>
                     <Button type="primary" onClick={handleSave} loading={saving}>
                         保存
                     </Button>

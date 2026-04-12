@@ -330,6 +330,8 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
       ...prev,
       [module]: false
     }));
+    // 关闭文件夹脚本配置
+    setSelectedFolder(null);
   };
 
   return (
@@ -557,7 +559,20 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
         )}
 
         <div className="workspace-main">
-          {activeModule === 'apis' && requestTabs.length > 0 ? (
+          {selectedFolder ? (
+            <FolderScriptPanel
+              folderPath={selectedFolder.path}
+              folderName={selectedFolder.name}
+              preScripts={selectedFolder.preScripts}
+              postScripts={selectedFolder.postScripts}
+              projectScripts={scripts.map((s) => ({ id: s.id, name: s.name }))}
+              onSave={(pre, post) => {
+                // Update the selected folder state with new scripts
+                setSelectedFolder({ ...selectedFolder, preScripts: pre, postScripts: post });
+              }}
+              onClose={() => setSelectedFolder(null)}
+            />
+          ) : activeModule === 'apis' && requestTabs.length > 0 ? (
             <>
               <div className="workspace-request">
                 <RequestPanel
@@ -612,24 +627,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
           )}
         </div>
       </div>
-
-      {/* Folder script configuration panel (shown when a folder is selected) */}
-      {selectedFolder && (
-        <div className="workspace-main">
-          <FolderScriptPanel
-            folderPath={selectedFolder.path}
-            folderName={selectedFolder.name}
-            preScripts={selectedFolder.preScripts}
-            postScripts={selectedFolder.postScripts}
-            projectScripts={scripts.map((s) => ({ id: s.id, name: s.name }))}
-            onSave={(pre, post) => {
-              // Update the selected folder state with new scripts
-              setSelectedFolder({ ...selectedFolder, preScripts: pre, postScripts: post });
-            }}
-            onClose={() => setSelectedFolder(null)}
-          />
-        </div>
-      )}
     </div>
   );
 };

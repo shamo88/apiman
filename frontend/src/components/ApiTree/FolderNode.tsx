@@ -1,6 +1,6 @@
 import React, { DragEvent, useCallback } from 'react';
 import { Dropdown } from 'antd';
-import { FolderOutlined, RightOutlined, DownOutlined, PlusOutlined, MoreOutlined, EditOutlined, CloseOutlined, CopyOutlined, CodeOutlined } from '@ant-design/icons';
+import { FolderOutlined, RightOutlined, DownOutlined, PlusOutlined, MoreOutlined, EditOutlined, CloseOutlined, CopyOutlined } from '@ant-design/icons';
 import { ProjectTree } from '../../store';
 import { useUIStore } from '../../store/useUIStore';
 import { ApiTreeItem } from './ApiTreeItem';
@@ -86,13 +86,6 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
       },
       { type: 'divider' as const },
       {
-        key: 'configure-scripts',
-        icon: <CodeOutlined />,
-        label: '配置脚本',
-        onClick: () => onConfigureFolderScripts?.(folderPath, folder.name),
-      },
-      { type: 'divider' as const },
-      {
         key: 'rename',
         icon: <EditOutlined />,
         label: '重命名',
@@ -134,6 +127,12 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
 
   const handleHeaderClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    onConfigureFolderScripts?.(folderPath, folder.name);
+  };
+
+  // 点击箭头图标展开/收起文件夹
+  const handleToggleIconClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
     onToggleFolder(folderPath);
   };
 
@@ -154,7 +153,7 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
         onDrop={handleDrop}
         onContextMenu={handleContextMenu}
       >
-        <span className="folder-toggle-icon">
+        <span className="folder-toggle-icon" onClick={handleToggleIconClick}>
           {isCollapsed ? <RightOutlined /> : <DownOutlined />}
         </span>
         <FolderOutlined className="folder-icon" />
