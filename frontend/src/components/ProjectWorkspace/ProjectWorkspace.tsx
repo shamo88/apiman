@@ -336,7 +336,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
     <div className="project-workspace">
       <div className="project-sidebar" style={{ width: sidebarWidth }}>
         {/* 接口列表模块 */}
-        <div className={`sidebar-module ${collapsedModules.apis ? 'collapsed' : ''}`}>
+        <div className={`sidebar-module ${collapsedModules.apis ? 'collapsed' : ''}`} data-module="apis">
           <div className="sidebar-module-header" onClick={() => toggleModule('apis')}>
             <div className="sidebar-module-title">
               {collapsedModules.apis ? <RightOutlined /> : <DownOutlined />}
