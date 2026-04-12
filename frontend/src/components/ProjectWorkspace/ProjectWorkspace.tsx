@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button, Dropdown, Input, message, Select, Space, Tabs } from 'antd';
-import { ApiOutlined, EnvironmentOutlined, FileOutlined, FolderOutlined, PlusOutlined, SearchOutlined, CodeOutlined, QuestionCircleOutlined, EditOutlined, DeleteOutlined, CopyOutlined } from '@ant-design/icons';
+import { ApiOutlined, EnvironmentOutlined, FileOutlined, FolderOutlined, PlusOutlined, SearchOutlined, CodeOutlined, QuestionCircleOutlined, EditOutlined, DeleteOutlined, CopyOutlined, DownOutlined, RightOutlined } from '@ant-design/icons';
 
 import { ApiTree } from '../ApiTree';
 import { RequestPanel } from '../RequestPanel';
@@ -28,7 +28,14 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
   const workspaceStore = useWorkspaceStore();
   const projectStore = useProjectStore();
   const { sidebarWidth, setSidebarWidth } = uiStore;
-  const [sidebarMenu, setSidebarMenu] = useState<'apis' | 'environments' | 'scripts' | 'project-settings'>('apis');
+  // 四个模块的折叠状态
+  const [collapsedModules, setCollapsedModules] = useState({
+    apis: false,
+    environments: true,
+    scripts: true,
+    projectSettings: true,
+  });
+  const [activeModule, setActiveModule] = useState<'apis' | 'environments' | 'scripts' | 'project-settings'>('apis');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [filterMethod, setFilterMethod] = useState('ALL');
   const [searchVersion, setSearchVersion] = useState(0);
@@ -72,7 +79,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
 
   // Load project scripts when project settings tab is opened
   useEffect(() => {
-    if (sidebarMenu === 'project-settings' && projectId) {
+    if (activeModule === 'project-settings' && projectId) {
       console.log('[DEBUG] Loading project scripts for:', projectId);
       GetProjectScriptsResult(projectId).then((result: any) => {
         console.log('[DEBUG] GetProjectScriptsResult result:', JSON.stringify(result, null, 2));
@@ -87,7 +94,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
         setProjectScripts({ preScripts: [], postScripts: [] });
       });
     }
-  }, [sidebarMenu, projectId]);
+  }, [activeModule, projectId]);
 
   // Handle folder script configuration
   const handleConfigureFolderScripts = useCallback(async (folderPath: string, folderName: string) => {
@@ -117,10 +124,10 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
 
   // Load script list when scripts tab or project settings is opened
   useEffect(() => {
-    if ((sidebarMenu === 'scripts' || sidebarMenu === 'project-settings') && projectId) {
+    if ((activeModule === 'scripts' || activeModule === 'project-settings') && projectId) {
       loadScripts(projectId);
     }
-  }, [sidebarMenu, projectId, loadScripts]);
+  }, [activeModule, projectId, loadScripts]);
 
   const {
     handleTreeItemClick,
@@ -146,14 +153,16 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
     workspaceStore.setWorkspaceState(projectId, updates);
   };
 
-  // Environment handlers
+  // Environment handlers - 带模块激活
   const handleOpenEnvironmentEditor = useCallback((env: Environment) => {
+    activateModule('environments');
     openEnvironmentEditor(env);
   }, [openEnvironmentEditor]);
 
   const handleCreateEnvironment = useCallback(() => {
     openCreateEnvironmentEditor(environments.length);
-    setSidebarMenu('environments');
+    setCollapsedModules(prev => ({ ...prev, environments: false }));
+    setActiveModule('environments');
   }, [openCreateEnvironmentEditor, environments.length]);
 
   const handleSaveEnvironment = useCallback(async () => {
@@ -210,12 +219,14 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
     }
   }, [projectId, createEnvironment, loadEnvironments]);
 
-  // Script handlers
+  // Script handlers - 带模块激活
   const handleSelectScript = useCallback((script: ProjectScript) => {
+    activateModule('scripts');
     selectScript(script);
   }, [selectScript]);
 
   const handleCreateScript = useCallback(async () => {
+    activateModule('scripts');
     const scriptName = `脚本${scripts.length + 1}`;
     try {
       const created = await createScript(projectId, scriptName, '', '// 在这里编写 JavaScript 脚本\n');
@@ -225,6 +236,17 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
       console.error('Failed to create script:', error);
     }
   }, [projectId, scripts.length, createScript, loadScripts, selectScript]);
+
+  // ApiTree handlers - 带模块激活
+  const handleApiTreeRequestClick = useCallback((path: string, method: string) => {
+    activateModule('apis');
+    handleTreeItemClick(path, method);
+  }, [handleTreeItemClick]);
+
+  const handleApiTreeCaseClick = useCallback((casePath: string) => {
+    activateModule('apis');
+    handleCaseClick(casePath);
+  }, [handleCaseClick]);
 
   const handleSaveScript = useCallback(async () => {
     if (!scriptFormName.trim()) return;
@@ -290,176 +312,227 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
   const scriptLogs = useMemo(() => workspace.response?.script_logs || [], [workspace.response]);
   const testResults = useMemo(() => workspace.response?.tests || [], [workspace.response]);
 
+  // 展开/折叠模块 - 只切换展开状态，不切换右侧工作区
+  const toggleModule = (module: 'apis' | 'environments' | 'scripts' | 'project-settings') => {
+    setCollapsedModules({
+      apis: module === 'apis' ? !collapsedModules.apis : collapsedModules.apis,
+      environments: module === 'environments' ? !collapsedModules.environments : collapsedModules.environments,
+      scripts: module === 'scripts' ? !collapsedModules.scripts : collapsedModules.scripts,
+      projectSettings: module === 'project-settings' ? !collapsedModules.projectSettings : collapsedModules.projectSettings,
+    });
+  };
+
+  // 切换右侧工作区到指定模块
+  const activateModule = (module: 'apis' | 'environments' | 'scripts' | 'project-settings') => {
+    setActiveModule(module);
+    // 确保目标模块展开
+    setCollapsedModules(prev => ({
+      ...prev,
+      [module]: false
+    }));
+  };
+
   return (
     <div className="project-workspace">
       <div className="project-sidebar" style={{ width: sidebarWidth }}>
-        <div className="sidebar-header sidebar-menu-header">
-          <div className="sidebar-top-menu">
-            <button
-              className={`sidebar-menu-item ${sidebarMenu === 'apis' ? 'active' : ''}`}
-              onClick={() => setSidebarMenu('apis')}
-            >
-              接口列表
-            </button>
-            <button
-              className={`sidebar-menu-item ${sidebarMenu === 'environments' ? 'active' : ''}`}
-              onClick={() => setSidebarMenu('environments')}
-            >
-              环境变量
-            </button>
-            <button
-              className={`sidebar-menu-item ${sidebarMenu === 'scripts' ? 'active' : ''}`}
-              onClick={() => setSidebarMenu('scripts')}
-            >
-              脚本
-            </button>
-            <button
-              className={`sidebar-menu-item ${sidebarMenu === 'project-settings' ? 'active' : ''}`}
-              onClick={() => setSidebarMenu('project-settings')}
-            >
-              项目设置
-            </button>
+        {/* 接口列表模块 */}
+        <div className={`sidebar-module ${collapsedModules.apis ? 'collapsed' : ''}`}>
+          <div className="sidebar-module-header" onClick={() => toggleModule('apis')}>
+            <div className="sidebar-module-title">
+              {collapsedModules.apis ? <RightOutlined /> : <DownOutlined />}
+              <ApiOutlined />
+              <span>接口列表</span>
+            </div>
+            {!collapsedModules.apis && (
+              <Space size="small">
+                <Dropdown
+                  menu={{
+                    items: [
+                      { key: 'folder', icon: <FolderOutlined />, label: '新建文件夹', onClick: () => handleAddFolder('') },
+                      { key: 'request', icon: <FileOutlined />, label: '新建请求', onClick: () => handleAddRequest('') },
+                    ]
+                  }}
+                  trigger={['click']}
+                >
+                  <Button size="small" icon={<PlusOutlined />} />
+                </Dropdown>
+              </Space>
+            )}
           </div>
-          {sidebarMenu === 'apis' ? (
-            <Space size="small">
-              <Dropdown
-                menu={{
-                  items: [
-                    { key: 'folder', icon: <FolderOutlined />, label: '新建文件夹', onClick: () => handleAddFolder('') },
-                    { key: 'request', icon: <FileOutlined />, label: '新建请求', onClick: () => handleAddRequest('') },
-                  ]
-                }}
-                trigger={['click']}
-              >
-                <Button size="small" icon={<PlusOutlined />} />
-              </Dropdown>
-            </Space>
-          ) : sidebarMenu === 'environments' ? (
-            <Button size="small" icon={<PlusOutlined />} onClick={handleCreateEnvironment} />
-          ) : (
-            <Button size="small" icon={<PlusOutlined />} onClick={handleCreateScript} />
+          {!collapsedModules.apis && (
+            <div className="sidebar-module-content">
+              <div className="sidebar-search">
+                <Input
+                  prefix={<SearchOutlined style={{ color: '#8b8b9a' }} />}
+                  placeholder="搜索接口..."
+                  value={searchKeyword}
+                  onChange={handleSearchChange}
+                  allowClear
+                  size="small"
+                />
+              </div>
+              <div className="sidebar-filters">
+                <Select
+                  value={filterMethod}
+                  onChange={setFilterMethod}
+                  size="small"
+                  style={{ width: '100%' }}
+                  options={[
+                    { value: 'ALL', label: '全部方法' },
+                    { value: 'GET', label: 'GET' },
+                    { value: 'POST', label: 'POST' },
+                    { value: 'PUT', label: 'PUT' },
+                    { value: 'DELETE', label: 'DELETE' },
+                    { value: 'PATCH', label: 'PATCH' },
+                  ]}
+                />
+              </div>
+              <div className="sidebar-content">
+                {!projectTree && (
+                  <div className="empty-sidebar">
+                    <ApiOutlined style={{ fontSize: 32, color: '#d0d0db', marginBottom: 12 }} />
+                    <div>暂无接口</div>
+                  </div>
+                )}
+                {projectTree && (
+                  <ApiTree
+                    tree={projectTree}
+                    collapsedFolders={collapsedFolders}
+                    expandedRequestPaths={workspace.expandedRequestPaths || new Set()}
+                    activeRequestPath={activeRequestPath}
+                    sidebarHighlightedCasePath={workspace.sidebarHighlightedCasePath}
+                    movedHighlightPath={null}
+                    onToggleFolder={handleToggleFolder}
+                    onToggleRequestCases={handleToggleRequestCases}
+                    onRequestClick={handleApiTreeRequestClick}
+                    onCaseClick={handleApiTreeCaseClick}
+                    onAddRequest={handleAddRequest}
+                    onAddFolder={handleAddFolder}
+                    onRename={handleRename}
+                    onDeleteRequest={handleDeleteRequest}
+                    onDeleteFolder={handleDeleteFolder}
+                    onCopyRequest={handleCopyRequest}
+                    onAddCase={handleAddCase}
+                    onDuplicateCase={handleDuplicateCase}
+                    onRenameCase={handleRenameCase}
+                    onDeleteCase={handleDeleteCase}
+                    onConfigureFolderScripts={handleConfigureFolderScripts}
+                    searchKeyword={searchKeyword}
+                    onSearchChange={setSearchKeyword}
+                    filterMethod={filterMethod}
+                    onFilterMethodChange={setFilterMethod}
+                  />
+                )}
+              </div>
+            </div>
           )}
         </div>
 
-        {sidebarMenu === 'apis' && (
-          <>
-            <div className="sidebar-search">
-              <Input
-                prefix={<SearchOutlined style={{ color: '#8b8b9a' }} />}
-                placeholder="搜索接口..."
-                value={searchKeyword}
-                onChange={handleSearchChange}
-                allowClear
-                size="small"
-              />
+        {/* 环境变量模块 */}
+        <div className={`sidebar-module ${collapsedModules.environments ? 'collapsed' : ''}`}>
+          <div className="sidebar-module-header" onClick={() => toggleModule('environments')}>
+            <div className="sidebar-module-title">
+              {collapsedModules.environments ? <RightOutlined /> : <DownOutlined />}
+              <EnvironmentOutlined />
+              <span>环境变量</span>
             </div>
-
-            <div className="sidebar-filters">
-              <Select
-                value={filterMethod}
-                onChange={setFilterMethod}
-                size="small"
-                style={{ width: '100%' }}
-                options={[
-                  { value: 'ALL', label: '全部方法' },
-                  { value: 'GET', label: 'GET' },
-                  { value: 'POST', label: 'POST' },
-                  { value: 'PUT', label: 'PUT' },
-                  { value: 'DELETE', label: 'DELETE' },
-                  { value: 'PATCH', label: 'PATCH' },
-                ]}
-              />
-            </div>
-
-            <div className="sidebar-content">
-              {!projectTree && (
-                <div className="empty-sidebar">
-                  <ApiOutlined style={{ fontSize: 32, color: '#d0d0db', marginBottom: 12 }} />
-                  <div>暂无接口</div>
+            {!collapsedModules.environments && (
+              <Button size="small" icon={<PlusOutlined />} onClick={(e) => { e.stopPropagation(); handleCreateEnvironment(); }} />
+            )}
+          </div>
+          {!collapsedModules.environments && (
+            <div className="sidebar-module-content">
+              <div className="sidebar-content environment-sidebar-content">
+                <div className="environment-list">
+                  {environments.length === 0 ? (
+                    <div className="empty-sidebar">暂无环境，点击右上角"新建"创建</div>
+                  ) : (
+                    environments.map(env => (
+                      <EnvironmentListItem
+                        key={env.id}
+                        env={env}
+                        isActive={editingEnvironmentId === env.id}
+                        onClick={handleOpenEnvironmentEditor}
+                        onDelete={handleDeleteEnvironmentById}
+                        onDuplicate={handleDuplicateEnvironment}
+                      />
+                    ))
+                  )}
                 </div>
-              )}
-              {projectTree && (
-                <ApiTree
-                  tree={projectTree}
-                  collapsedFolders={collapsedFolders}
-                  expandedRequestPaths={workspace.expandedRequestPaths || new Set()}
-                  activeRequestPath={activeRequestPath}
-                  sidebarHighlightedCasePath={workspace.sidebarHighlightedCasePath}
-                  movedHighlightPath={null}
-                  onToggleFolder={handleToggleFolder}
-                  onToggleRequestCases={handleToggleRequestCases}
-                  onRequestClick={handleTreeItemClick}
-                  onCaseClick={handleCaseClick}
-                  onAddRequest={handleAddRequest}
-                  onAddFolder={handleAddFolder}
-                  onRename={handleRename}
-                  onDeleteRequest={handleDeleteRequest}
-                  onDeleteFolder={handleDeleteFolder}
-                  onCopyRequest={handleCopyRequest}
-                  onAddCase={handleAddCase}
-                  onDuplicateCase={handleDuplicateCase}
-                  onRenameCase={handleRenameCase}
-                  onDeleteCase={handleDeleteCase}
-                  onConfigureFolderScripts={handleConfigureFolderScripts}
-                  searchKeyword={searchKeyword}
-                  onSearchChange={setSearchKeyword}
-                  filterMethod={filterMethod}
-                  onFilterMethodChange={setFilterMethod}
-                />
-              )}
+              </div>
             </div>
-          </>
-        )}
+          )}
+        </div>
 
-        {sidebarMenu === 'environments' && (
-          <div className="sidebar-content environment-sidebar-content">
-            <div className="environment-list">
-              {environments.length === 0 ? (
-                <div className="empty-sidebar">暂无环境，点击右上角"新建"创建</div>
-              ) : (
-                environments.map(env => (
-                  <EnvironmentListItem
-                    key={env.id}
-                    env={env}
-                    isActive={editingEnvironmentId === env.id}
-                    onClick={handleOpenEnvironmentEditor}
-                    onDelete={handleDeleteEnvironmentById}
-                    onDuplicate={handleDuplicateEnvironment}
-                  />
-                ))
-              )}
+        {/* 脚本模块 */}
+        <div className={`sidebar-module ${collapsedModules.scripts ? 'collapsed' : ''}`}>
+          <div className="sidebar-module-header" onClick={() => toggleModule('scripts')}>
+            <div className="sidebar-module-title">
+              {collapsedModules.scripts ? <RightOutlined /> : <DownOutlined />}
+              <CodeOutlined />
+              <span>脚本</span>
+            </div>
+            {!collapsedModules.scripts && (
+              <Button size="small" icon={<PlusOutlined />} onClick={(e) => { e.stopPropagation(); handleCreateScript(); }} />
+            )}
+          </div>
+          {!collapsedModules.scripts && (
+            <div className="sidebar-module-content">
+              <div className="sidebar-content environment-sidebar-content">
+                <div className="environment-list">
+                  {scripts.length === 0 ? (
+                    <div className="empty-sidebar">暂无脚本，点击右上角"新建"创建</div>
+                  ) : (
+                    scripts.map(script => (
+                      <button
+                        key={script.id}
+                        className={`environment-list-item ${editingScriptId === script.id ? 'active' : ''}`}
+                        onClick={(e) => { e.stopPropagation(); handleSelectScript(script); }}
+                      >
+                        <span className="environment-list-item-icon">
+                          <CodeOutlined />
+                        </span>
+                        <span className="environment-list-item-name">{script.name}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 项目设置模块 */}
+        <div className={`sidebar-module ${collapsedModules.projectSettings ? 'collapsed' : ''}`}>
+          <div className="sidebar-module-header" onClick={() => toggleModule('project-settings')}>
+            <div className="sidebar-module-title">
+              {collapsedModules.projectSettings ? <RightOutlined /> : <DownOutlined />}
+              <FileOutlined />
+              <span>项目设置</span>
             </div>
           </div>
-        )}
-
-        {sidebarMenu === 'scripts' && (
-          <div className="sidebar-content environment-sidebar-content">
-            <div className="environment-list">
-              {scripts.length === 0 ? (
-                <div className="empty-sidebar">暂无脚本，点击右上角"新建"创建</div>
-              ) : (
-                scripts.map(script => (
-                  <button
-                    key={script.id}
-                    className={`environment-list-item ${editingScriptId === script.id ? 'active' : ''}`}
-                    onClick={() => handleSelectScript(script)}
-                  >
-                    <span className="environment-list-item-icon">
-                      <CodeOutlined />
-                    </span>
-                    <span className="environment-list-item-name">{script.name}</span>
-                  </button>
-                ))
-              )}
+          {!collapsedModules.projectSettings && (
+            <div className="sidebar-module-content">
+              <div className="environment-list">
+                <button
+                  className={`environment-list-item ${activeModule === 'project-settings' ? 'active' : ''}`}
+                  onClick={(e) => { e.stopPropagation(); activateModule('project-settings'); }}
+                >
+                  <span className="environment-list-item-icon">
+                    <CodeOutlined />
+                  </span>
+                  <span className="environment-list-item-name">全局脚本</span>
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <ResizeHandle sidebarWidth={sidebarWidth} onResize={handleSidebarResize} onResizeEnd={handleSidebarResizeEnd} />
 
       <div className="project-main">
-        {sidebarMenu === 'apis' && requestTabs.length > 0 && (
+        {activeModule === 'apis' && requestTabs.length > 0 && (
           <div className="request-tabs-row">
             <div className="request-tabs-scroll-wrap">
               <Tabs
@@ -484,7 +557,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
         )}
 
         <div className="workspace-main">
-          {sidebarMenu === 'apis' && requestTabs.length > 0 ? (
+          {activeModule === 'apis' && requestTabs.length > 0 ? (
             <>
               <div className="workspace-request">
                 <RequestPanel
@@ -520,12 +593,12 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
                 </>
               )}
             </>
-          ) : sidebarMenu === 'environments' ? (
+          ) : activeModule === 'environments' ? (
             <EnvironmentEditor
               onSave={handleSaveEnvironment}
               onDelete={handleDeleteEnvironment}
             />
-          ) : sidebarMenu === 'project-settings' ? (
+          ) : activeModule === 'project-settings' ? (
             <ProjectScriptPanel
               projectId={projectId}
               projectName={projectTree?.name || '项目'}

@@ -10,6 +10,57 @@
   flex-direction: column;
   border-right: 1px solid var(--border-color, #f0f0f0);
   background: var(--bg-primary, #fff);
+  overflow-y: auto;
+}
+
+/* 纵向模块化布局 */
+.sidebar-module {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sidebar-module-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+
+.sidebar-module-header:hover {
+  background: var(--bg-hover);
+}
+
+.sidebar-module-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sidebar-module-title .anticon {
+  font-size: 14px;
+  color: var(--accent-primary);
+}
+
+.sidebar-module.collapsed .sidebar-module-header {
+  background: var(--bg-secondary);
+}
+
+.sidebar-module-content {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.sidebar-module.collapsed .sidebar-module-content {
+  display: none;
 }
 
 .sidebar-content {

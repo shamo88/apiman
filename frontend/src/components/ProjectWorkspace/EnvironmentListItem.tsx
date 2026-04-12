@@ -42,7 +42,7 @@ export const EnvironmentListItem: React.FC<EnvironmentListItemProps> = ({
       {contextMenu}
       <button
         className={`environment-list-item ${isActive ? 'active' : ''}`}
-        onClick={() => onClick(env)}
+        onClick={(e) => { e.stopPropagation(); onClick(env); }}
         onContextMenu={(e) => {
           e.stopPropagation();
           contextMenuProps.onContextMenu(e);
