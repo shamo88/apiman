@@ -64,6 +64,25 @@ func (h *Handler) HandleToolCall(call MCPToolCall) (*MCPToolResult, error) {
 		preScriptIDs := parseStringArray(call.Arguments["pre_script_ids"])
 		postScriptIDs := parseStringArray(call.Arguments["post_script_ids"])
 		return h.executeRaw(spec, preScriptIDs, postScriptIDs)
+	case "mcp_delete_request":
+		path, _ := call.Arguments["path"].(string)
+		return h.deleteRequest(path)
+	case "mcp_delete_folder":
+		path, _ := call.Arguments["path"].(string)
+		return h.deleteFolder(path)
+	case "mcp_delete_case":
+		path, _ := call.Arguments["path"].(string)
+		caseID, _ := call.Arguments["case_id"].(string)
+		return h.deleteCase(path, caseID)
+	case "mcp_list_environments":
+		return h.listEnvironments()
+	case "mcp_get_case":
+		path, _ := call.Arguments["path"].(string)
+		caseID, _ := call.Arguments["case_id"].(string)
+		return h.getCase(path, caseID)
+	case "mcp_search_apis":
+		keyword, _ := call.Arguments["keyword"].(string)
+		return h.searchAPIs(keyword)
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", call.Name)
 	}
@@ -740,4 +759,341 @@ func (h *Handler) createFolder(parentID, name string) (*MCPToolResult, error) {
 	return &MCPToolResult{
 		Content: []MCPContentBlock{{Type: "text", Text: string(data)}},
 	}, nil
+}
+
+// deleteRequest deletes a saved request from the bound project.
+func (h *Handler) deleteRequest(path string) (*MCPToolResult, error) {
+	if path == "" {
+		return nil, fmt.Errorf("path is required")
+	}
+
+	// Parse path to get project ID
+	parts := strings.Split(path, "|")
+	if len(parts) != 3 || parts[0] != "request" {
+		return nil, fmt.Errorf("invalid path format: %s", path)
+	}
+	projectID := parts[1]
+
+	// Security check: verify projectID matches bound project
+	if h.projectID != "" && projectID != h.projectID {
+		return nil, fmt.Errorf("project ID mismatch: requested %s but bound to %s", projectID, h.projectID)
+	}
+
+	if err := h.svc.DeleteRequest(path); err != nil {
+		return nil, fmt.Errorf("failed to delete request: %s", err)
+	}
+
+	result := MCPDeleteResponse{
+		Success: true,
+		Message: "Request deleted successfully",
+	}
+
+	data, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MCPToolResult{
+		Content: []MCPContentBlock{{Type: "text", Text: string(data)}},
+	}, nil
+}
+
+// deleteFolder deletes a folder and all its contents from the bound project.
+func (h *Handler) deleteFolder(path string) (*MCPToolResult, error) {
+	if path == "" {
+		return nil, fmt.Errorf("path is required")
+	}
+
+	// Parse path to get project ID
+	parts := strings.Split(path, "|")
+	if len(parts) != 3 || parts[0] != "folder" {
+		return nil, fmt.Errorf("invalid path format: %s", path)
+	}
+	projectID := parts[1]
+
+	// Security check: verify projectID matches bound project
+	if h.projectID != "" && projectID != h.projectID {
+		return nil, fmt.Errorf("project ID mismatch: requested %s but bound to %s", projectID, h.projectID)
+	}
+
+	if err := h.svc.DeleteFolder(path); err != nil {
+		return nil, fmt.Errorf("failed to delete folder: %s", err)
+	}
+
+	result := MCPDeleteResponse{
+		Success: true,
+		Message: "Folder deleted successfully",
+	}
+
+	data, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MCPToolResult{
+		Content: []MCPContentBlock{{Type: "text", Text: string(data)}},
+	}, nil
+}
+
+// deleteCase deletes a test case from a specific request.
+func (h *Handler) deleteCase(path, caseID string) (*MCPToolResult, error) {
+	if path == "" {
+		return nil, fmt.Errorf("path is required")
+	}
+	if caseID == "" {
+		return nil, fmt.Errorf("case_id is required")
+	}
+
+	// Parse path to get project ID
+	parts := strings.Split(path, "|")
+	if len(parts) != 3 || parts[0] != "request" {
+		return nil, fmt.Errorf("invalid path format: %s", path)
+	}
+	projectID := parts[1]
+
+	// Security check: verify projectID matches bound project
+	if h.projectID != "" && projectID != h.projectID {
+		return nil, fmt.Errorf("project ID mismatch: requested %s but bound to %s", projectID, h.projectID)
+	}
+
+	if _, err := h.svc.DeleteRequestCase(path, caseID); err != nil {
+		return nil, fmt.Errorf("failed to delete case: %s", err)
+	}
+
+	result := MCPDeleteResponse{
+		Success: true,
+		Message: "Case deleted successfully",
+	}
+
+	data, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MCPToolResult{
+		Content: []MCPContentBlock{{Type: "text", Text: string(data)}},
+	}, nil
+}
+
+// listEnvironments lists all environments in the bound project.
+func (h *Handler) listEnvironments() (*MCPToolResult, error) {
+	if h.projectID == "" {
+		return &MCPToolResult{
+			Content: []MCPContentBlock{{Type: "text", Text: "[]"}},
+		}, nil
+	}
+
+	envs, err := h.svc.LoadEnvironments(h.projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list environments: %s", err)
+	}
+
+	resp := MCPListEnvironmentsResponse{
+		Environments: envs,
+	}
+
+	data, err := json.Marshal(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MCPToolResult{
+		Content: []MCPContentBlock{{Type: "text", Text: string(data)}},
+	}, nil
+}
+
+// getCase gets detailed information about a specific test case.
+func (h *Handler) getCase(path, caseID string) (*MCPToolResult, error) {
+	if path == "" {
+		return nil, fmt.Errorf("path is required")
+	}
+	if caseID == "" {
+		return nil, fmt.Errorf("case_id is required")
+	}
+
+	// Parse path to get project ID
+	parts := strings.Split(path, "|")
+	if len(parts) != 3 || parts[0] != "request" {
+		return nil, fmt.Errorf("invalid path format: %s", path)
+	}
+	projectID := parts[1]
+
+	// Security check: verify projectID matches bound project
+	if h.projectID != "" && projectID != h.projectID {
+		return nil, fmt.Errorf("project ID mismatch: requested %s but bound to %s", projectID, h.projectID)
+	}
+
+	curlReq, err := h.svc.GetRequest(path)
+	if err != nil {
+		return nil, fmt.Errorf("request not found: %s", err)
+	}
+
+	// Find the case
+	for _, c := range curlReq.Cases {
+		if c.ID == caseID {
+			result := MCPGetCaseResponse{
+				ID:   c.ID,
+				Name: c.Name,
+				Spec: c.Spec,
+			}
+
+			data, err := json.Marshal(result)
+			if err != nil {
+				return nil, err
+			}
+
+			return &MCPToolResult{
+				Content: []MCPContentBlock{{Type: "text", Text: string(data)}},
+			}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("case not found: %s", caseID)
+}
+
+// searchAPIs searches APIs by keyword in the bound project.
+func (h *Handler) searchAPIs(keyword string) (*MCPToolResult, error) {
+	if h.projectID == "" {
+		return &MCPToolResult{
+			Content: []MCPContentBlock{{Type: "text", Text: "{\"folders\":[],\"requests\":[]}"}},
+		}, nil
+	}
+
+	if keyword == "" {
+		return nil, fmt.Errorf("keyword is required")
+	}
+
+	tree, err := h.svc.GetProjectTree(h.projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Search and filter
+	folders := searchFolders(tree.Children, keyword)
+	requests := searchRequests(tree.Children, keyword)
+
+	resp := MCPSearchAPIsResponse{
+		Folders:  folders,
+		Requests: requests,
+	}
+
+	data, err := json.Marshal(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MCPToolResult{
+		Content: []MCPContentBlock{{Type: "text", Text: string(data)}},
+	}, nil
+}
+
+// searchFolders recursively searches folders by keyword.
+func searchFolders(children []*project.ProjectTree, keyword string) []*models.MCPAPIInfo {
+	var result []*models.MCPAPIInfo
+	keywordLower := strings.ToLower(keyword)
+
+	for _, child := range children {
+		if child.Type == "folder" || child.Type == "project" {
+			matches := strings.Contains(strings.ToLower(child.Name), keywordLower)
+			if matches {
+				info := &models.MCPAPIInfo{
+					ID:   child.ID,
+					Name: child.Name,
+					Path: child.Path,
+				}
+				if len(child.Children) > 0 {
+					info.Children = searchChildrenRecursive(child.Children, keyword)
+				}
+				result = append(result, info)
+			} else if len(child.Children) > 0 {
+				subFolders := searchFolders(child.Children, keyword)
+				if len(subFolders) > 0 {
+					info := &models.MCPAPIInfo{
+						ID:       child.ID,
+						Name:     child.Name,
+						Path:     child.Path,
+						Children: subFolders,
+					}
+					result = append(result, info)
+				}
+			}
+		}
+	}
+	return result
+}
+
+// searchRequests recursively searches requests by keyword.
+func searchRequests(children []*project.ProjectTree, keyword string) []*models.MCPAPIInfo {
+	var result []*models.MCPAPIInfo
+	keywordLower := strings.ToLower(keyword)
+
+	for _, child := range children {
+		if child.Type == "request" {
+			matchesName := strings.Contains(strings.ToLower(child.Name), keywordLower)
+			matchesURL := strings.Contains(strings.ToLower(child.URL), keywordLower)
+			if matchesName || matchesURL {
+				info := &models.MCPAPIInfo{
+					ID:     child.ID,
+					Name:   child.Name,
+					Method: child.Method,
+					URL:    child.URL,
+					Path:   child.Path,
+				}
+				if len(child.Children) > 0 {
+					info.Children = flattenCaseChildren(child.Children)
+				}
+				result = append(result, info)
+			}
+		} else if len(child.Children) > 0 {
+			result = append(result, searchRequests(child.Children, keyword)...)
+		}
+	}
+	return result
+}
+
+// searchChildrenRecursive searches both folders and requests in children.
+func searchChildrenRecursive(children []*project.ProjectTree, keyword string) []*models.MCPAPIInfo {
+	var result []*models.MCPAPIInfo
+	keywordLower := strings.ToLower(keyword)
+
+	for _, child := range children {
+		if child.Type == "folder" {
+			matches := strings.Contains(strings.ToLower(child.Name), keywordLower)
+			if matches {
+				info := &models.MCPAPIInfo{
+					ID:   child.ID,
+					Name: child.Name,
+					Path: child.Path,
+				}
+				if len(child.Children) > 0 {
+					info.Children = searchChildrenRecursive(child.Children, keyword)
+				}
+				result = append(result, info)
+			} else if len(child.Children) > 0 {
+				info := &models.MCPAPIInfo{
+					ID:       child.ID,
+					Name:     child.Name,
+					Path:     child.Path,
+					Children: searchChildrenRecursive(child.Children, keyword),
+				}
+				if len(info.Children) > 0 {
+					result = append(result, info)
+				}
+			}
+		} else if child.Type == "request" {
+			matchesName := strings.Contains(strings.ToLower(child.Name), keywordLower)
+			matchesURL := strings.Contains(strings.ToLower(child.URL), keywordLower)
+			if matchesName || matchesURL {
+				info := &models.MCPAPIInfo{
+					ID:     child.ID,
+					Name:   child.Name,
+					Method: child.Method,
+					URL:    child.URL,
+					Path:   child.Path,
+				}
+				result = append(result, info)
+			}
+		}
+	}
+	return result
 }

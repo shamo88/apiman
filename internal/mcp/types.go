@@ -5,16 +5,16 @@ import "apiman/internal/models"
 // MCP JSON-RPC 2.0 Types
 
 type JSONRPCRequest struct {
-	JSONRPC string          `json:"jsonrpc"`
-	ID      interface{}     `json:"id"`
-	Method  string          `json:"method"`
-	Params  map[string]any  `json:"params,omitempty"`
+	JSONRPC string         `json:"jsonrpc"`
+	ID      interface{}    `json:"id"`
+	Method  string         `json:"method"`
+	Params  map[string]any `json:"params,omitempty"`
 }
 
 type JSONRPCResponse struct {
-	JSONRPC string      `json:"jsonrpc"`
-	ID      interface{} `json:"id"`
-	Result  any        `json:"result,omitempty"`
+	JSONRPC string        `json:"jsonrpc"`
+	ID      interface{}   `json:"id"`
+	Result  any           `json:"result,omitempty"`
 	Error   *JSONRPCError `json:"error,omitempty"`
 }
 
@@ -32,13 +32,13 @@ type MCPMessage struct {
 }
 
 type MCPInitializeResult struct {
-	ProtocolVersion string         `json:"protocolVersion"`
-	Capabilities     MCPCapabilities `json:"capabilities"`
-	ServerInfo       MCPServerInfo   `json:"serverInfo"`
+	ProtocolVersion string          `json:"protocolVersion"`
+	Capabilities    MCPCapabilities `json:"capabilities"`
+	ServerInfo      MCPServerInfo   `json:"serverInfo"`
 }
 
 type MCPCapabilities struct {
-	Tools   any `json:"tools"`
+	Tools     any `json:"tools"`
 	Resources any `json:"resources,omitempty"`
 }
 
@@ -73,8 +73,8 @@ type MCPContentBlock struct {
 // List APIs Response
 
 type MCPListAPIsResponse struct {
-	Folders   []*models.MCPAPIInfo `json:"folders"`
-	Requests  []*models.MCPAPIInfo `json:"requests"`
+	Folders  []*models.MCPAPIInfo `json:"folders"`
+	Requests []*models.MCPAPIInfo `json:"requests"`
 }
 
 // Create Case Response
@@ -103,4 +103,32 @@ type MCPCreateFolderResponse struct {
 type MCPUpdateCaseResponse struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+// Delete Response
+
+type MCPDeleteResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message,omitempty"`
+}
+
+// Get Case Response
+
+type MCPGetCaseResponse struct {
+	ID   string                 `json:"id"`
+	Name string                 `json:"name"`
+	Spec models.HttpRequestSpec `json:"spec"`
+}
+
+// List Environments Response
+
+type MCPListEnvironmentsResponse struct {
+	Environments []models.Environment `json:"environments"`
+}
+
+// Search APIs Response
+
+type MCPSearchAPIsResponse struct {
+	Folders  []*models.MCPAPIInfo `json:"folders"`
+	Requests []*models.MCPAPIInfo `json:"requests"`
 }

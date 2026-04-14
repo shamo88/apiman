@@ -7,7 +7,7 @@ func GetToolDefinitions() []MCPTool {
 			Name:        "mcp_list_apis",
 			Description: "List all APIs (requests) in the bound project, including folders and multi-level hierarchy.",
 			InputSchema: map[string]interface{}{
-				"type": "object",
+				"type":       "object",
 				"properties": map[string]interface{}{},
 			},
 		},
@@ -15,7 +15,7 @@ func GetToolDefinitions() []MCPTool {
 			Name:        "mcp_list_scripts",
 			Description: "List all scripts in the bound project. Returns only id, name, and description.",
 			InputSchema: map[string]interface{}{
-				"type": "object",
+				"type":       "object",
 				"properties": map[string]interface{}{},
 			},
 		},
@@ -53,11 +53,11 @@ func GetToolDefinitions() []MCPTool {
 								"type": "object",
 								"properties": map[string]interface{}{
 									"method":    map[string]interface{}{"type": "string"},
-									"http_url":   map[string]interface{}{"type": "string"},
-									"headers":    map[string]interface{}{"type": "array"},
-									"params":     map[string]interface{}{"type": "array"},
-									"body":       map[string]interface{}{"type": "string"},
-									"body_type":  map[string]interface{}{"type": "string"},
+									"http_url":  map[string]interface{}{"type": "string"},
+									"headers":   map[string]interface{}{"type": "array"},
+									"params":    map[string]interface{}{"type": "array"},
+									"body":      map[string]interface{}{"type": "string"},
+									"body_type": map[string]interface{}{"type": "string"},
 								},
 							},
 						},
@@ -91,11 +91,11 @@ func GetToolDefinitions() []MCPTool {
 								"type": "object",
 								"properties": map[string]interface{}{
 									"method":    map[string]interface{}{"type": "string"},
-									"http_url":   map[string]interface{}{"type": "string"},
-									"headers":    map[string]interface{}{"type": "array"},
-									"params":     map[string]interface{}{"type": "array"},
-									"body":       map[string]interface{}{"type": "string"},
-									"body_type":  map[string]interface{}{"type": "string"},
+									"http_url":  map[string]interface{}{"type": "string"},
+									"headers":   map[string]interface{}{"type": "array"},
+									"params":    map[string]interface{}{"type": "array"},
+									"body":      map[string]interface{}{"type": "string"},
+									"body_type": map[string]interface{}{"type": "string"},
 								},
 							},
 						},
@@ -241,6 +241,92 @@ func GetToolDefinitions() []MCPTool {
 					},
 				},
 				"required": []string{"method", "http_url"},
+			},
+		},
+		{
+			Name:        "mcp_delete_request",
+			Description: "Delete a saved API request from the bound project.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "Request path in format 'request|project-id|request-id'",
+					},
+				},
+				"required": []string{"path"},
+			},
+		},
+		{
+			Name:        "mcp_delete_folder",
+			Description: "Delete a folder and all its contents (subfolders and requests) from the bound project.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "Folder path in format 'folder|project-id|folder-id'",
+					},
+				},
+				"required": []string{"path"},
+			},
+		},
+		{
+			Name:        "mcp_delete_case",
+			Description: "Delete a test case from a specific request.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "Request path in format 'request|project-id|request-id'",
+					},
+					"case_id": map[string]interface{}{
+						"type":        "string",
+						"description": "The ID of the case to delete",
+					},
+				},
+				"required": []string{"path", "case_id"},
+			},
+		},
+		{
+			Name:        "mcp_list_environments",
+			Description: "List all environments in the bound project.",
+			InputSchema: map[string]interface{}{
+				"type":       "object",
+				"properties": map[string]interface{}{},
+			},
+		},
+		{
+			Name:        "mcp_get_case",
+			Description: "Get detailed information about a specific test case.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "Request path in format 'request|project-id|request-id'",
+					},
+					"case_id": map[string]interface{}{
+						"type":        "string",
+						"description": "The ID of the case to retrieve",
+					},
+				},
+				"required": []string{"path", "case_id"},
+			},
+		},
+		{
+			Name:        "mcp_search_apis",
+			Description: "Search APIs (requests) in the bound project by name or URL keyword.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"keyword": map[string]interface{}{
+						"type":        "string",
+						"description": "Keyword to search for in request name or URL",
+					},
+				},
+				"required": []string{"keyword"},
 			},
 		},
 	}
