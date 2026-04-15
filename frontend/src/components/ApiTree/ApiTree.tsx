@@ -199,6 +199,7 @@ export const ApiTree: React.FC<ApiTreeProps> = ({
     return (
       <FolderNode
         folder={child}
+        collapsedFolders={collapsedFolders}
         isCollapsed={child.path ? collapsedFolders.has(child.path) : false}
         expandedRequestPaths={expandedRequestPaths}
         activeRequestPath={activeRequestPath}

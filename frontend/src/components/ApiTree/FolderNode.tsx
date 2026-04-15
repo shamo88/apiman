@@ -3,6 +3,7 @@ import { Dropdown } from 'antd';
 import { FolderOutlined, RightOutlined, DownOutlined, PlusOutlined, MoreOutlined, EditOutlined, CloseOutlined, CopyOutlined } from '@ant-design/icons';
 import { ProjectTree } from '../../store';
 import { useUIStore } from '../../store/useUIStore';
+import { useProjectStore } from '../../store/useProjectStore';
 import { ApiTreeItem } from './ApiTreeItem';
 import { ContextMenu, useContextMenu } from '../ContextMenu';
 import './ApiTree.css';
@@ -10,6 +11,7 @@ import './ApiTree.css';
 interface FolderNodeProps {
   folder: ProjectTree;
   isCollapsed: boolean;
+  collapsedFolders: Set<string>;
   expandedRequestPaths: Set<string>;
   activeRequestPath: string;
   sidebarHighlightedCasePath: string;
@@ -40,6 +42,7 @@ interface FolderNodeProps {
 export const FolderNode: React.FC<FolderNodeProps> = ({
   folder,
   isCollapsed,
+  collapsedFolders,
   expandedRequestPaths,
   activeRequestPath,
   sidebarHighlightedCasePath,
@@ -67,6 +70,7 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
   onDrop,
 }) => {
   const { dropTargetFolderPath } = useUIStore();
+  const { toggleFolderCollapse } = useProjectStore();
   const folderPath = folder.path || '';
   const folderChildren = folder.children || [];
   const orderedKids = folderChildren.filter((child: ProjectTree) => child.type === 'folder' || child.type === 'request');
@@ -147,10 +151,10 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
   };
 
   // 点击箭头图标展开/收起文件夹
-  const handleToggleIconClick = (e: React.MouseEvent) => {
+  const handleToggleIconClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    onToggleFolder(folderPath);
-  };
+    toggleFolderCollapse(folderPath);
+  }, [folderPath, toggleFolderCollapse]);
 
   // Helper to check if the selected case BELONGS to a specific request
   const selectedCaseBelongsToRequest = (request: ProjectTree): boolean => {
@@ -212,11 +216,11 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
               },
             ],
           }}
-          trigger={['click']}
+          trigger={['hover']}
         >
-          <button className="folder-action-btn" onClick={(e) => e.stopPropagation()}>
+          <span className="folder-action-btn" onClick={(e) => e.stopPropagation()}>
             <MoreOutlined />
-          </button>
+          </span>
         </Dropdown>
       </div>
 
@@ -274,7 +278,8 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
               <FolderNode
                 key={child.path || child.id}
                 folder={child}
-                isCollapsed={child.path ? false : true}
+                collapsedFolders={collapsedFolders}
+                isCollapsed={child.path ? collapsedFolders.has(child.path) : false}
                 expandedRequestPaths={expandedRequestPaths}
                 activeRequestPath={activeRequestPath}
                 sidebarHighlightedCasePath={sidebarHighlightedCasePath}
