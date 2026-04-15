@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, DragEvent } from 'react';
 import { Button, Dropdown, Input, message, Select, Space, Tabs } from 'antd';
 import { ApiOutlined, EnvironmentOutlined, FileOutlined, FolderOutlined, PlusOutlined, SearchOutlined, CodeOutlined, QuestionCircleOutlined, EditOutlined, DeleteOutlined, CopyOutlined, DownOutlined, RightOutlined } from '@ant-design/icons';
 
@@ -139,6 +139,8 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
     handleCopyRequest,
     handleRename,
     handleDeleteFolder,
+    handleMoveRequest,
+    handleMoveFolder,
     handleDuplicateCase,
     handleRenameCase,
     handleDeleteCase,
@@ -300,6 +302,85 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
     localStorage.setItem('apiman-response-height', height.toString());
   };
 
+  // 拖拽处理函数
+  // 使用 timer 来延迟清除 drop target，避免在拖拽到兄弟节点时闪烁
+  const dropTargetTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearDropTargetWithDelay = useCallback(() => {
+    dropTargetTimerRef.current = setTimeout(() => {
+      uiStore.setDropTarget(null);
+      uiStore.setDropBeforeId(null);
+    }, 100);
+  }, [uiStore]);
+
+  const cancelDropTargetTimer = useCallback(() => {
+    if (dropTargetTimerRef.current) {
+      clearTimeout(dropTargetTimerRef.current);
+      dropTargetTimerRef.current = null;
+    }
+  }, []);
+
+  const handleDragStart = useCallback((e: DragEvent, node: ProjectTree) => {
+    cancelDropTargetTimer();
+    uiStore.setDraggingNode({ type: node.type as 'request' | 'folder', path: node.path || '' });
+    uiStore.setDropTarget(null);
+    uiStore.setDropBeforeId(null);
+  }, [uiStore, cancelDropTargetTimer]);
+
+  // 当拖拽进入一个元素时，设置 drop target 并取消 pending 的清除
+  const handleDragEnter = useCallback((e: DragEvent, targetPath: string, beforeId: string = '') => {
+    e.preventDefault();
+    e.stopPropagation();
+    cancelDropTargetTimer();
+    uiStore.setDropTarget(targetPath);
+    uiStore.setDropBeforeId(beforeId);
+  }, [uiStore, cancelDropTargetTimer]);
+
+  const handleDragOver = useCallback((e: DragEvent, targetPath: string, beforeId: string = '') => {
+    e.preventDefault();
+    uiStore.setDropTarget(targetPath);
+    uiStore.setDropBeforeId(beforeId);
+  }, [uiStore]);
+
+  // 延迟清除 drop target，因为 dragLeave 会在 dragEnter 之前触发（当拖拽到兄弟节点时）
+  // 但是：如果 relatedTarget 为 null（移动到空白区域），立即清除而不是延迟
+  const handleDragLeave = useCallback((e: DragEvent, folderPath: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const relatedTarget = e.relatedTarget as HTMLElement | null;
+    if (relatedTarget && e.currentTarget instanceof HTMLElement) {
+      if (e.currentTarget.contains(relatedTarget)) {
+        return;
+      }
+      // relatedTarget 存在且不在当前元素内，说明移动到了另一个有效目标
+      // 不要清除，等 enter 事件处理
+      return;
+    }
+    // relatedTarget 为 null（移动到空白区域）或 currentTarget 无效，立即清除
+    cancelDropTargetTimer();
+    uiStore.setDropTarget(null);
+    uiStore.setDropBeforeId(null);
+  }, [uiStore, cancelDropTargetTimer]);
+
+  const handleDrop = useCallback((e: DragEvent, targetPath: string, beforeId?: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    cancelDropTargetTimer();
+    const draggingNode = uiStore.draggingNode;
+    if (!draggingNode) return;
+
+    // 使用 store 中的 dropTargetFolderPath 和 dropBeforeId
+    const finalTargetPath = uiStore.dropTargetFolderPath ?? targetPath;
+    const finalBeforeId = uiStore.dropBeforeId ?? beforeId ?? '';
+
+    if (draggingNode.type === 'request') {
+      handleMoveRequest(draggingNode.path, finalTargetPath, finalBeforeId);
+    } else if (draggingNode.type === 'folder') {
+      handleMoveFolder(draggingNode.path, finalTargetPath, finalBeforeId);
+    }
+    uiStore.clearDragState();
+  }, [uiStore, cancelDropTargetTimer, handleMoveRequest, handleMoveFolder]);
+
   // 使用 useMemo 缓存计算结果，避免每次渲染重新计算
   const requestTabs = useMemo(() => workspace.requestTabs || [], [workspace.requestTabs]);
   const activeRequestTab = useMemo(() => workspace.activeRequestTab || '', [workspace.activeRequestTab]);
@@ -423,6 +504,10 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
                     onSearchChange={setSearchKeyword}
                     filterMethod={filterMethod}
                     onFilterMethodChange={setFilterMethod}
+                    onDragStart={handleDragStart}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
                   />
                 )}
               </div>

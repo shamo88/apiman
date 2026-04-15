@@ -24,9 +24,10 @@ interface ApiTreeItemProps {
   onRenameCase: (casePath: string, currentName: string) => void;
   onDeleteCase: (casePath: string, name: string) => void;
   onDragStart?: (e: DragEvent, node: ProjectTree) => void;
-  onDragOver?: (e: DragEvent, nodePath: string) => void;
-  onDragLeave?: () => void;
-  onDrop?: (e: DragEvent, nodePath: string) => void;
+  onDragEnter?: (e: DragEvent, targetPath: string, beforeId: string) => void;
+  onDragOver?: (e: DragEvent, targetPath: string, beforeId: string) => void;
+  onDragLeave?: (e: DragEvent, targetPath: string) => void;
+  onDrop?: (e: DragEvent, targetPath: string, beforeId: string) => void;
 }
 
 // Case item with its own context menu
@@ -150,6 +151,7 @@ export const ApiTreeItem: React.FC<ApiTreeItemProps> = ({
   onRenameCase,
   onDeleteCase,
   onDragStart,
+  onDragEnter,
   onDragOver,
   onDragLeave,
   onDrop,
@@ -199,22 +201,29 @@ export const ApiTreeItem: React.FC<ApiTreeItemProps> = ({
     onDragStart?.(e, request);
   };
 
+  const handleDragEnter = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // For ApiTreeItem: target is '' (root or parent folder), beforeId is item's ID
+    onDragEnter?.(e, '', request.id || '');
+  };
+
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    onDragOver?.(e, request.path || '');
+    onDragOver?.(e, '', request.id || '');
   };
 
   const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    onDragLeave?.();
+    onDragLeave?.(e, '');
   };
 
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    onDrop?.(e, request.path || '');
+    onDrop?.(e, '', request.id || '');
   };
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -230,6 +239,7 @@ export const ApiTreeItem: React.FC<ApiTreeItemProps> = ({
         onClick={onClick}
         draggable
         onDragStart={handleDragStart}
+        onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}

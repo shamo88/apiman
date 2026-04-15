@@ -149,9 +149,9 @@ export function useProjects() {
     }
   }, [loadProjectTree]);
 
-  const moveFolder = useCallback(async (projectId: string, folderPath: string, targetPath: string) => {
+  const moveFolder = useCallback(async (projectId: string, folderPath: string, targetPath: string, beforeId?: string) => {
     try {
-      await MoveFolder(projectId, folderPath, targetPath);
+      await MoveFolder(folderPath, targetPath, beforeId || '');
       await loadProjectTree(projectId);
     } catch (error: unknown) {
       const errMsg = getErrorMessage(error);
@@ -160,9 +160,9 @@ export function useProjects() {
     }
   }, [loadProjectTree]);
 
-  const moveRequest = useCallback(async (projectId: string, requestPath: string, targetPath: string) => {
+  const moveRequest = useCallback(async (projectId: string, requestPath: string, targetPath: string, beforeId?: string) => {
     try {
-      await MoveRequest(projectId, requestPath, targetPath);
+      await MoveRequest(requestPath, targetPath, beforeId || '');
       await loadProjectTree(projectId);
     } catch (error: unknown) {
       const errMsg = getErrorMessage(error);

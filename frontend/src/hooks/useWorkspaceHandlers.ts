@@ -285,17 +285,17 @@ export const useWorkspaceHandlers = (projectId: string) => {
     }
   }, [projectId, deleteFolder]);
 
-  const handleMoveRequest = useCallback(async (requestPath: string, targetPath: string) => {
+  const handleMoveRequest = useCallback(async (requestPath: string, targetPath: string, beforeId?: string) => {
     try {
-      await moveRequest(projectId, requestPath, targetPath);
+      await moveRequest(projectId, requestPath, targetPath, beforeId);
     } catch (error) {
       // Error handled in hook
     }
   }, [projectId, moveRequest]);
 
-  const handleMoveFolder = useCallback(async (folderPath: string, targetPath: string) => {
+  const handleMoveFolder = useCallback(async (folderPath: string, targetPath: string, beforeId?: string) => {
     try {
-      await moveFolder(projectId, folderPath, targetPath);
+      await moveFolder(projectId, folderPath, targetPath, beforeId);
     } catch (error) {
       // Error handled in hook
     }

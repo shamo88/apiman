@@ -43,6 +43,7 @@ interface UIStore {
   // 拖拽状态
   draggingNode: { type: 'request' | 'folder'; path: string } | null;
   dropTargetFolderPath: string | null;
+  dropBeforeId: string | null; // 用于排序：在哪个ID之前插入
   invalidDropHint: { message: string; x: number; y: number } | null;
   movedHighlightPath: string | null;
   draggingProjectId: string | null;
@@ -96,6 +97,7 @@ interface UIStore {
   // Actions - 拖拽
   setDraggingNode: (node: { type: 'request' | 'folder'; path: string } | null) => void;
   setDropTarget: (path: string | null) => void;
+  setDropBeforeId: (id: string | null) => void;
   setInvalidDropHint: (hint: { message: string; x: number; y: number } | null) => void;
   setMovedHighlightPath: (path: string | null) => void;
   clearDragState: () => void;
@@ -150,6 +152,7 @@ export const useUIStore = create<UIStore>()(
       // 拖拽初始状态
       draggingNode: null,
       dropTargetFolderPath: null,
+      dropBeforeId: null,
       invalidDropHint: null,
       movedHighlightPath: null,
       draggingProjectId: null,
@@ -203,11 +206,13 @@ export const useUIStore = create<UIStore>()(
       // Actions - 拖拽
       setDraggingNode: (node) => set({ draggingNode: node }),
       setDropTarget: (path) => set({ dropTargetFolderPath: path }),
+      setDropBeforeId: (id) => set({ dropBeforeId: id }),
       setInvalidDropHint: (hint) => set({ invalidDropHint: hint }),
       setMovedHighlightPath: (path) => set({ movedHighlightPath: path }),
       clearDragState: () => set({
         draggingNode: null,
         dropTargetFolderPath: null,
+        dropBeforeId: null,
         invalidDropHint: null,
       }),
       setDraggingProjectId: (id) => set({ draggingProjectId: id }),

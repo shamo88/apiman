@@ -34,9 +34,10 @@ interface ApiTreeProps {
   filterMethod: string;
   onFilterMethodChange: (method: string) => void;
   onDragStart?: (e: DragEvent, node: ProjectTree) => void;
-  onDragOver?: (e: DragEvent, folderPath: string) => void;
-  onDragLeave?: () => void;
-  onDrop?: (e: DragEvent, folderPath: string) => void;
+  onDragEnter?: (e: DragEvent, targetPath: string, beforeId: string) => void;
+  onDragOver?: (e: DragEvent, targetPath: string, beforeId: string) => void;
+  onDragLeave?: (e: DragEvent, targetPath: string) => void;
+  onDrop?: (e: DragEvent, targetPath: string, beforeId: string) => void;
 }
 
 export const ApiTree: React.FC<ApiTreeProps> = ({
@@ -66,6 +67,7 @@ export const ApiTree: React.FC<ApiTreeProps> = ({
   filterMethod,
   onFilterMethodChange,
   onDragStart,
+  onDragEnter,
   onDragOver,
   onDragLeave,
   onDrop,
@@ -186,6 +188,11 @@ export const ApiTree: React.FC<ApiTreeProps> = ({
           onDuplicateCase={onDuplicateCase}
           onRenameCase={onRenameCase}
           onDeleteCase={(path, name) => handleDeleteCase(path, name)}
+          onDragStart={onDragStart}
+          onDragEnter={onDragEnter}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          onDrop={onDrop}
         />
       );
     }
@@ -213,6 +220,8 @@ export const ApiTree: React.FC<ApiTreeProps> = ({
         onRenameCase={onRenameCase}
         onDeleteCase={(path, name) => handleDeleteCase(path, name)}
         onConfigureFolderScripts={onConfigureFolderScripts}
+        onDragStart={onDragStart}
+        onDragEnter={onDragEnter}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
@@ -222,7 +231,30 @@ export const ApiTree: React.FC<ApiTreeProps> = ({
 
   return (
     <div className="api-tree">
-      <div className={`api-tree-content ${draggingNode && !dropTargetFolderPath ? 'drop-zone-active' : ''}`}>
+      <div
+        className={`api-tree-content ${draggingNode && !dropTargetFolderPath ? 'drop-zone-active' : ''}`}
+        onDragEnter={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          // For root: targetPath is '' (root), beforeId is '' (append at end)
+          onDragEnter?.(e, '', '');
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onDragOver?.(e, '', '');
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onDragLeave?.(e, '');
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onDrop?.(e, '', '');
+        }}
+      >
         {rootChildren.map((child) => (
           <div key={child.path || child.id} className="api-root-sibling">
             {renderChild(child)}

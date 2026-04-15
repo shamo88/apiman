@@ -30,9 +30,11 @@ interface FolderNodeProps {
   onRenameCase: (casePath: string, currentName: string) => void;
   onDeleteCase: (casePath: string, name: string) => void;
   onConfigureFolderScripts?: (folderPath: string, folderName: string) => void;
-  onDragOver?: (e: DragEvent, folderPath: string) => void;
-  onDragLeave?: () => void;
-  onDrop?: (e: DragEvent, folderPath: string) => void;
+  onDragStart?: (e: DragEvent, node: ProjectTree) => void;
+  onDragEnter?: (e: DragEvent, targetPath: string, beforeId: string) => void;
+  onDragOver?: (e: DragEvent, targetPath: string, beforeId: string) => void;
+  onDragLeave?: (e: DragEvent, targetPath: string) => void;
+  onDrop?: (e: DragEvent, targetPath: string, beforeId: string) => void;
 }
 
 export const FolderNode: React.FC<FolderNodeProps> = ({
@@ -58,6 +60,8 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
   onRenameCase,
   onDeleteCase,
   onConfigureFolderScripts,
+  onDragStart,
+  onDragEnter,
   onDragOver,
   onDragLeave,
   onDrop,
@@ -107,22 +111,34 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
     contextMenuProps.onContextMenu(e);
   }, [contextMenuProps]);
 
+  const handleDragStart = (e: DragEvent) => {
+    e.stopPropagation();
+    onDragStart?.(e, folder);
+  };
+
+  const handleDragEnter = (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // For folder header: target is the folder itself, beforeId is '' (append at end)
+    onDragEnter?.(e, folderPath, '');
+  };
+
   const handleDragOver = (e: DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    onDragOver?.(e, folderPath);
+    onDragOver?.(e, folderPath, '');
   };
 
   const handleDragLeave = (e: DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    onDragLeave?.();
+    onDragLeave?.(e, folderPath);
   };
 
   const handleDrop = (e: DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    onDrop?.(e, folderPath);
+    onDrop?.(e, folderPath, '');
   };
 
   const handleHeaderClick = (e: React.MouseEvent) => {
@@ -143,11 +159,14 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
   };
 
   return (
-    <div className="api-folder">
+    <div className="api-folder" id={`folder-${folderPath}`}>
       {contextMenu}
       <div
         className={`api-folder-header ${movedHighlightPath === (folder.path || folder.id) ? 'moved-highlight' : ''} ${isDropTarget ? 'drop-target-active' : ''}`}
         onClick={handleHeaderClick}
+        draggable
+        onDragStart={handleDragStart}
+        onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -202,7 +221,30 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
       </div>
 
       {!isCollapsed && orderedKids.length > 0 && (
-        <div className="api-folder-content">
+        <div
+          className="api-folder-content"
+          onDragEnter={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // 当拖拽到内容区域时，目标就是当前文件夹
+            onDragEnter?.(e, folderPath, '');
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDragOver?.(e, folderPath, '');
+          }}
+          onDragLeave={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDragLeave?.(e, folderPath);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDrop?.(e, folderPath, '');
+          }}
+        >
           {orderedKids.map((child: ProjectTree) =>
             child.type === 'request' ? (
               <ApiTreeItem
@@ -222,6 +264,11 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
                 onDuplicateCase={onDuplicateCase}
                 onRenameCase={onRenameCase}
                 onDeleteCase={(path, name) => onDeleteCase(path, name)}
+                onDragStart={onDragStart}
+                onDragEnter={onDragEnter}
+                onDragOver={onDragOver}
+                onDragLeave={onDragLeave}
+                onDrop={onDrop}
               />
             ) : (
               <FolderNode
@@ -248,6 +295,8 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
                 onRenameCase={onRenameCase}
                 onDeleteCase={onDeleteCase}
                 onConfigureFolderScripts={onConfigureFolderScripts}
+                onDragStart={onDragStart}
+                onDragEnter={onDragEnter}
                 onDragOver={onDragOver}
                 onDragLeave={onDragLeave}
                 onDrop={onDrop}
