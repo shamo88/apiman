@@ -288,8 +288,8 @@ export const FolderNode: React.FC<FolderNodeProps> = ({
                 onToggleRequestCases={onToggleRequestCases}
                 onRequestClick={onRequestClick}
                 onCaseClick={onCaseClick}
-                onAddRequest={onAddRequest}
-                onAddFolder={onAddFolder}
+                onAddRequest={(path) => child.path && onAddRequest(path)}
+                onAddFolder={(path) => child.path && onAddFolder(path)}
                 onRename={onRename}
                 onRenameFolder={onRenameFolder}
                 onDeleteFolder={onDeleteFolder}

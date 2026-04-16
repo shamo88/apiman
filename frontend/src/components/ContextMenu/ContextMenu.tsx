@@ -164,6 +164,7 @@ export const useContextMenu = (
     if (activeMenuId === menuIdRef.current) {
       activeMenuId = null;
       activeMenuCloseHandler = null;
+      activeMenuItems = [];
     }
     setVisible(false);
     options.onOpenChange?.(false);
