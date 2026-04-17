@@ -1,9 +1,11 @@
 import React from 'react';
-import { Button, Empty, Input, Space } from 'antd';
+import { Button, Empty, Input, Space, Tooltip } from 'antd';
+import { QuestionCircleOutlined } from '@ant-design/icons';
 import { javascript } from '@codemirror/lang-javascript';
 import CodeMirror from '@uiw/react-codemirror';
 import { useScriptStore } from '../../store/useScriptStore';
 import { useScriptHandlers } from '../../hooks/useScriptHandlers';
+import { useUIStore } from '../../store';
 
 interface ScriptEditorProps {
   onClose?: () => void;
@@ -21,6 +23,7 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({ onClose }) => {
   } = useScriptStore();
 
   const { handleSaveScript, handleDeleteScript } = useScriptHandlers();
+  const setScriptHelpVisible = useUIStore((state) => state.setScriptHelpVisible);
 
   const handleSave = async () => {
     await handleSaveScript(scriptFormName.trim(), scriptFormDescription.trim(), scriptFormContent);
@@ -52,6 +55,9 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({ onClose }) => {
               />
             </div>
             <Space>
+              <Tooltip title="脚本开发指南">
+                <Button icon={<QuestionCircleOutlined />} onClick={() => setScriptHelpVisible(true)} />
+              </Tooltip>
               <Button danger onClick={handleDelete}>删除</Button>
               <Button type="primary" onClick={handleSave}>保存脚本</Button>
             </Space>
