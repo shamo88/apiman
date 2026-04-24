@@ -46,7 +46,7 @@ export const useWorkspaceHandlers = (projectId: string) => {
     createFolder,
   } = useProjects();
 
-  const { executeRequest, executing } = useRequest();
+  const { executeRequest, cancelRequest, executing } = useRequest();
   const workspaceStore = useWorkspaceStore();
   const projectStore = useProjectStore();
 
@@ -441,5 +441,6 @@ export const useWorkspaceHandlers = (projectId: string) => {
     handleToggleFolder,
     handleToggleRequestCases,
     loadRequestContent,
+    cancelRequest,
   };
 };

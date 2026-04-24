@@ -10,6 +10,7 @@ interface RequestPanelProps {
   onApiConfigChange: (config: ApiConfig) => void;
   executing: boolean;
   onExecute: () => void;
+  onCancel: () => void;
   onSave: () => void;
   environmentVariables: Record<string, string>;
   projectScripts: Array<{ id: string; name: string }>;
@@ -28,6 +29,7 @@ export const RequestPanel: React.FC<RequestPanelProps> = ({
   onApiConfigChange,
   executing,
   onExecute,
+  onCancel,
   onSave,
   environmentVariables,
   projectScripts,
@@ -59,6 +61,7 @@ export const RequestPanel: React.FC<RequestPanelProps> = ({
         onMethodChange={(value) => updateConfig({ method: value })}
         onUrlChange={handleUrlChange}
         onSend={onExecute}
+        onCancel={onCancel}
         onSave={onSave}
       />
 

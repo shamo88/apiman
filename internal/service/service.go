@@ -618,6 +618,23 @@ func (s *Service) ExecuteHTTPRequestWithScripts(
 	)
 }
 
+// ExecuteHTTPRequestWithScriptsWithCancel executes HTTP request with cancelable context
+func (s *Service) ExecuteHTTPRequestWithScriptsWithCancel(
+	ctx context.Context,
+	projectID, projectName, requestName, requestPath string,
+	environmentID string,
+	spec models.HttpRequestSpec,
+	preScriptIDs []string,
+	postScriptIDs []string,
+) (*models.CurlResponse, error) {
+	return s.ExecuteHTTPRequestWithScriptsWithSourceAndCancel(
+		ctx,
+		projectID, projectName, requestName, requestPath,
+		environmentID, spec, preScriptIDs, postScriptIDs,
+		models.HistorySourceGUI, "",
+	)
+}
+
 func (s *Service) ExecuteHTTPRequestWithScriptsWithSource(
 	projectID, projectName, requestName, requestPath string,
 	environmentID string,
@@ -758,6 +775,142 @@ func (s *Service) ExecuteHTTPRequestWithScriptsWithSource(
 	// 记录历史
 	if recordErr := s.RecordHistoryWithSource(projectID, projectName, requestName, requestPath, spec, resp, source, sourceTool); recordErr != nil {
 		// 历史记录失败不影响主流程
+	}
+
+	return resp, nil
+}
+
+// ExecuteHTTPRequestWithScriptsWithSourceAndCancel is like ExecuteHTTPRequestWithScriptsWithSource but with a cancelable context
+func (s *Service) ExecuteHTTPRequestWithScriptsWithSourceAndCancel(
+	ctx context.Context,
+	projectID, projectName, requestName, requestPath string,
+	environmentID string,
+	spec models.HttpRequestSpec,
+	preScriptIDs []string,
+	postScriptIDs []string,
+	source models.HistorySourceType,
+	sourceTool string,
+) (*models.CurlResponse, error) {
+	var preScriptContents, postScriptContents []string
+	var preScriptNames, postScriptNames []string
+
+	merged, err := s.ProjectMgr.GetRequestScriptsWithPriority(requestPath)
+	if err != nil {
+		return nil, err
+	}
+
+	scriptsToUse := preScriptIDs
+	if len(preScriptIDs) == 0 && merged != nil {
+		scriptsToUse = merged.PreScripts
+	}
+
+	postScriptsToUse := postScriptIDs
+	if len(postScriptIDs) == 0 && merged != nil {
+		postScriptsToUse = merged.PostScripts
+	}
+
+	if len(scriptsToUse) > 0 {
+		scripts, err := s.ProjectMgr.ListProjectScripts(projectID)
+		if err == nil {
+			scriptMap := make(map[string]string)
+			for _, scr := range scripts {
+				scriptMap[scr.ID] = scr.Content
+			}
+			for _, id := range scriptsToUse {
+				if content, ok := scriptMap[id]; ok {
+					preScriptContents = append(preScriptContents, content)
+					for _, scr := range scripts {
+						if scr.ID == id {
+							preScriptNames = append(preScriptNames, scr.Name)
+							break
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if len(postScriptsToUse) > 0 {
+		scripts, err := s.ProjectMgr.ListProjectScripts(projectID)
+		if err == nil {
+			scriptMap := make(map[string]string)
+			for _, scr := range scripts {
+				scriptMap[scr.ID] = scr.Content
+			}
+			for _, id := range postScriptsToUse {
+				if content, ok := scriptMap[id]; ok {
+					postScriptContents = append(postScriptContents, content)
+					for _, scr := range scripts {
+						if scr.ID == id {
+							postScriptNames = append(postScriptNames, scr.Name)
+							break
+						}
+					}
+				}
+			}
+		}
+	}
+
+	projectPath, err := s.ProjectMgr.ProjectPathByID(projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	projectVarsPath := filepath.Join(projectPath, "variables.json")
+	projectVars := script.NewProjectVariables()
+	if err := projectVars.LoadFromFile(projectVarsPath); err != nil {
+		return nil, err
+	}
+	globals := projectVars.GetAll()
+
+	var environment map[string]string
+	if environmentID != "" {
+		envs, err := s.LoadEnvironments(projectID)
+		if err == nil {
+			for _, env := range envs {
+				if env.ID == environmentID {
+					environment = env.Variables
+					break
+				}
+			}
+		}
+	}
+	if environment == nil {
+		environment = make(map[string]string)
+	}
+
+	appCfg, _ := s.ConfigManager.LoadAppConfig()
+	proxyOpts := buildProxyOptions(appCfg)
+	timeout := getTimeout(appCfg)
+
+	globalSetter := func(key, value string) {
+		projectVars.Set(key, value)
+		_ = projectVars.SaveToFile(projectVarsPath)
+	}
+
+	resp, replacedURL, err := s.ScriptableExecutor.ExecuteWithScriptsContext(
+		ctx,
+		&spec,
+		proxyOpts,
+		preScriptContents,
+		postScriptContents,
+		preScriptNames,
+		postScriptNames,
+		globals,
+		environment,
+		globalSetter,
+		timeout,
+	)
+
+	if err != nil {
+		return &models.CurlResponse{
+			Error: err.Error(),
+		}, err
+	}
+
+	spec.HttpURL = replacedURL
+
+	if recordErr := s.RecordHistoryWithSource(projectID, projectName, requestName, requestPath, spec, resp, source, sourceTool); recordErr != nil {
 	}
 
 	return resp, nil

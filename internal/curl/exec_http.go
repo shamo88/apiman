@@ -3,6 +3,7 @@ package curl
 import (
 	"apiman/internal/models"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -14,11 +15,16 @@ import (
 
 // ExecuteHTTPRequest runs an HTTP request from structured fields (Postman-aligned).
 func (c *CurlExecutor) ExecuteHTTPRequest(spec *models.HttpRequestSpec) (*models.CurlResponse, error) {
-	return c.ExecuteHTTPRequestWithProxy(spec, nil, 30)
+	return c.ExecuteHTTPRequestWithProxyContext(context.Background(), spec, nil, 30)
 }
 
 // ExecuteHTTPRequestWithProxy is like ExecuteHTTPRequest but honors proxy options and timeout.
 func (c *CurlExecutor) ExecuteHTTPRequestWithProxy(spec *models.HttpRequestSpec, proxyOpts *ProxyOptions, timeoutSeconds int) (*models.CurlResponse, error) {
+	return c.ExecuteHTTPRequestWithProxyContext(context.Background(), spec, proxyOpts, timeoutSeconds)
+}
+
+// ExecuteHTTPRequestWithProxyContext is like ExecuteHTTPRequestWithProxy but with context support for cancellation.
+func (c *CurlExecutor) ExecuteHTTPRequestWithProxyContext(ctx context.Context, spec *models.HttpRequestSpec, proxyOpts *ProxyOptions, timeoutSeconds int) (*models.CurlResponse, error) {
 	if spec == nil {
 		return &models.CurlResponse{Error: "request is nil"}, nil
 	}
@@ -113,7 +119,7 @@ func (c *CurlExecutor) ExecuteHTTPRequestWithProxy(spec *models.HttpRequestSpec,
 		client.Transport = buildTransportWithProxy(proxyOpts)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := client.Do(req.WithContext(ctx))
 	if err != nil {
 		return &models.CurlResponse{Error: fmt.Sprintf("Request failed: %v", err)}, nil
 	}

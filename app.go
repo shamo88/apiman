@@ -9,11 +9,15 @@ import (
 	"apiman/internal/service"
 	"context"
 	"encoding/json"
+	"sync"
 )
 
 type App struct {
-	ctx     context.Context
-	service *service.Service
+	ctx           context.Context
+	service       *service.Service
+	requestCtx    context.Context
+	requestCancel context.CancelFunc
+	requestMu     sync.Mutex
 }
 
 func NewApp() (*App, error) {
@@ -262,7 +266,30 @@ func (a *App) ExecuteHTTPRequestWithScripts(
 	preScriptIDs []string,
 	postScriptIDs []string,
 ) (*models.CurlResponse, error) {
-	return a.service.ExecuteHTTPRequestWithScripts(projectID, projectName, requestName, requestPath, environmentID, spec, preScriptIDs, postScriptIDs)
+	// 取消之前的请求
+	a.cancelCurrentRequest()
+
+	// 创建新的 context 和 cancelFunc
+	a.requestCtx, a.requestCancel = context.WithCancel(context.Background())
+	return a.service.ExecuteHTTPRequestWithScriptsWithCancel(
+		a.requestCtx,
+		projectID, projectName, requestName, requestPath,
+		environmentID, spec, preScriptIDs, postScriptIDs,
+	)
+}
+
+// CancelCurrentRequest cancels the currently running HTTP request if any.
+func (a *App) CancelCurrentRequest() {
+	a.cancelCurrentRequest()
+}
+
+func (a *App) cancelCurrentRequest() {
+	a.requestMu.Lock()
+	defer a.requestMu.Unlock()
+	if a.requestCancel != nil {
+		a.requestCancel()
+		a.requestCancel = nil
+	}
 }
 
 func (a *App) SyncProjectToGit(projectID string) error {

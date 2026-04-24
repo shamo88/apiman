@@ -170,6 +170,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
     handleCreateFolder,
     handleToggleFolder,
     handleToggleRequestCases,
+    cancelRequest,
   } = useWorkspaceHandlers(projectId);
 
   const handleUpdateWorkspace = (updates: any) => {
@@ -687,6 +688,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
                   onApiConfigChange={(config) => handleUpdateWorkspace({ apiConfig: config })}
                   executing={executing}
                   onExecute={handleExecuteRequest}
+                  onCancel={cancelRequest}
                   onSave={workspace.requestEditorSurface === 'case' ? handleSaveCase : handleSaveRequest}
                   environmentVariables={environmentVariables}
                   projectScripts={scripts.map((s) => ({ id: s.id, name: s.name }))}
