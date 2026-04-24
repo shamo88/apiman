@@ -94,6 +94,29 @@
 
 .kv-row .ant-input {
   flex: 1;
+  min-width: 0;
+}
+
+.kv-row .variable-editable-wrapper {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+.kv-row .variable-editable {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.kv-row .variable-editable[data-multiline="true"] {
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 32px;
 }
 
 /* Body Editor */

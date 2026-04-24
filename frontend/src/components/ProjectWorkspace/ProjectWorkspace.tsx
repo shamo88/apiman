@@ -447,19 +447,21 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
               <span>接口列表</span>
             </div>
             {!collapsedModules.apis && (
-              <Space size="small">
-                <Dropdown
-                  menu={{
-                    items: [
-                      { key: 'folder', icon: <FolderOutlined />, label: '新建文件夹', onClick: () => handleAddFolder('') },
-                      { key: 'request', icon: <FileOutlined />, label: '新建请求', onClick: () => handleAddRequest('') },
-                    ]
-                  }}
-                  trigger={['click']}
-                >
-                  <Button size="small" icon={<PlusOutlined />} onClick={(e) => e.stopPropagation()} />
-                </Dropdown>
-              </Space>
+              <div onClick={(e) => e.stopPropagation()}>
+                <Space size="small">
+                  <Dropdown
+                    menu={{
+                      items: [
+                        { key: 'folder', icon: <FolderOutlined />, label: '新建文件夹', onClick: () => handleAddFolder('') },
+                        { key: 'request', icon: <FileOutlined />, label: '新建请求', onClick: () => handleAddRequest('') },
+                      ]
+                    }}
+                    trigger={['hover']}
+                  >
+                    <Button size="small" icon={<PlusOutlined />} />
+                  </Dropdown>
+                </Space>
+              </div>
             )}
           </div>
           {!collapsedModules.apis && (

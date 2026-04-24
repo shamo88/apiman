@@ -27,6 +27,8 @@ export const VariableEditableInput: React.FC<VariableEditableInputProps> = ({
     const [suggestionPos, setSuggestionPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
     const suggestions = getVariableSuggestions(value, caretIndex, environmentVariables);
     const suggestionItems = forceSuggestAll ? Object.keys(environmentVariables) : suggestions.items;
+    // 检测内容是否包含换行
+    const hasNewline = (value || '').includes('\n');
 
     const updateCaretPosition = () => {
         const editor = editorRef.current;
@@ -100,7 +102,7 @@ export const VariableEditableInput: React.FC<VariableEditableInputProps> = ({
             <div
                 ref={editorRef}
                 className="variable-editable"
-                data-multiline={multiline ? 'true' : 'false'}
+                data-multiline={multiline || hasNewline ? 'true' : 'false'}
                 contentEditable
                 suppressContentEditableWarning
                 data-placeholder={placeholder}
