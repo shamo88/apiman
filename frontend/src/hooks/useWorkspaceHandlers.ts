@@ -213,7 +213,10 @@ export const useWorkspaceHandlers = (projectId: string) => {
   }, [project, workspace, executeRequest]);
 
   const handleSaveRequest = useCallback(async () => {
-    if (!project || !workspace.currentRequest?.path) return;
+    if (!project || !workspace.currentRequest?.path) {
+      message.error('请先在左侧选择一个请求，或创建新请求');
+      return;
+    }
     try {
       // Preserve existing cases by passing current requestCases
       await saveRequest(
@@ -230,7 +233,10 @@ export const useWorkspaceHandlers = (projectId: string) => {
 
   // Save only the active case, preserving interface and other cases
   const handleSaveCase = useCallback(async () => {
-    if (!project || !workspace.currentRequest?.path || !workspace.activeCaseId) return;
+    if (!project || !workspace.currentRequest?.path || !workspace.activeCaseId) {
+      message.error('请先选择一个请求和用例');
+      return;
+    }
     try {
       // Replace only the active case in the cases array
       const updatedCases = workspace.requestCases.map(c =>
