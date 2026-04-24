@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Tabs, Button, Input } from 'antd';
+import { Tabs, Button, Input, Breadcrumb } from 'antd';
 import { ApiRequestBar, KeyValueEditor, BodyTypeSelector, ScriptBindingList, VariableEditableInput } from '../request';
 import { ApiConfig } from '../../constants/defaults';
 import { buildCurlCommand, parseCurlToApiConfig } from '../../utils/curlUtils';
@@ -14,6 +14,11 @@ interface RequestPanelProps {
   onSave: () => void;
   environmentVariables: Record<string, string>;
   projectScripts: Array<{ id: string; name: string }>;
+  breadcrumbPath?: string;
+  requestName?: string;
+  caseName?: string;
+  onRenameRequest?: (newName: string) => void;
+  onRenameCase?: (newName: string) => void;
 }
 
 // 动态键值对接口，支持通过变量访问属性
@@ -33,6 +38,11 @@ export const RequestPanel: React.FC<RequestPanelProps> = ({
   onSave,
   environmentVariables,
   projectScripts,
+  breadcrumbPath,
+  requestName,
+  caseName,
+  onRenameRequest,
+  onRenameCase,
 }) => {
   const [activeTab, setActiveTab] = useState('params');
   const [curlPreview, setCurlPreview] = useState('');
@@ -51,8 +61,94 @@ export const RequestPanel: React.FC<RequestPanelProps> = ({
     onApiConfigChange({ ...apiConfig, ...parsed });
   };
 
+  const [editingName, setEditingName] = useState(false);
+  const [editedName, setEditedName] = useState(requestName);
+
+  const handleNameClick = () => {
+    setEditingName(true);
+    setEditedName(requestName || '');
+  };
+
+  const handleNameBlur = () => {
+    setEditingName(false);
+    if (editedName && editedName !== requestName && onRenameRequest) {
+      onRenameRequest(editedName);
+    }
+  };
+
+  const handleNameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      setEditingName(false);
+      if (editedName && editedName !== requestName && onRenameRequest) {
+        onRenameRequest(editedName);
+      }
+    }
+  };
+
+  // Case name editing
+  const [editingCase, setEditingCase] = useState(false);
+  const [editedCaseName, setEditedCaseName] = useState(caseName);
+
+  const handleCaseClick = () => {
+    setEditingCase(true);
+    setEditedCaseName(caseName || '');
+  };
+
+  const handleCaseBlur = () => {
+    setEditingCase(false);
+    if (editedCaseName && editedCaseName !== caseName && onRenameCase) {
+      onRenameCase(editedCaseName);
+    }
+  };
+
+  const handleCaseKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      setEditingCase(false);
+      if (editedCaseName && editedCaseName !== caseName && onRenameCase) {
+        onRenameCase(editedCaseName);
+      }
+    }
+  };
+
   return (
     <div className="request-panel">
+      <Breadcrumb
+        separator=">"
+        items={[
+          ...(breadcrumbPath ? breadcrumbPath.split('/').filter(Boolean).map((name) => ({ title: name })) : []),
+          ...(requestName ? [{
+            title: editingName ? (
+              <Input
+                size="small"
+                value={editedName}
+                onChange={(e) => setEditedName(e.target.value)}
+                onBlur={handleNameBlur}
+                onKeyDown={handleNameKeyDown}
+                autoFocus
+                style={{ width: 120 }}
+              />
+            ) : (
+              <span onClick={handleNameClick} style={{ cursor: 'pointer' }}>{requestName}</span>
+            )
+          }] : []),
+          ...(caseName ? [{
+            title: editingCase ? (
+              <Input
+                size="small"
+                value={editedCaseName}
+                onChange={(e) => setEditedCaseName(e.target.value)}
+                onBlur={handleCaseBlur}
+                onKeyDown={handleCaseKeyDown}
+                autoFocus
+                style={{ width: 120 }}
+              />
+            ) : (
+              <span onClick={handleCaseClick} style={{ cursor: 'pointer' }}>{caseName}</span>
+            )
+          }] : []),
+        ]}
+        style={{ marginBottom: 4, fontSize: 12 }}
+      />
       <ApiRequestBar
         method={apiConfig.method}
         url={apiConfig.url}

@@ -335,11 +335,16 @@ export const useWorkspaceHandlers = (projectId: string) => {
     }
   }, [projectId, deleteCase]);
 
-  const handleRenameCase = useCallback(async (casePath: string, currentName: string) => {
-    // Open the rename modal for case, do not call API directly
-    const uiStore = useUIStore.getState();
-    uiStore.openCaseRenameModal(casePath);
-  }, []);
+  const handleRenameCase = useCallback(async (casePath: string, newName: string) => {
+    // casePath format: requestCase|projectId|requestId|caseId
+    const parts = casePath.replace('requestCase|', '').split('|');
+    if (parts.length !== 3) return;
+    try {
+      await renameCase(parts[0], parts[1], parts[2], newName);
+    } catch (error) {
+      // Error handled in hook
+    }
+  }, [renameCase]);
 
   const loadRequestContent = useCallback(async (path: string) => {
     if (!projectId) return;
@@ -421,6 +426,14 @@ export const useWorkspaceHandlers = (projectId: string) => {
     workspaceStore.setWorkspaceState(projectId, { expandedRequestPaths: expanded });
   }, [projectId, workspace, workspaceStore]);
 
+  const handleRenameRequest = useCallback(async (requestPath: string, newName: string) => {
+    try {
+      await renameRequest(projectId, requestPath, newName);
+    } catch (error) {
+      // Error handled in hook
+    }
+  }, [projectId, renameRequest]);
+
   return {
     // State
     workspace,
@@ -448,5 +461,6 @@ export const useWorkspaceHandlers = (projectId: string) => {
     handleToggleRequestCases,
     loadRequestContent,
     cancelRequest,
+    handleRenameRequest,
   };
 };
