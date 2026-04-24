@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Form, Col, Divider, Modal, Row } from 'antd';
 import { SettingOutlined, GlobalOutlined, GithubOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { GeneralSettings } from './GeneralSettings';
@@ -40,6 +40,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
   const projectStore = useProjectStore();
   const [activeSettingsTab, setActiveSettingsTab] = useState('general');
   const [form] = Form.useForm();
+
+  // 加载当前配置到表单
+  useEffect(() => {
+    if (visible) {
+      const loadConfig = async () => {
+        try {
+          const config = await LoadAppConfig();
+          form.setFieldsValue({
+            ui: {
+              enableListAnimation: config?.ui?.enableListAnimation ?? false,
+            },
+            proxy: {
+              enabled: config?.proxy?.enabled ?? false,
+              httpHost: config?.proxy?.httpHost || '',
+              httpPort: config?.proxy?.httpPort,
+              httpsHost: config?.proxy?.httpsHost || '',
+              httpsPort: config?.proxy?.httpsPort,
+              socks5Host: config?.proxy?.socks5Host || '',
+              socks5Port: config?.proxy?.socks5Port,
+            },
+            gitSync: {
+              enabled: config?.gitSync?.enabled ?? false,
+              remoteUrl: config?.gitSync?.remoteUrl || '',
+              branch: config?.gitSync?.branch || 'main',
+              password: config?.gitSync?.password || '',
+            },
+          });
+        } catch (error) {
+          console.error('Failed to load config:', error);
+        }
+      };
+      loadConfig();
+    }
+  }, [visible]);
 
   const handleGitSyncChange = async (enabled: boolean) => {
     const { ListProjects } = await import('../../../wailsjs/go/main/App');
