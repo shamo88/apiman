@@ -493,51 +493,52 @@
 .environment-list-item {
   display: flex;
   align-items: center;
-  padding: 10px 14px;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-card);
-  color: var(--text-secondary);
-  text-align: left;
-  border-radius: var(--radius-md);
+  width: 100%;
+  padding: 5px 10px 5px 6px;
   cursor: pointer;
   transition: all 0.2s ease;
+  border: none;
+  border-left: 2px solid transparent;
+  background: transparent;
   font-size: 13px;
-  gap: 10px;
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+.environment-list-item:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+  border-left-color: transparent;
+}
+
+.environment-list-item.active {
+  background: var(--bg-active);
+  color: var(--text-primary);
+  border-left-color: var(--accent-primary);
 }
 
 .environment-list-item:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
-  border-color: var(--accent-primary);
-  box-shadow: var(--shadow-card);
 }
 
 .environment-list-item.active {
-  background: linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(79, 70, 229, 0.04) 100%);
-  color: var(--text-primary);
-  border-color: var(--accent-primary);
-  box-shadow: var(--shadow-glow);
+  background: rgba(79, 70, 229, 0.1);
+  color: var(--accent-primary);
 }
 
 .environment-list-item-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  margin-right: 6px;
+  font-size: 14px;
   flex-shrink: 0;
+  color: var(--text-muted);
 }
 
 .environment-list-item.active .environment-list-item-icon {
-  background: var(--accent-primary);
-  color: white;
-}
-
-.environment-list-item:not(.active) .environment-list-item-icon {
-  background: var(--bg-tertiary);
-  color: var(--text-muted);
+  color: #faad14;
 }
 
 .environment-list-item-name {

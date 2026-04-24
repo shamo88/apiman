@@ -414,14 +414,19 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
   const scriptLogs = useMemo(() => workspace.response?.script_logs || [], [workspace.response]);
   const testResults = useMemo(() => workspace.response?.tests || [], [workspace.response]);
 
-  // 展开/折叠模块 - 只切换展开状态，不切换右侧工作区
+  // 展开/折叠模块 - 展开时同时激活模块以加载数据
   const toggleModule = (module: 'apis' | 'environments' | 'scripts' | 'project-settings') => {
+    const isCollapsing = !collapsedModules[module];
     setCollapsedModules({
       apis: module === 'apis' ? !collapsedModules.apis : collapsedModules.apis,
       environments: module === 'environments' ? !collapsedModules.environments : collapsedModules.environments,
       scripts: module === 'scripts' ? !collapsedModules.scripts : collapsedModules.scripts,
       projectSettings: module === 'project-settings' ? !collapsedModules.projectSettings : collapsedModules.projectSettings,
     });
+    // 展开时激活对应模块以触发数据加载
+    if (!isCollapsing && (module === 'scripts' || module === 'project-settings')) {
+      setActiveModule(module);
+    }
   };
 
   // 切换右侧工作区到指定模块
