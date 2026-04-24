@@ -229,13 +229,17 @@
 .project-main .ant-tabs-tab {
   padding: 8px 14px !important;
   margin: 0 6px 0 0 !important;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--text-secondary) !important;
   transition: all 0.2s;
   border: 1px solid transparent !important;
   border-radius: 8px 8px 0 0 !important;
   background: transparent !important;
+}
+
+.project-main .ant-tabs-nav-list .ant-tabs-tab {
+  font-size: 12px !important;
 }
 
 .project-main .ant-tabs-tab:hover {
@@ -597,21 +601,25 @@
 .request-tabs-scroll-wrap {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
 }
 
 .request-tabs-scroll-wrap .ant-tabs {
   border-bottom: none;
-}
-
-/* Multi-tab horizontal scroll */
-.request-tabs-scroll-wrap .ant-tabs-nav-wrap {
-  overflow-x: auto;
-  overflow-y: hidden;
+  margin: 0;
 }
 
 .request-tabs-scroll-wrap .ant-tabs-nav {
-  margin-bottom: 0;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+.request-tabs-scroll-wrap .ant-tabs-nav::before {
+  display: none;
+}
+
+.request-tabs-scroll-wrap .ant-tabs-nav-list {
+  padding-right: 80px;
 }
 
 .request-tabs-environment-select {
