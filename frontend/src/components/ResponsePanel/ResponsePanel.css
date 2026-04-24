@@ -106,7 +106,7 @@
   overflow: hidden !important;
 }
 
-.response-json-viewport > * {
+.response-json-viewport>* {
   flex: 1;
   min-height: 0;
   overflow: hidden !important;
@@ -233,7 +233,7 @@
 
 .response-header {
   flex-shrink: 0;
-  padding: 12px 16px;
+  padding: 8px 16px;
   background: var(--bg-tertiary);
   border-bottom: 1px solid var(--border-subtle);
   display: flex;

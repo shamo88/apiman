@@ -222,12 +222,12 @@
 
 .project-main .ant-tabs-nav {
   margin: 0 !important;
-  padding: 8px 16px 0 !important;
+  padding: 6px 8px 0 !important;
   background: linear-gradient(180deg, rgba(79, 70, 229, 0.03), transparent);
 }
 
 .project-main .ant-tabs-tab {
-  padding: 8px 14px !important;
+  padding: 4px 8px !important;
   margin: 0 6px 0 0 !important;
   font-size: 12px;
   font-weight: 500;
