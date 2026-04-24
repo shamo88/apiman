@@ -49,8 +49,8 @@ func main() {
 
 	err = wails.Run(&options.App{
 		Title:            "Apiman - API Management Tool",
-		Width:            1280,
-		Height:           800,
+		Width:            1300,
+		Height:           900,
 		MinWidth:         800,
 		MinHeight:        600,
 		Frameless:        true,
