@@ -26,7 +26,7 @@
 /* 组件容器 */
 .enhanced-json-view {
     font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-    font-size: 13px;
+    font-size: 12px;
     line-height: 1.5;
     color: var(--json-bracket-color);
     background: transparent;

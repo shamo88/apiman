@@ -6,6 +6,7 @@ import { toWailsHttpSpec } from '../utils/curlUtils';
 import {
   ExecuteHTTPRequestWithScripts,
   ExecuteCurl,
+  CancelCurrentRequest,
 } from '../../wailsjs/go/main/App';
 
 export function useRequest() {
@@ -25,7 +26,6 @@ export function useRequest() {
       const spec = toWailsHttpSpec(apiConfig);
 
       let response;
-      // Always use ExecuteHTTPRequestWithScripts to ensure environment variables and globals are substituted
       response = await ExecuteHTTPRequestWithScripts(
         projectId,
         requestName || 'api',
@@ -39,7 +39,6 @@ export function useRequest() {
 
       setResponse(projectId, response);
 
-      // Format response body
       if (response?.body) {
         try {
           const json = JSON.parse(response.body);
@@ -51,12 +50,24 @@ export function useRequest() {
 
       return response;
     } catch (error: any) {
-      message.error(`请求失败: ${error?.message || error}`);
+      if (error?.message?.includes('aborted') || error?.message?.includes('canceled') || error?.message?.includes('context canceled')) {
+        message.info('请求已取消');
+      } else {
+        message.error(`请求失败: ${error?.message || error}`);
+      }
       throw error;
     } finally {
       setExecuting(false);
     }
   }, [setExecuting, setResponse, setFormattedResponse]);
+
+  const cancelRequest = useCallback(async () => {
+    try {
+      await CancelCurrentRequest();
+    } catch (error) {
+      console.error('Cancel request failed:', error);
+    }
+  }, []);
 
   const executeCurl = useCallback(async (command: string) => {
     setExecuting(true);
@@ -75,6 +86,7 @@ export function useRequest() {
   return {
     executing,
     executeRequest,
+    cancelRequest,
     executeCurl,
   };
 }

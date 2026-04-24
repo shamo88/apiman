@@ -11,6 +11,7 @@ interface ApiRequestBarProps {
     onMethodChange: (method: string) => void;
     onUrlChange: (url: string) => void;
     onSend: () => void;
+    onCancel: () => void;
     onSave: () => void;
 }
 
@@ -22,6 +23,7 @@ export const ApiRequestBar: React.FC<ApiRequestBarProps> = ({
     onMethodChange,
     onUrlChange,
     onSend,
+    onCancel,
     onSave,
 }) => {
     return (
@@ -37,9 +39,15 @@ export const ApiRequestBar: React.FC<ApiRequestBarProps> = ({
                 style={{ flex: 1 }}
                 environmentVariables={environmentVariables}
             />
-            <Button type="primary" onClick={onSend} loading={executing}>
-                发送
-            </Button>
+            {executing ? (
+                <Button danger onClick={onCancel}>
+                    取消
+                </Button>
+            ) : (
+                <Button type="primary" onClick={onSend}>
+                    发送
+                </Button>
+            )}
             <Button onClick={onSave}>
                 保存
             </Button>

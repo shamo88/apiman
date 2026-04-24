@@ -39,10 +39,31 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
   const [searchKeyword, setSearchKeyword] = useState('');
   const [filterMethod, setFilterMethod] = useState('ALL');
   const [searchVersion, setSearchVersion] = useState(0);
+  // 响应面板高度 - 不缓存，每次重新计算，默认占50%
   const [responseHeight, setResponseHeight] = useState(() => {
-    const saved = localStorage.getItem('apiman-response-height');
-    return saved ? parseInt(saved, 10) : 300;
+    const screenHeight = window.innerHeight;
+    const titleBarHeight = 40;
+    const tabsRowHeight = 40;
+    const splitterHeight = 6;
+    const otherHeight = 100; // 底部边距等
+    const availableHeight = screenHeight - titleBarHeight - tabsRowHeight - splitterHeight - otherHeight;
+    return Math.floor(availableHeight / 2); // 各占50%
   });
+
+  // 监听窗口变化，重新计算高度
+  useEffect(() => {
+    const handleResize = () => {
+      const screenHeight = window.innerHeight;
+      const titleBarHeight = 40;
+      const tabsRowHeight = 40;
+      const splitterHeight = 6;
+      const otherHeight = 100;
+      const availableHeight = screenHeight - titleBarHeight - tabsRowHeight - splitterHeight - otherHeight;
+      setResponseHeight(Math.floor(availableHeight / 2));
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const [selectedFolder, setSelectedFolder] = useState<{ path: string; name: string; preScripts: string[]; postScripts: string[] } | null>(null);
   const [projectScripts, setProjectScripts] = useState<{ preScripts: string[]; postScripts: string[] }>({ preScripts: [], postScripts: [] });
 
@@ -149,6 +170,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
     handleCreateFolder,
     handleToggleFolder,
     handleToggleRequestCases,
+    cancelRequest,
   } = useWorkspaceHandlers(projectId);
 
   const handleUpdateWorkspace = (updates: any) => {
@@ -299,7 +321,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
 
   const handleResponseHeightChange = (height: number) => {
     setResponseHeight(height);
-    localStorage.setItem('apiman-response-height', height.toString());
   };
 
   // 拖拽处理函数
@@ -427,19 +448,21 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
               <span>接口列表</span>
             </div>
             {!collapsedModules.apis && (
-              <Space size="small">
-                <Dropdown
-                  menu={{
-                    items: [
-                      { key: 'folder', icon: <FolderOutlined />, label: '新建文件夹', onClick: () => handleAddFolder('') },
-                      { key: 'request', icon: <FileOutlined />, label: '新建请求', onClick: () => handleAddRequest('') },
-                    ]
-                  }}
-                  trigger={['click']}
-                >
-                  <Button size="small" icon={<PlusOutlined />} onClick={(e) => e.stopPropagation()} />
-                </Dropdown>
-              </Space>
+              <div onClick={(e) => e.stopPropagation()}>
+                <Space size="small">
+                  <Dropdown
+                    menu={{
+                      items: [
+                        { key: 'folder', icon: <FolderOutlined />, label: '新建文件夹', onClick: () => handleAddFolder('') },
+                        { key: 'request', icon: <FileOutlined />, label: '新建请求', onClick: () => handleAddRequest('') },
+                      ]
+                    }}
+                    trigger={['hover']}
+                  >
+                    <Button size="small" icon={<PlusOutlined />} />
+                  </Dropdown>
+                </Space>
+              </div>
             )}
           </div>
           {!collapsedModules.apis && (
@@ -665,6 +688,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
                   onApiConfigChange={(config) => handleUpdateWorkspace({ apiConfig: config })}
                   executing={executing}
                   onExecute={handleExecuteRequest}
+                  onCancel={cancelRequest}
                   onSave={workspace.requestEditorSurface === 'case' ? handleSaveCase : handleSaveRequest}
                   environmentVariables={environmentVariables}
                   projectScripts={scripts.map((s) => ({ id: s.id, name: s.name }))}
@@ -673,10 +697,10 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
               {workspace.response && (
                 <>
                   <ResizeSplitter
-                    onRatioChange={handleResponseHeightChange}
-                    initialRatio={responseHeight}
-                    minRatio={100}
-                    maxRatio={800}
+                    height={responseHeight}
+                    onHeightChange={handleResponseHeightChange}
+                    minHeight={100}
+                    maxHeight={800}
                   />
                   <div className="workspace-response" style={{ height: responseHeight }}>
                     <ResponsePanel

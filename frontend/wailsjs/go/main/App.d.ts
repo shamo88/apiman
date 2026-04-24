@@ -10,6 +10,8 @@ export function AddRequestCase(arg1:string,arg2:string):Promise<models.CurlReque
 
 export function BatchExecuteHTTPRequests(arg1:Array<any>,arg2:string,arg3:boolean,arg4:number):Promise<any>;
 
+export function CancelCurrentRequest():Promise<void>;
+
 export function ClearHistory():Promise<void>;
 
 export function CopyRequest(arg1:string):Promise<models.CurlRequest>;

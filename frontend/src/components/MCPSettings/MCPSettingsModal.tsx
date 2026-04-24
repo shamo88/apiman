@@ -25,7 +25,7 @@ export interface Environment {
 export const MCPSettingsModal: React.FC = () => {
     const projectStore = useProjectStore();
     const uiStore = useUIStore();
-    const { mcpConfig, mcpStatus, saveMCPConfig } = useMCP();
+    const { mcpConfig, mcpStatus, saveMCPConfig, loadMCPConfig } = useMCP();
     const { environments, loadEnvironments } = useEnvironments();
 
     const visible = uiStore.mcpModalVisible;
@@ -34,6 +34,13 @@ export const MCPSettingsModal: React.FC = () => {
     const [loading, setLoading] = useState(false);
 
     const projects = projectStore.projects;
+
+    // 弹窗打开时加载 MCP 配置
+    useEffect(() => {
+        if (visible) {
+            loadMCPConfig();
+        }
+    }, [visible]);
 
     const generateRandomKey = () => {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';

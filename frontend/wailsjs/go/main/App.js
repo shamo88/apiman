@@ -14,6 +14,10 @@ export function BatchExecuteHTTPRequests(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['BatchExecuteHTTPRequests'](arg1, arg2, arg3, arg4);
 }
 
+export function CancelCurrentRequest() {
+  return window['go']['main']['App']['CancelCurrentRequest']();
+}
+
 export function ClearHistory() {
   return window['go']['main']['App']['ClearHistory']();
 }

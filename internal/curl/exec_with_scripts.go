@@ -103,7 +103,7 @@ func (se *ScriptableExecutor) ExecuteWithScriptsContext(
 		}
 	}
 
-	curlResp, err := se.CurlExecutor.ExecuteHTTPRequestWithProxy(specCopy, proxyOpts, timeoutSeconds)
+	curlResp, err := se.CurlExecutor.ExecuteHTTPRequestWithProxyContext(ctx, specCopy, proxyOpts, timeoutSeconds)
 	if err != nil {
 		return &models.CurlResponse{Error: err.Error()}, replacedURL, err
 	}

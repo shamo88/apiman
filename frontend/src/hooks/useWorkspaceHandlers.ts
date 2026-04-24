@@ -46,7 +46,7 @@ export const useWorkspaceHandlers = (projectId: string) => {
     createFolder,
   } = useProjects();
 
-  const { executeRequest, executing } = useRequest();
+  const { executeRequest, cancelRequest, executing } = useRequest();
   const workspaceStore = useWorkspaceStore();
   const projectStore = useProjectStore();
 
@@ -213,7 +213,10 @@ export const useWorkspaceHandlers = (projectId: string) => {
   }, [project, workspace, executeRequest]);
 
   const handleSaveRequest = useCallback(async () => {
-    if (!project || !workspace.currentRequest?.path) return;
+    if (!project || !workspace.currentRequest?.path) {
+      message.error('请先在左侧选择一个请求，或创建新请求');
+      return;
+    }
     try {
       // Preserve existing cases by passing current requestCases
       await saveRequest(
@@ -230,7 +233,10 @@ export const useWorkspaceHandlers = (projectId: string) => {
 
   // Save only the active case, preserving interface and other cases
   const handleSaveCase = useCallback(async () => {
-    if (!project || !workspace.currentRequest?.path || !workspace.activeCaseId) return;
+    if (!project || !workspace.currentRequest?.path || !workspace.activeCaseId) {
+      message.error('请先选择一个请求和用例');
+      return;
+    }
     try {
       // Replace only the active case in the cases array
       const updatedCases = workspace.requestCases.map(c =>
@@ -342,6 +348,15 @@ export const useWorkspaceHandlers = (projectId: string) => {
       workspaceStore.setSidebarHighlightedCasePath(projectId, '');
       const request = await GetRequest(path);
       workspaceStore.setCurrentRequest(projectId, request as CurlRequest);
+
+      // Update apiConfig when switching tabs (matching handleTreeItemClick behavior)
+      const cfg = apiConfigFromRequest(request as CurlRequest, request.name || '');
+      workspaceStore.setApiConfig(projectId, {
+        ...cfg,
+        preScripts: request.pre_scripts || [],
+        postScripts: request.post_scripts || [],
+      });
+
       // 不调用 hydrateRequestEditor，因为它会清空 response
       // 切换 tab 时保留原有的 response
     } catch (error) {
@@ -432,5 +447,6 @@ export const useWorkspaceHandlers = (projectId: string) => {
     handleToggleFolder,
     handleToggleRequestCases,
     loadRequestContent,
+    cancelRequest,
   };
 };

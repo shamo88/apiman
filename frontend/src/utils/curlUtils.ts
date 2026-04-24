@@ -121,31 +121,41 @@ export const parseCurlToApiConfig = (curl: string): Partial<ApiConfig> => {
     }
   }
 
-  // Extract URL
-  let urlMatch = curl.match(/['"](https?:\/\/[^\s'"]+)['"]/);
-  if (!urlMatch) {
+  // Extract URL - find ALL matches and use the last one (actual API URL after -x proxy)
+  const allUrlMatches = curl.match(/['"](https?:\/\/[^\s'"]+)['"]/g);
+  let lastUrl = '';
+  if (allUrlMatches && allUrlMatches.length > 0) {
+    // Remove quotes from last match
+    lastUrl = allUrlMatches[allUrlMatches.length - 1].replace(/^['"]|['"]$/g, '');
+  } else {
     const bareUrlMatch = curl.match(/(https?:\/\/[^\s'"-]+(?:\?[^\s'"]*)?)/);
     if (bareUrlMatch) {
-      urlMatch = ['', bareUrlMatch[1]];
+      lastUrl = bareUrlMatch[1];
     }
   }
-  if (urlMatch) {
-    const fullUrl = urlMatch[1];
+  if (lastUrl) {
     try {
-      const urlObj = new URL(fullUrl);
+      const urlObj = new URL(lastUrl);
       result.url = `${urlObj.origin}${urlObj.pathname}`;
       urlObj.searchParams.forEach((val, key) => {
         result.params!.push({ key, value: val, enabled: true });
       });
     } catch {
-      result.url = fullUrl.split('?')[0];
+      result.url = lastUrl.split('?')[0];
     }
   }
 
-  // Extract body
-  const bodyMatch = curl.match(/-d\s+['"]([^'"]*)['"]/);
-  if (bodyMatch) {
-    result.body = bodyMatch[1];
+  // Extract body - handle JSON/quoted body with any characters inside
+  // Match -d followed by quoted string (single or double quotes)
+  const bodyMatchSingle = curl.match(/-d\s+'([^']*)'/);
+  const bodyMatchDouble = curl.match(/-d\s+"([^"]*)"/);
+  if (bodyMatchSingle) {
+    result.body = bodyMatchSingle[1];
+    if (result.bodyType === 'none') {
+      result.bodyType = 'raw';
+    }
+  } else if (bodyMatchDouble) {
+    result.body = bodyMatchDouble[1];
     if (result.bodyType === 'none') {
       result.bodyType = 'raw';
     }
