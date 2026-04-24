@@ -63,11 +63,9 @@ export function useRequest() {
 
   const cancelRequest = useCallback(async () => {
     try {
-      console.log('[Cancel] Calling CancelCurrentRequest...');
       await CancelCurrentRequest();
-      console.log('[Cancel] CancelCurrentRequest completed');
     } catch (error) {
-      console.error('[Cancel] Cancel request failed:', error);
+      console.error('Cancel request failed:', error);
     }
   }, []);
 
