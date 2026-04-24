@@ -101,7 +101,11 @@ func (c *CurlExecutor) ExecuteHTTPRequestWithProxy(spec *models.HttpRequestSpec,
 	}
 
 	for key, value := range headerMap {
-		req.Header.Set(key, value)
+		if strings.EqualFold(key, "Host") {
+			req.Host = value
+		} else {
+			req.Header.Set(key, value)
+		}
 	}
 
 	client := &http.Client{Timeout: time.Duration(timeoutSeconds) * time.Second}
