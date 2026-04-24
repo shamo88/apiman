@@ -342,6 +342,15 @@ export const useWorkspaceHandlers = (projectId: string) => {
       workspaceStore.setSidebarHighlightedCasePath(projectId, '');
       const request = await GetRequest(path);
       workspaceStore.setCurrentRequest(projectId, request as CurlRequest);
+
+      // Update apiConfig when switching tabs (matching handleTreeItemClick behavior)
+      const cfg = apiConfigFromRequest(request as CurlRequest, request.name || '');
+      workspaceStore.setApiConfig(projectId, {
+        ...cfg,
+        preScripts: request.pre_scripts || [],
+        postScripts: request.post_scripts || [],
+      });
+
       // 不调用 hydrateRequestEditor，因为它会清空 response
       // 切换 tab 时保留原有的 response
     } catch (error) {
