@@ -1,27 +1,21 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 interface ResizeSplitterProps {
-  onRatioChange: (pixelValue: number) => void;
-  initialRatio?: number;
-  minRatio?: number;
-  maxRatio?: number;
+  height: number; // 当前高度由父组件控制
+  onHeightChange: (height: number) => void;
+  minHeight?: number;
+  maxHeight?: number;
 }
 
-const STORAGE_KEY = 'apiman-response-height';
-
 export const ResizeSplitter: React.FC<ResizeSplitterProps> = ({
-  onRatioChange,
-  initialRatio = 300,
-  minRatio = 100,
-  maxRatio = 800,
+  height,
+  onHeightChange,
+  minHeight = 100,
+  maxHeight = 800,
 }) => {
-  const [height, setHeight] = useState(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? parseInt(saved, 10) : initialRatio;
-  });
   const [isDragging, setIsDragging] = useState(false);
-  const startPosRef = useRef(0);
-  const startHeightRef = useRef(0);
+  const startPosRef = React.useRef(0);
+  const startHeightRef = React.useRef(0);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -36,18 +30,14 @@ export const ResizeSplitter: React.FC<ResizeSplitterProps> = ({
 
     const delta = startPosRef.current - e.clientY;
     let newHeight = startHeightRef.current + delta;
-    newHeight = Math.min(maxRatio, Math.max(minRatio, newHeight));
+    newHeight = Math.min(maxHeight, Math.max(minHeight, newHeight));
 
-    setHeight(newHeight);
-    onRatioChange(newHeight);
-  }, [isDragging, maxRatio, minRatio, onRatioChange]);
+    onHeightChange(newHeight);
+  }, [isDragging, maxHeight, minHeight, onHeightChange]);
 
   const handleMouseUp = useCallback(() => {
-    if (isDragging) {
-      setIsDragging(false);
-      localStorage.setItem(STORAGE_KEY, height.toString());
-    }
-  }, [isDragging, height]);
+    setIsDragging(false);
+  }, []);
 
   useEffect(() => {
     if (isDragging) {
