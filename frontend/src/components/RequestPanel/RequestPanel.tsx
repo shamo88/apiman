@@ -173,7 +173,7 @@ export const RequestPanel: React.FC<RequestPanelProps> = ({
               children: (
                 <KeyValueEditor
                   items={apiConfig.params}
-                  onAdd={() => updateConfig({ params: [...apiConfig.params, { key: '', value: '', enabled: true }] })}
+                  onAdd={(initial) => updateConfig({ params: [...apiConfig.params, { key: initial?.key ?? '', value: initial?.value ?? '', enabled: true }] })}
                   onRemove={(index) => updateConfig({ params: apiConfig.params.filter((_, i) => i !== index) })}
                   onUpdate={(index, field, value) => {
                     const newParams = [...apiConfig.params];
@@ -203,7 +203,7 @@ export const RequestPanel: React.FC<RequestPanelProps> = ({
               children: (
                 <KeyValueEditor
                   items={apiConfig.headers}
-                  onAdd={() => updateConfig({ headers: [...apiConfig.headers, { key: '', value: '', enabled: true }] })}
+                  onAdd={(initial) => updateConfig({ headers: [...apiConfig.headers, { key: initial?.key ?? '', value: initial?.value ?? '', enabled: true }] })}
                   onRemove={(index) => updateConfig({ headers: apiConfig.headers.filter((_, i) => i !== index) })}
                   onUpdate={(index, field, value) => {
                     const newHeaders = [...apiConfig.headers];
@@ -214,13 +214,15 @@ export const RequestPanel: React.FC<RequestPanelProps> = ({
                     }
                     updateConfig({ headers: newHeaders });
                   }}
-                  renderValueInput={(index, value, onChange) => (
+                  renderValueInput={(index, value, onChange, onBlur, onEnter) => (
                     <VariableEditableInput
                       value={value}
                       onChange={onChange}
                       placeholder="Value"
                       environmentVariables={environmentVariables}
                       style={{ flex: 1 }}
+                      onBlur={onBlur}
+                      onEnter={onEnter}
                     />
                   )}
                   addButtonText="添加请求头"
@@ -244,8 +246,8 @@ export const RequestPanel: React.FC<RequestPanelProps> = ({
                   {(apiConfig.bodyType === 'form-data' || apiConfig.bodyType === 'x-www-form-urlencoded') && (
                     <KeyValueEditor
                       items={apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded}
-                      onAdd={() => {
-                        const newData = [...(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded), { key: '', value: '', enabled: true }];
+                      onAdd={(initial) => {
+                        const newData = [...(apiConfig.bodyType === 'form-data' ? apiConfig.formData : apiConfig.urlencoded), { key: initial?.key ?? '', value: initial?.value ?? '', enabled: true }];
                         updateConfig(apiConfig.bodyType === 'form-data'
                           ? { ...apiConfig, formData: newData }
                           : { ...apiConfig, urlencoded: newData });
@@ -267,24 +269,28 @@ export const RequestPanel: React.FC<RequestPanelProps> = ({
                           ? { ...apiConfig, formData: newData }
                           : { ...apiConfig, urlencoded: newData });
                       }}
-                      renderKeyInput={(index, value, onChange) => (
+                      renderKeyInput={(index, value, onChange, onBlur, onEnter) => (
                         <VariableEditableInput
                           value={value}
                           onChange={onChange}
                           placeholder="Key"
                           environmentVariables={environmentVariables}
                           style={{ flex: 1 }}
+                          onBlur={onBlur}
+                          onEnter={onEnter}
                         />
                       )}
-                      renderValueInput={(index, value, onChange) => (
-                        <VariableEditableInput
-                          value={value}
-                          onChange={onChange}
-                          placeholder="Value"
-                          environmentVariables={environmentVariables}
-                          style={{ flex: 1 }}
-                        />
-                      )}
+                  renderValueInput={(index, value, onChange, onBlur, onEnter) => (
+                    <VariableEditableInput
+                      value={value}
+                      onChange={onChange}
+                      placeholder="Value"
+                      environmentVariables={environmentVariables}
+                      style={{ flex: 1 }}
+                      onBlur={onBlur}
+                      onEnter={onEnter}
+                    />
+                  )}
                       addButtonText="添加字段"
                     />
                   )}

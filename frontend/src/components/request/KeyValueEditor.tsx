@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { Checkbox, Input, Button } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 
@@ -10,11 +10,11 @@ export interface KeyValueItem {
 
 interface KeyValueEditorProps {
     items: KeyValueItem[];
-    onAdd: () => void;
+    onAdd: (initial?: { key: string; value: string }) => void;
     onRemove: (index: number) => void;
     onUpdate: (index: number, field: 'key' | 'value' | 'enabled', value: string | boolean) => void;
-    renderKeyInput?: (index: number, value: string, onChange: (value: string) => void) => React.ReactNode;
-    renderValueInput?: (index: number, value: string, onChange: (value: string) => void) => React.ReactNode;
+    renderKeyInput?: (index: number, value: string, onChange: (value: string) => void, onBlur?: () => void, onEnter?: () => void) => React.ReactNode;
+    renderValueInput?: (index: number, value: string, onChange: (value: string) => void, onBlur?: () => void, onEnter?: () => void) => React.ReactNode;
     addButtonText?: string;
     keyPlaceholder?: string;
     valuePlaceholder?: string;
@@ -31,13 +31,31 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
     keyPlaceholder = 'Key',
     valuePlaceholder = 'Value',
 }) => {
+    // Refs to track pending values and debounce timers for auto-add
+    const pendingKeyRef = useRef<string>('');
+    const pendingValueRef = useRef<string>('');
+    const pendingKeyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const pendingValueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const clearPendingKey = () => {
+        if (pendingKeyTimerRef.current) {
+            clearTimeout(pendingKeyTimerRef.current);
+            pendingKeyTimerRef.current = null;
+        }
+    };
+
+    const clearPendingValue = () => {
+        if (pendingValueTimerRef.current) {
+            clearTimeout(pendingValueTimerRef.current);
+            pendingValueTimerRef.current = null;
+        }
+    };
     // Determine if the last actual item has content (key or value)
     const lastItem = items.length > 0 ? items[items.length - 1] : null;
     const lastItemHasContent = lastItem && (lastItem.key.trim() !== '' || lastItem.value.trim() !== '');
 
-    // Should we show a "shadow" empty row after the last item?
-    // Yes if: we have items AND the last item has content
-    const showShadowRow = items.length > 0 && lastItemHasContent;
+    // Always render shadow row when items exist (never unmount - that destroys focus)
+    const showShadowRow = items.length > 0;
 
     // Should we show a placeholder empty row when items is empty?
     const showEmptyRow = items.length === 0;
@@ -104,46 +122,57 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
                 <div className="kv-row kv-row-params">
                     <Checkbox className="kv-param-enabled" checked={false} onChange={() => {}} />
                     {renderKeyInput ? (
-                        renderKeyInput(items.length, '', (value) => {
-                            if (value.trim() !== '') {
-                                const newItemIndex = items.length;
-                                onAdd();
-                                onUpdate(newItemIndex, 'key', value);
-                            }
+                        renderKeyInput(items.length, pendingKeyRef.current, (value) => {
+                            // Always use ref directly in timer callback - ref is always current
+                            pendingKeyRef.current = value;
+                            clearPendingKey();
+                            pendingKeyTimerRef.current = setTimeout(() => {
+                                if (pendingKeyRef.current.trim() !== '') {
+                                    onAdd({ key: pendingKeyRef.current, value: '' });
+                                }
+                                pendingKeyRef.current = '';
+                            }, 500);
                         })
                     ) : (
                         <Input
                             placeholder={keyPlaceholder}
-                            value={''}
+                            value={pendingKeyRef.current}
                             onChange={(e) => {
-                                const value = e.target.value;
-                                if (value.trim() !== '') {
-                                    const newItemIndex = items.length;
-                                    onAdd();
-                                    onUpdate(newItemIndex, 'key', value);
-                                }
+                                pendingKeyRef.current = e.target.value;
+                                clearPendingKey();
+                                pendingKeyTimerRef.current = setTimeout(() => {
+                                    if (pendingKeyRef.current.trim() !== '') {
+                                        onAdd({ key: pendingKeyRef.current, value: '' });
+                                    }
+                                    pendingKeyRef.current = '';
+                                }, 500);
                             }}
                         />
                     )}
                     {renderValueInput ? (
-                        renderValueInput(items.length, '', (value) => {
-                            if (value.trim() !== '') {
-                                const newItemIndex = items.length;
-                                onAdd();
-                                onUpdate(newItemIndex, 'value', value);
-                            }
+                        renderValueInput(items.length, pendingValueRef.current, (value) => {
+                            pendingValueRef.current = value;
+                            clearPendingValue();
+                            pendingValueTimerRef.current = setTimeout(() => {
+                                if (pendingValueRef.current.trim() !== '') {
+                                    onAdd({ key: '', value: pendingValueRef.current });
+                                }
+                                pendingValueRef.current = '';
+                            }, 500);
                         })
                     ) : (
                         <Input
                             placeholder={valuePlaceholder}
-                            value={''}
+                            value={pendingValueRef.current}
                             onChange={(e) => {
-                                const value = e.target.value;
-                                if (value.trim() !== '') {
-                                    const newItemIndex = items.length;
-                                    onAdd();
-                                    onUpdate(newItemIndex, 'value', value);
-                                }
+                                pendingValueRef.current = e.target.value;
+                                clearPendingValue();
+                                pendingValueTimerRef.current = setTimeout(() => {
+                                    if (pendingValueRef.current.trim() !== '') {
+                                        onAdd({ key: '', value: pendingValueRef.current });
+                                    }
+                                    pendingValueRef.current = '';
+                                }, 500);
                             }}
                         />
                     )}
@@ -159,45 +188,55 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
                     <Checkbox className="kv-param-enabled" checked={false} onChange={(e) => onUpdate(0, 'enabled', e.target.checked)} />
                     {renderKeyInput ? (
                         renderKeyInput(0, '', (value) => {
-                            if (value.trim() !== '') {
-                                const newItemIndex = items.length;
-                                onAdd();
-                                onUpdate(newItemIndex, 'key', value);
-                            }
+                            pendingKeyRef.current = value;
+                            clearPendingKey();
+                            pendingKeyTimerRef.current = setTimeout(() => {
+                                if (pendingKeyRef.current.trim() !== '') {
+                                    onAdd({ key: pendingKeyRef.current, value: '' });
+                                }
+                                pendingKeyRef.current = '';
+                            }, 500);
                         })
                     ) : (
                         <Input
                             placeholder={keyPlaceholder}
                             value={''}
                             onChange={(e) => {
-                                const value = e.target.value;
-                                if (value.trim() !== '') {
-                                    const newItemIndex = items.length;
-                                    onAdd();
-                                    onUpdate(newItemIndex, 'key', value);
-                                }
+                                pendingKeyRef.current = e.target.value;
+                                clearPendingKey();
+                                pendingKeyTimerRef.current = setTimeout(() => {
+                                    if (pendingKeyRef.current.trim() !== '') {
+                                        onAdd({ key: pendingKeyRef.current, value: '' });
+                                    }
+                                    pendingKeyRef.current = '';
+                                }, 500);
                             }}
                         />
                     )}
                     {renderValueInput ? (
                         renderValueInput(0, '', (value) => {
-                            if (value.trim() !== '') {
-                                const newItemIndex = items.length;
-                                onAdd();
-                                onUpdate(newItemIndex, 'value', value);
-                            }
+                            pendingValueRef.current = value;
+                            clearPendingValue();
+                            pendingValueTimerRef.current = setTimeout(() => {
+                                if (pendingValueRef.current.trim() !== '') {
+                                    onAdd({ key: '', value: pendingValueRef.current });
+                                }
+                                pendingValueRef.current = '';
+                            }, 500);
                         })
                     ) : (
                         <Input
                             placeholder={valuePlaceholder}
                             value={''}
                             onChange={(e) => {
-                                const value = e.target.value;
-                                if (value.trim() !== '') {
-                                    const newItemIndex = items.length;
-                                    onAdd();
-                                    onUpdate(newItemIndex, 'value', value);
-                                }
+                                pendingValueRef.current = e.target.value;
+                                clearPendingValue();
+                                pendingValueTimerRef.current = setTimeout(() => {
+                                    if (pendingValueRef.current.trim() !== '') {
+                                        onAdd({ key: '', value: pendingValueRef.current });
+                                    }
+                                    pendingValueRef.current = '';
+                                }, 500);
                             }}
                         />
                     )}
@@ -211,7 +250,7 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
             )}
 
             {/* Hidden add button - kept for backward compatibility */}
-            <Button type="link" icon={<PlusOutlined />} onClick={onAdd} style={{ display: 'none' }}>
+            <Button type="link" icon={<PlusOutlined />} onClick={() => onAdd()} style={{ display: 'none' }}>
                 {addButtonText}
             </Button>
         </div>

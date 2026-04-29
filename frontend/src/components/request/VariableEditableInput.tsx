@@ -9,6 +9,8 @@ interface VariableEditableInputProps {
     style?: React.CSSProperties;
     environmentVariables: Record<string, string>;
     multiline?: boolean;
+    onBlur?: () => void;
+    onEnter?: () => void;
 }
 
 export const VariableEditableInput: React.FC<VariableEditableInputProps> = ({
@@ -18,8 +20,11 @@ export const VariableEditableInput: React.FC<VariableEditableInputProps> = ({
     style,
     environmentVariables,
     multiline = false,
+    onBlur,
+    onEnter,
 }) => {
     const editorRef = useRef<HTMLDivElement | null>(null);
+    const isFocusedRef = useRef(false); // Track if user is actively typing (skip useEffect DOM overwrite)
     const [caretIndex, setCaretIndex] = useState<number>((value || '').length);
     const [focused, setFocused] = useState(false);
     const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
@@ -52,6 +57,8 @@ export const VariableEditableInput: React.FC<VariableEditableInputProps> = ({
     useEffect(() => {
         const editor = editorRef.current;
         if (!editor) return;
+        // Skip DOM overwrite while user is actively typing - their input is already in the DOM
+        if (isFocusedRef.current) return;
         const html = renderHighlightedVariableHtml(value, environmentVariables);
         if (editor.innerHTML !== html) {
             editor.innerHTML = html;
@@ -107,12 +114,15 @@ export const VariableEditableInput: React.FC<VariableEditableInputProps> = ({
                 suppressContentEditableWarning
                 data-placeholder={placeholder}
                 onFocus={() => {
+                    isFocusedRef.current = true;
                     setFocused(true);
                     updateCaretPosition();
                 }}
                 onBlur={() => {
+                    isFocusedRef.current = false;
                     setFocused(false);
                     setForceSuggestAll(false);
+                    onBlur?.();
                 }}
                 onDoubleClick={(e) => {
                     setCaretIndex(getCaretOffset(e.currentTarget));
@@ -155,7 +165,10 @@ export const VariableEditableInput: React.FC<VariableEditableInputProps> = ({
                             return;
                         }
                     }
-                    if (!multiline && e.key === 'Enter') e.preventDefault();
+                    if (!multiline && e.key === 'Enter') {
+                        e.preventDefault();
+                        onEnter?.();
+                    }
                 }}
                 onKeyUp={(e) => {
                     setCaretIndex(getCaretOffset(e.currentTarget));
