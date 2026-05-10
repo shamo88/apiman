@@ -21,11 +21,13 @@ frontend/node_modules
 apiman/frontend/node_modules
 
 # Wails build output
-build/
+build/bin
+build/windows
 apiman/build/
 
 # Wails development files
 frontend/dist
+frontend/wailsjs
 apiman/frontend/dist
 
 # IDE
