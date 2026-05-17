@@ -25,31 +25,43 @@ export const VariableEditableInput: React.FC<VariableEditableInputProps> = ({
 }) => {
     const editorRef = useRef<HTMLDivElement | null>(null);
     const isFocusedRef = useRef(false); // Track if user is actively typing (skip useEffect DOM overwrite)
+    const suggestionListRef = useRef<HTMLDivElement | null>(null);
     const [caretIndex, setCaretIndex] = useState<number>((value || '').length);
     const [focused, setFocused] = useState(false);
     const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
     const [forceSuggestAll, setForceSuggestAll] = useState(false);
     const [suggestionPos, setSuggestionPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+    // Store caret rect captured directly from double-click event to avoid timing issues with selection
+    const doubleClickCaretRectRef = useRef<DOMRect | null>(null);
     const suggestions = getVariableSuggestions(value, caretIndex, environmentVariables);
-    const suggestionItems = forceSuggestAll ? Object.keys(environmentVariables) : suggestions.items;
+    const suggestionItems = forceSuggestAll
+        ? [...Object.keys(environmentVariables), ...BUILT_IN_GENERATORS.map(g => g.name)]
+        : suggestions.items;
     // 检测内容是否包含换行
     const hasNewline = (value || '').includes('\n');
 
     const updateCaretPosition = () => {
         const editor = editorRef.current;
         if (!editor) return;
-        const rect = editor.getBoundingClientRect();
         const range = window.getSelection()?.rangeCount ? window.getSelection()?.getRangeAt(0) : null;
         if (range) {
             const caretRect = range.getBoundingClientRect();
             setSuggestionPos({
-                top: caretRect.top - rect.top + 20,
-                left: caretRect.right - rect.left + 5,
+                top: caretRect.bottom + window.scrollY + 5,
+                left: caretRect.left + window.scrollX,
+            });
+        } else if (doubleClickCaretRectRef.current) {
+            // Use stored rect from double-click when selection is no longer available
+            const rect = doubleClickCaretRectRef.current;
+            setSuggestionPos({
+                top: rect.bottom + window.scrollY + 5,
+                left: rect.left + window.scrollX,
             });
         } else {
+            const rect = editor.getBoundingClientRect();
             setSuggestionPos({
-                top: 20,
-                left: 5,
+                top: rect.bottom + window.scrollY + 5,
+                left: rect.left + window.scrollX,
             });
         }
     };
@@ -78,9 +90,20 @@ export const VariableEditableInput: React.FC<VariableEditableInputProps> = ({
 
     useEffect(() => {
         if (focused && suggestionItems.length > 0) {
-            updateCaretPosition();
+            // In forceSuggestAll mode (double-click), position is already set from mouse coordinates
+            // Don't re-query selection which may be stale after re-render
+            if (!forceSuggestAll) {
+                updateCaretPosition();
+            }
         }
-    }, [caretIndex, focused, suggestionItems.length]);
+    }, [caretIndex, focused, suggestionItems.length, forceSuggestAll]);
+
+    // Scroll active suggestion into view when navigating with arrow keys
+    useEffect(() => {
+        if (!suggestionListRef.current || suggestionItems.length === 0) return;
+        const activeEl = suggestionListRef.current.children[activeSuggestionIndex] as HTMLElement | undefined;
+        activeEl?.scrollIntoView({ block: 'nearest' });
+    }, [activeSuggestionIndex, suggestionItems.length]);
 
     const applySuggestion = (name: string) => {
         const token = `{{${name}}}`;
@@ -96,12 +119,12 @@ export const VariableEditableInput: React.FC<VariableEditableInputProps> = ({
         onChange(next);
         setCaretIndex(nextCaret);
         setForceSuggestAll(false);
-        window.requestAnimationFrame(() => {
-            if (editorRef.current) {
-                setCaretOffset(editorRef.current, nextCaret);
-                editorRef.current.focus();
-            }
-        });
+        doubleClickCaretRectRef.current = null;
+        // Immediately update DOM with highlighted tokens - can't rely on effect (blocked by isFocusedRef)
+        if (editorRef.current) {
+            editorRef.current.innerHTML = renderHighlightedVariableHtml(next, environmentVariables);
+            setCaretOffset(editorRef.current, nextCaret);
+        }
     };
 
     return (
@@ -122,12 +145,21 @@ export const VariableEditableInput: React.FC<VariableEditableInputProps> = ({
                     isFocusedRef.current = false;
                     setFocused(false);
                     setForceSuggestAll(false);
+                    doubleClickCaretRectRef.current = null;
                     onBlur?.();
                 }}
                 onDoubleClick={(e) => {
-                    setCaretIndex(getCaretOffset(e.currentTarget));
+                    // Use mouse coordinates from the click event - more reliable than selection APIs
+                    doubleClickCaretRectRef.current = new DOMRect(e.clientX, e.clientY, 0, 0);
+                    // Immediate position set avoids rendering at wrong location before effect runs
+                    setSuggestionPos({
+                        top: e.clientY + window.scrollY + 5,
+                        left: e.clientX + window.scrollX,
+                    });
+                    const editor = editorRef.current;
+                    if (!editor) return;
+                    setCaretIndex(getCaretOffset(editor));
                     setForceSuggestAll(true);
-                    updateCaretPosition();
                 }}
                 onInput={(e) => {
                     const nextText = multiline
@@ -177,9 +209,10 @@ export const VariableEditableInput: React.FC<VariableEditableInputProps> = ({
             />
             {focused && suggestionItems.length > 0 && (
                 <div
+                    ref={suggestionListRef}
                     className="variable-editable-suggestions"
                     style={{
-                        position: 'absolute',
+                        position: 'fixed',
                         top: suggestionPos.top,
                         left: suggestionPos.left,
                         zIndex: 1200,
