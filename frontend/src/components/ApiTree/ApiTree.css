@@ -21,22 +21,22 @@
 
 /* API Request Block */
 .api-request-block {
-  margin-bottom: 2px;
+  margin-bottom: 0;
 }
 
 /* Folder */
 .api-folder {
-  margin-bottom: 2px;
+  margin-bottom: 0;
 }
 
 .api-folder-header {
   display: flex;
   align-items: center;
-  padding: 5px 10px 5px 6px;
+  padding: 0 10px 0 6px;
   cursor: pointer;
   transition: all 0.2s ease;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   text-align: left;
   border-left: 2px solid transparent;
@@ -200,7 +200,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: left;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
 }
 
@@ -246,11 +246,11 @@
 .api-item {
   display: flex;
   align-items: center;
-  padding: 5px 10px 5px 6px;
+  padding: 0 10px 0 6px;
   cursor: pointer;
   transition: all 0.2s ease;
   border-left: 2px solid transparent;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary);
   text-align: left;
 }
@@ -364,7 +364,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: left;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary, #666);
   padding-left: 0;
 }
@@ -375,7 +375,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: left;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
 }
 
@@ -414,10 +414,11 @@
 .api-case-item {
   display: flex;
   align-items: center;
-  padding: 4px 8px;
+  padding: 0 10px 0 6px;
   border-radius: 4px;
   cursor: pointer;
   transition: background 0.15s;
+  font-size: 12px;
 }
 
 .api-case-item:hover {
@@ -453,7 +454,7 @@
 }
 
 .api-case-name {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary, #666);
   white-space: nowrap;
   overflow: hidden;

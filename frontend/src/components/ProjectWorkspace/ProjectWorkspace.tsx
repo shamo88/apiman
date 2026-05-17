@@ -171,6 +171,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
     handleToggleFolder,
     handleToggleRequestCases,
     cancelRequest,
+    handleRenameRequest,
   } = useWorkspaceHandlers(projectId);
 
   const handleUpdateWorkspace = (updates: any) => {
@@ -406,22 +407,88 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
   const requestTabs = useMemo(() => workspace.requestTabs || [], [workspace.requestTabs]);
   const activeRequestTab = useMemo(() => workspace.activeRequestTab || '', [workspace.activeRequestTab]);
   const activeTab = useMemo(() => requestTabs.find(t => t.id === activeRequestTab), [requestTabs, activeRequestTab]);
-  const activeRequestPath = useMemo(() => activeTab?.path || '', [activeTab]);
+
+  // 从 projectTree 中查找请求节点，获取其文件夹路径
+  const breadcrumbPath = useMemo(() => {
+    if (!activeTab?.path || !projectTree) return '';
+    // 递归查找，找到请求节点并构建文件夹路径
+    const findPath = (node: ProjectTree, targetPath: string, currentPath: string): string | null => {
+      // 如果是请求节点，检查是否匹配
+      if (node.type === 'request' && node.path === targetPath) {
+        return currentPath; // 返回父文件夹路径
+      }
+      // 如果是文件夹，递归查找子节点
+      if (node.children) {
+        const folderPath = currentPath ? `${currentPath}/${node.name}` : node.name;
+        for (const child of node.children) {
+          const result = findPath(child, targetPath, folderPath);
+          if (result !== null) return result;
+        }
+      }
+      return null;
+    };
+    return findPath(projectTree, activeTab.path, '') || '';
+  }, [activeTab, projectTree]);
+
+  // 重命名当前请求
+  const handleRenameCurrentRequest = useCallback(async (newName: string) => {
+    if (!activeTab?.path) return;
+    try {
+      await handleRenameRequest(activeTab.path, newName);
+      // 更新 tab title
+      const updatedTabs = workspace.requestTabs.map(t =>
+        t.id === activeTab.id ? { ...t, title: newName } : t
+      );
+      workspaceStore.setWorkspaceState(projectId, { requestTabs: updatedTabs });
+    } catch (error) {
+      console.error('Failed to rename request:', error);
+    }
+  }, [activeTab, workspace.requestTabs, projectId, handleRenameRequest, workspaceStore]);
+
+  // 重命名当前用例
+  const handleRenameCurrentCase = useCallback(async (newName: string) => {
+    if (!workspace.currentRequest?.path || !workspace.activeCaseId) return;
+    // request path format: request|projectId|requestId
+    const pathParts = workspace.currentRequest.path.replace('request|', '').split('|');
+    if (pathParts.length !== 2) return;
+    const [, requestId] = pathParts;
+    // casePath format: requestCase|projectId|requestId|caseId
+    const casePath = `requestCase|${projectId}|${requestId}|${workspace.activeCaseId}`;
+    try {
+      await handleRenameCase(casePath, newName);
+      // 更新本地用例名称
+      workspaceStore.renameCase(projectId, workspace.activeCaseId, newName);
+    } catch (error) {
+      console.error('Failed to rename case:', error);
+    }
+  }, [workspace.currentRequest?.path, workspace.activeCaseId, projectId, handleRenameCase, workspaceStore]);
 
   // 缓存环境和脚本相关数据
   const selectedEnvironment = useMemo(() => environments.find((e) => e.id === workspace.selectedEnvironmentId), [environments, workspace.selectedEnvironmentId]);
   const environmentVariables = useMemo(() => selectedEnvironment?.variables || {}, [selectedEnvironment]);
   const scriptLogs = useMemo(() => workspace.response?.script_logs || [], [workspace.response]);
   const testResults = useMemo(() => workspace.response?.tests || [], [workspace.response]);
+  // 当前用例名
+  const activeCaseName = useMemo(() => {
+    if (workspace.requestEditorSurface !== 'case' || !workspace.activeCaseId) return '';
+    const caseItem = workspace.requestCases.find(c => c.id === workspace.activeCaseId);
+    return caseItem?.name || '';
+  }, [workspace.requestEditorSurface, workspace.activeCaseId, workspace.requestCases]);
 
-  // 展开/折叠模块 - 只切换展开状态，不切换右侧工作区
+  // 展开/折叠模块 - 展开时同时激活模块以加载数据
   const toggleModule = (module: 'apis' | 'environments' | 'scripts' | 'project-settings') => {
+    const key = module === 'project-settings' ? 'projectSettings' : module;
+    const isCollapsing = !collapsedModules[key as keyof typeof collapsedModules];
     setCollapsedModules({
       apis: module === 'apis' ? !collapsedModules.apis : collapsedModules.apis,
       environments: module === 'environments' ? !collapsedModules.environments : collapsedModules.environments,
       scripts: module === 'scripts' ? !collapsedModules.scripts : collapsedModules.scripts,
       projectSettings: module === 'project-settings' ? !collapsedModules.projectSettings : collapsedModules.projectSettings,
     });
+    // 展开时激活对应模块以触发数据加载
+    if (!isCollapsing && (module === 'scripts' || module === 'project-settings')) {
+      setActiveModule(module);
+    }
   };
 
   // 切换右侧工作区到指定模块
@@ -505,7 +572,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
                     tree={projectTree}
                     collapsedFolders={collapsedFolders}
                     expandedRequestPaths={workspace.expandedRequestPaths || new Set()}
-                    activeRequestPath={activeRequestPath}
+                    activeRequestPath={activeTab?.path || ''}
                     sidebarHighlightedCasePath={workspace.sidebarHighlightedCasePath}
                     movedHighlightPath={null}
                     onToggleFolder={handleToggleFolder}
@@ -692,6 +759,11 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
                   onSave={workspace.requestEditorSurface === 'case' ? handleSaveCase : handleSaveRequest}
                   environmentVariables={environmentVariables}
                   projectScripts={scripts.map((s) => ({ id: s.id, name: s.name }))}
+                  breadcrumbPath={breadcrumbPath}
+                  requestName={activeTab?.title}
+                  caseName={activeCaseName}
+                  onRenameRequest={handleRenameCurrentRequest}
+                  onRenameCase={handleRenameCurrentCase}
                 />
               </div>
               {workspace.response && (

@@ -41,6 +41,23 @@ go test ./...
 - `internal/` - All Go business logic
 - `frontend/src/App.tsx` - Main React component (~2000 lines)
 
+### Internal Packages (`internal/`)
+```
+config/      # App config, encrypted storage
+crypto/      # Key derivation, encryption (NaCl secretbox)
+curl/        # HTTP execution engine, cookie handling
+git/         # Git sync operations
+history/     # Request history storage
+logger/      # Logging with lumberjack rotation
+mcp/         # MCP server implementation (port 3847)
+models/      # Data structures
+openapi/     # OpenAPI import
+postman/     # Postman collection import
+project/     # Project tree, groups state
+script/      # goja JS runtime, am API (crypto, executor)
+service/     # Business logic orchestration
+```
+
 ### Data Storage
 ```
 ~/.apiman/                         # Windows: C:\Users\{user}\.apiman\
@@ -211,6 +228,7 @@ Three tabs in **Settings** modal:
 
 ## Window System
 - Frameless window (`Frameless: true` in `main.go`)
+- **Default size**: 1300*900 (configured in `main.go`, not configurable via UI)
 - Custom title bar: `frontend/src/components/TitleBar/TitleBar.tsx`
 - Drag region: `--wails-draggable: drag` / `no-drag` for buttons
 - Controls use Wails runtime: `WindowMinimise()`, `WindowToggleMaximise()`, `Quit()`
