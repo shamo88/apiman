@@ -26,6 +26,7 @@ apiman/build/
 
 # Wails development files
 frontend/dist
+frontend/wailsjs
 apiman/frontend/dist
 
 # IDE
