@@ -165,25 +165,53 @@ export const useKeyboardShortcuts = () => {
       const { UpdateRequest, UpdateRequestScripts, GetProjectTree } = await import('../../wailsjs/go/main/App');
       const { models } = await import('../../wailsjs/go/models');
 
-      const wailsCases = workspaceState.requestCases.map(c =>
-        models.HttpRequestCase.createFrom({
-          id: c.id,
-          name: (c.name || '').trim() || '未命名',
-          spec: models.HttpRequestSpec.createFrom(toWailsHttpSpec({ ...c.config, name: '' })),
-        })
-      );
+      // 判断是否在用例模式下：case 模式且有激活的用例
+      const isCaseMode = workspaceState.requestEditorSurface === 'case' && !!workspaceState.activeCaseId;
+
+      let specUrl = workspaceState.apiConfig;
+      let wailsCases: any[];
+      let activeCaseId = '';
+
+      if (isCaseMode) {
+        // 用例模式：使用接口配置（interfaceApiConfig）作为 spec，避免编辑中的用例数据污染接口
+        // 同时更新当前激活用例的 config 为编辑器中的最新数据
+        const updatedCases = workspaceState.requestCases.map((c: any) =>
+          c.id === workspaceState.activeCaseId
+            ? { ...c, config: workspaceState.apiConfig }
+            : c
+        );
+        wailsCases = updatedCases.map((c: any) =>
+          models.HttpRequestCase.createFrom({
+            id: c.id,
+            name: (c.name || '').trim() || '未命名',
+            spec: models.HttpRequestSpec.createFrom(toWailsHttpSpec({ ...c.config, name: '' })),
+          })
+        );
+        specUrl = workspaceState.interfaceApiConfig || workspaceState.apiConfig;
+        activeCaseId = workspaceState.activeCaseId;
+      } else {
+        // 接口/普通模式：使用 apiConfig 作为 spec
+        wailsCases = workspaceState.requestCases.map((c: any) =>
+          models.HttpRequestCase.createFrom({
+            id: c.id,
+            name: (c.name || '').trim() || '未命名',
+            spec: models.HttpRequestSpec.createFrom(toWailsHttpSpec({ ...c.config, name: '' })),
+          })
+        );
+        activeCaseId = workspaceState.activeCaseId;
+      }
 
       await UpdateRequest(
         workspaceState.currentRequest.path,
-        toWailsHttpSpec({ ...workspaceState.apiConfig, name: '' }),
+        toWailsHttpSpec({ ...specUrl, name: '' }),
         wailsCases,
-        workspaceState.activeCaseId
+        activeCaseId
       );
 
       await UpdateRequestScripts(
         workspaceState.currentRequest.path,
-        workspaceState.apiConfig.preScripts,
-        workspaceState.apiConfig.postScripts
+        specUrl.preScripts,
+        specUrl.postScripts
       );
 
       const tree = await GetProjectTree(project.id);

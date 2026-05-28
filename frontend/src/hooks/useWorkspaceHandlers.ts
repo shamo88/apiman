@@ -88,10 +88,11 @@ export const useWorkspaceHandlers = (projectId: string) => {
       }
 
       const cfg = apiConfigFromRequest(request as CurlRequest, request.name || '');
-      // When switching to interface, preserve current editor state
-      // and load interface from server
+      // When switching to interface, reset case state and load interface from server
       workspaceStore.setWorkspaceState(projectId, {
-        interfaceApiConfig: { ...workspace.apiConfig },
+        requestCases: [],
+        activeCaseId: '',
+        interfaceApiConfig: { ...cfg },
         requestEditorSurface: 'interface',
       });
       workspaceStore.setApiConfig(projectId, {
@@ -157,11 +158,15 @@ export const useWorkspaceHandlers = (projectId: string) => {
               name: c.name,
               config: apiConfigFromHttpSpec(c.spec, c.name),
             }));
-            // Preserve current apiConfig (may contain unsaved interface changes)
+            // Preserve interface spec from server (not from current editor state)
+            const ifaceCfg = apiConfigFromHttpSpec(
+              request.interface_spec || models.HttpRequestSpec.createFrom({}),
+              request.name || ''
+            );
             workspaceStore.setWorkspaceState(projectId, {
               requestCases: rows,
               activeCaseId: caseId,
-              interfaceApiConfig: { ...workspace.apiConfig },
+              interfaceApiConfig: ifaceCfg,
             });
             workspaceStore.setApiConfig(projectId, { ...caseConfig, name: request.name || '' });
           }
@@ -362,6 +367,25 @@ export const useWorkspaceHandlers = (projectId: string) => {
         postScripts: request.post_scripts || [],
       });
 
+      // 重置用例状态，防止残留数据影响保存
+      const reqCases = request.cases as models.HttpRequestCase[] | undefined;
+      if (reqCases && reqCases.length > 0) {
+        const ifaceCfg = apiConfigFromHttpSpec(
+          request.interface_spec || models.HttpRequestSpec.createFrom({}),
+          request.name || ''
+        );
+        workspaceStore.setWorkspaceState(projectId, {
+          requestCases: [],
+          activeCaseId: '',
+          interfaceApiConfig: ifaceCfg,
+        });
+      } else {
+        workspaceStore.setWorkspaceState(projectId, {
+          requestCases: [],
+          activeCaseId: '',
+          interfaceApiConfig: cfg,
+        });
+      }
       // 不调用 hydrateRequestEditor，因为它会清空 response
       // 切换 tab 时保留原有的 response
     } catch (error) {
