@@ -88,13 +88,33 @@ export const useWorkspaceHandlers = (projectId: string) => {
       }
 
       const cfg = apiConfigFromRequest(request as CurlRequest, request.name || '');
-      // When switching to interface, reset case state and load interface from server
-      workspaceStore.setWorkspaceState(projectId, {
-        requestCases: [],
-        activeCaseId: '',
-        interfaceApiConfig: { ...cfg },
-        requestEditorSurface: 'interface',
-      });
+      // When switching to interface: load cases from request to avoid clearing them on save
+      const reqItemCases = request.cases as models.HttpRequestCase[] | undefined;
+      const hasCases = reqItemCases && reqItemCases.length > 0;
+      if (hasCases) {
+        const reqRows = reqItemCases!.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          config: apiConfigFromHttpSpec(c.spec, c.name),
+        }));
+        const ifaceCfg = apiConfigFromHttpSpec(
+          request.interface_spec || models.HttpRequestSpec.createFrom({}),
+          request.name || ''
+        );
+        workspaceStore.setWorkspaceState(projectId, {
+          requestCases: reqRows,
+          activeCaseId: '',
+          interfaceApiConfig: ifaceCfg,
+          requestEditorSurface: 'interface',
+        });
+      } else {
+        workspaceStore.setWorkspaceState(projectId, {
+          requestCases: [],
+          activeCaseId: '',
+          interfaceApiConfig: { ...cfg },
+          requestEditorSurface: 'interface',
+        });
+      }
       workspaceStore.setApiConfig(projectId, {
         ...cfg,
         preScripts: request.pre_scripts || [],
@@ -367,15 +387,20 @@ export const useWorkspaceHandlers = (projectId: string) => {
         postScripts: request.post_scripts || [],
       });
 
-      // 重置用例状态，防止残留数据影响保存
+      // 加载请求的用例到 requestCases，避免接口保存时清空用例
       const reqCases = request.cases as models.HttpRequestCase[] | undefined;
       if (reqCases && reqCases.length > 0) {
+        const rows = reqCases.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          config: apiConfigFromHttpSpec(c.spec, c.name),
+        }));
         const ifaceCfg = apiConfigFromHttpSpec(
           request.interface_spec || models.HttpRequestSpec.createFrom({}),
           request.name || ''
         );
         workspaceStore.setWorkspaceState(projectId, {
-          requestCases: [],
+          requestCases: rows,
           activeCaseId: '',
           interfaceApiConfig: ifaceCfg,
         });
