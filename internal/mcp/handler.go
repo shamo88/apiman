@@ -534,33 +534,35 @@ func (h *Handler) createCase(path string, caseData map[string]any) (*MCPToolResu
 		Name: caseName,
 	}
 
-	// If spec is provided, update the case with that spec
+	// If spec is provided, update the case with that spec. We no
+	// longer gate this on method/http_url/body being non-empty — if
+	// the caller only sends headers/params/cookies, those still
+	// belong in the case spec. The previous check would silently
+	// discard those mutations and is the root cause of report #1.
 	if specData, ok := caseData["spec"].(map[string]any); ok {
 		spec := parseSpecFromMap(specData)
-		if spec.Method != "" || spec.HttpURL != "" || spec.Body != "" {
-			// Get the latest request to find the new case ID
-			updatedReq, err := h.svc.GetRequest(path)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get updated request: %s", err)
+		// Get the latest request to find the new case ID
+		updatedReq, err := h.svc.GetRequest(path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get updated request: %s", err)
+		}
+		if len(updatedReq.Cases) > 0 {
+			newCaseID := updatedReq.Cases[len(updatedReq.Cases)-1].ID
+			// Update the case with the provided spec
+			updatedCases := make([]models.HttpRequestCase, len(updatedReq.Cases))
+			copy(updatedCases, updatedReq.Cases)
+			for i, c := range updatedCases {
+				if c.ID == newCaseID {
+					updatedCases[i].Spec = spec
+					break
+				}
 			}
-			if len(updatedReq.Cases) > 0 {
-				newCaseID := updatedReq.Cases[len(updatedReq.Cases)-1].ID
-				// Update the case with the provided spec
-				updatedCases := make([]models.HttpRequestCase, len(updatedReq.Cases))
-				copy(updatedCases, updatedReq.Cases)
-				for i, c := range updatedCases {
-					if c.ID == newCaseID {
-						updatedCases[i].Spec = spec
-						break
-					}
-				}
-				var interfaceSpec models.HttpRequestSpec
-				if updatedReq.InterfaceSpec != nil {
-					interfaceSpec = *updatedReq.InterfaceSpec
-				}
-				if err := h.svc.UpdateRequest(path, interfaceSpec, updatedCases, newCaseID); err != nil {
-					return nil, fmt.Errorf("failed to update case spec: %s", err)
-				}
+			var interfaceSpec models.HttpRequestSpec
+			if updatedReq.InterfaceSpec != nil {
+				interfaceSpec = *updatedReq.InterfaceSpec
+			}
+			if err := h.svc.UpdateRequest(path, interfaceSpec, updatedCases, newCaseID); err != nil {
+				return nil, fmt.Errorf("failed to update case spec: %s", err)
 			}
 		}
 	}
@@ -850,10 +852,50 @@ func (h *Handler) updateCase(path, caseID string, caseData map[string]any) (*MCP
 			if name, ok := caseData["name"].(string); ok && name != "" {
 				updatedCases[i].Name = name
 			}
-			// Update spec if provided
+			// Update spec if provided. Like update_request, this is a
+			// merge (PATCH): only fields present in specData replace
+			// the existing ones; missing fields keep their previous
+			// values. Arrays (headers, params, form_data, url_encoded)
+			// are replaced wholesale when the corresponding key is
+			// present, otherwise preserved.
 			if specData, ok := caseData["spec"].(map[string]any); ok {
-				spec := parseSpecFromMap(specData)
-				updatedCases[i].Spec = spec
+				merged := updatedCases[i].Spec
+				if presentField(specData, "method") {
+					if v, ok := specData["method"].(string); ok {
+						merged.Method = v
+					}
+				}
+				if presentField(specData, "http_url") {
+					if v, ok := specData["http_url"].(string); ok {
+						merged.HttpURL = v
+					}
+				}
+				if presentField(specData, "body") {
+					if v, ok := specData["body"].(string); ok {
+						merged.Body = v
+					}
+				}
+				if presentField(specData, "body_type") {
+					if v, ok := specData["body_type"].(string); ok {
+						merged.BodyType = v
+					}
+				}
+				if presentField(specData, "headers") {
+					merged.Headers = parseRequestKeyValArray(specData["headers"])
+				}
+				if presentField(specData, "params") {
+					merged.Params = parseRequestKeyValArray(specData["params"])
+				}
+				if presentField(specData, "form_data") {
+					merged.FormData = parseRequestPairArray(specData["form_data"])
+				}
+				if presentField(specData, "url_encoded") {
+					merged.UrlEncoded = parseRequestPairArray(specData["url_encoded"])
+				}
+				if presentField(specData, "cookies") {
+					merged.Cookies = parseRequestKeyValArray(specData["cookies"])
+				}
+				updatedCases[i].Spec = merged
 			}
 			break
 		}

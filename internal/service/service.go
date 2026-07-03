@@ -713,16 +713,28 @@ func (s *Service) ExecuteHTTPRequestWithScriptsWithSource(
 	}
 
 	projectPath, err := s.ProjectMgr.ProjectPathByID(projectID)
-	if err != nil {
+	if err != nil && projectID != "" {
+		// Project-bound calls must have a valid project; this is a real
+		// error. When projectID is empty (mcp_execute_raw on an unbound
+		// server) we tolerate the failure and fall back to global-only
+		// variable scope.
 		return nil, err
 	}
 
-	projectVarsPath := filepath.Join(projectPath, "variables.json")
-	projectVars := script.NewProjectVariables()
-	if err := projectVars.LoadFromFile(projectVarsPath); err != nil {
-		return nil, err
+	// projectVars is nil when no project is bound (mcp_execute_raw).
+	// globalSetter below must therefore nil-check before calling Set /
+	// SaveToFile, and {{var}} substitution falls back to global-only.
+	projectVarsPath := ""
+	var projectVars *script.ProjectVariables
+	globals := map[string]string{}
+	if projectPath != "" {
+		projectVarsPath = filepath.Join(projectPath, "variables.json")
+		projectVars = script.NewProjectVariables()
+		if err := projectVars.LoadFromFile(projectVarsPath); err != nil {
+			return nil, err
+		}
+		globals = projectVars.GetAll()
 	}
-	globals := projectVars.GetAll()
 
 	var environment map[string]string
 	if environmentID != "" {
@@ -745,6 +757,9 @@ func (s *Service) ExecuteHTTPRequestWithScriptsWithSource(
 	timeout := getTimeout(appCfg)
 
 	globalSetter := func(key, value string) {
+		if projectVars == nil {
+			return
+		}
 		projectVars.Set(key, value)
 		_ = projectVars.SaveToFile(projectVarsPath)
 	}
@@ -852,16 +867,28 @@ func (s *Service) ExecuteHTTPRequestWithScriptsWithSourceAndCancel(
 	}
 
 	projectPath, err := s.ProjectMgr.ProjectPathByID(projectID)
-	if err != nil {
+	if err != nil && projectID != "" {
+		// Project-bound calls must have a valid project; this is a real
+		// error. When projectID is empty (mcp_execute_raw on an unbound
+		// server) we tolerate the failure and fall back to global-only
+		// variable scope.
 		return nil, err
 	}
 
-	projectVarsPath := filepath.Join(projectPath, "variables.json")
-	projectVars := script.NewProjectVariables()
-	if err := projectVars.LoadFromFile(projectVarsPath); err != nil {
-		return nil, err
+	// projectVars is nil when no project is bound (mcp_execute_raw).
+	// globalSetter below must therefore nil-check before calling Set /
+	// SaveToFile, and {{var}} substitution falls back to global-only.
+	projectVarsPath := ""
+	var projectVars *script.ProjectVariables
+	globals := map[string]string{}
+	if projectPath != "" {
+		projectVarsPath = filepath.Join(projectPath, "variables.json")
+		projectVars = script.NewProjectVariables()
+		if err := projectVars.LoadFromFile(projectVarsPath); err != nil {
+			return nil, err
+		}
+		globals = projectVars.GetAll()
 	}
-	globals := projectVars.GetAll()
 
 	var environment map[string]string
 	if environmentID != "" {
@@ -884,6 +911,9 @@ func (s *Service) ExecuteHTTPRequestWithScriptsWithSourceAndCancel(
 	timeout := getTimeout(appCfg)
 
 	globalSetter := func(key, value string) {
+		if projectVars == nil {
+			return
+		}
 		projectVars.Set(key, value)
 		_ = projectVars.SaveToFile(projectVarsPath)
 	}

@@ -419,7 +419,16 @@ func (se *ScriptExecutor) injectAmResponse(vm *goja.Runtime, am *goja.Object, ex
 	}
 
 	response := vm.NewObject()
+	// `code` is the canonical field name; `status_code` is exposed as
+	// an alias because users reasonably expect either (matches HTTP
+	// terminology). Both reference the same int.
 	response.Set("code", execCtx.Response.StatusCode)
+	response.Set("status_code", execCtx.Response.StatusCode)
+	// Duration is in milliseconds to match the units users see in
+	// Postman / typical HTTP client dashboards. Stored on the snapshot
+	// as ms (int64) — if a future change adds ns precision, divide here.
+	response.Set("duration", execCtx.Response.Duration)
+	response.Set("elapsed_ms", execCtx.Response.Duration)
 
 	headers := vm.NewObject()
 	headers.Set("all", func() map[string][]string {
