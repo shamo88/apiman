@@ -419,6 +419,56 @@ func GetToolDefinitions() []MCPTool {
 			},
 		},
 
+		// ---- Script help (C-plan) ----
+		// Two reference tools that close the AI knowledge gap: a full
+		// am.* API reference, and a catalog of worked pre/post script
+		// examples. AI clients should call these BEFORE writing
+		// mcp_create_script / mcp_update_script content. See
+		// internal/mcp/script_help.go for source of truth.
+
+		{
+			Name: "mcp_get_am_api_docs",
+			Description: "Return the full `am.*` API reference for apiman pre/post " +
+				"scripts (the runtime injected into every script's JS VM). " +
+				"**Call this first** when writing a script via mcp_create_script / " +
+				"mcp_update_script — am.* methods are not discoverable from " +
+				"the rest of the tool catalog. The response is Markdown: " +
+				"{markdown, version}. Summary of what is covered: " +
+				"console (log/info/warn/error), " +
+				"am.globals (get/set/unset — persisted globals), " +
+				"am.environment (get — read-only), " +
+				"am.locals (get/set/unset — per-chain scratch), " +
+				"am.request (mutate outgoing request in pre-script only), " +
+				"am.response (read in post-script only), " +
+				"am.test + am.expect (assertions), " +
+				"am.crypto (HMAC, hash, base64, AES, RSA). " +
+				"Plus: execution order, common pitfalls, variable priority.",
+			InputSchema: map[string]interface{}{
+				"type":       "object",
+				"properties": map[string]interface{}{},
+			},
+		},
+		{
+			Name: "mcp_get_script_examples",
+			Description: "Return a catalog of worked pre/post script examples. " +
+				"**Call this when you need to write a script that does a " +
+				"common pattern** (signing, token extraction, assertions, " +
+				"URL templating, body signing, cookie capture). Each example " +
+				"has a stable id you can reference (e.g. \"signing\", \"token_extract\"). " +
+				"Response shape: {examples: [{id, title, description, stage, code}], count}. " +
+				"Use stage=\"pre\" or \"post\" to filter, omit for all.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"stage": map[string]interface{}{
+						"type":        "string",
+						"enum":        []string{"pre", "post", "either"},
+						"description": "Filter examples by stage. Omit to return all.",
+					},
+				},
+			},
+		},
+
 		// ---- P1-3: Environment CRUD ----
 
 		{

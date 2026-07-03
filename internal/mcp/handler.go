@@ -147,6 +147,13 @@ func (h *Handler) HandleToolCall(call MCPToolCall) (*MCPToolResult, error) {
 		confirm, _ := call.Arguments["confirm"].(bool)
 		return h.clearHistory(confirm)
 
+	// ---- C-plan: Script help (so AI clients can write am.* scripts) ----
+	case "mcp_get_am_api_docs":
+		return h.getAmApiDocs()
+	case "mcp_get_script_examples":
+		stage, _ := call.Arguments["stage"].(string)
+		return h.getScriptExamples(stage)
+
 	// ---- P1-3: Environment CRUD ----
 	case "mcp_create_environment":
 		name, _ := call.Arguments["name"].(string)
@@ -1760,6 +1767,46 @@ func (h *Handler) setActiveEnvironment(id string) (*MCPToolResult, error) {
 		EnvironmentID: id,
 		Previous:      previous,
 	})
+	if err != nil {
+		return nil, err
+	}
+	return &MCPToolResult{
+		Content: []MCPContentBlock{{Type: "text", Text: string(data)}},
+	}, nil
+}
+
+// getAmApiDocs returns the full am.* runtime reference. Static content
+// lives in script_help.go so any field drift can be tracked in one place.
+// The version field lets AI clients (and humans) detect stale copies.
+func (h *Handler) getAmApiDocs() (*MCPToolResult, error) {
+	resp := MCPGetAmApiDocsResponse{
+		Markdown: amApiDocsMarkdown,
+		Version:  amApiDocsVersion,
+	}
+	data, err := json.Marshal(resp)
+	if err != nil {
+		return nil, err
+	}
+	return &MCPToolResult{
+		Content: []MCPContentBlock{{Type: "text", Text: string(data)}},
+	}, nil
+}
+
+// getScriptExamples returns the example catalog, optionally filtered by
+// stage. Empty stage returns all.
+func (h *Handler) getScriptExamples(stage string) (*MCPToolResult, error) {
+	out := make([]MCPScriptExample, 0, len(scriptExamplesCatalog))
+	for _, ex := range scriptExamplesCatalog {
+		if stage != "" && ex.Stage != stage && ex.Stage != "either" {
+			continue
+		}
+		out = append(out, ex)
+	}
+	resp := MCPGetScriptExamplesResponse{
+		Examples: out,
+		Count:    len(out),
+	}
+	data, err := json.Marshal(resp)
 	if err != nil {
 		return nil, err
 	}

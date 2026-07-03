@@ -281,3 +281,39 @@ type MCPDeleteScriptResponse struct {
 	Deleted bool   `json:"deleted"`
 	ID      string `json:"id"`
 }
+
+// ---- Script help (so AI clients can write am.* pre/post scripts) ----
+//
+// AI clients connected to apiman via MCP have no other way to learn the
+// `am.*` script runtime API — schema is the only protocol-level channel.
+// These two tools let an AI client pull a full reference on demand, the
+// same as a human reading the GUI's "Script Help" window.
+
+// MCPScriptExample is a single worked example returned by
+// mcp_get_script_examples. Each example includes a stable id (so an AI
+// can reference "example:signing"), a title, a short description of
+// when to use it, and the actual JavaScript source.
+type MCPScriptExample struct {
+	ID          string `json:"id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Stage       string `json:"stage"` // "pre" | "post" | "either"
+	Code        string `json:"code"`
+}
+
+// MCPGetScriptExamplesResponse returns the full example catalog. The AI
+// can call this once to load a mental model, then write a custom script
+// adapted to the current request.
+type MCPGetScriptExamplesResponse struct {
+	Examples []MCPScriptExample `json:"examples"`
+	Count    int                `json:"count"`
+}
+
+// MCPGetAmApiDocsResponse is the full `am.*` reference. Markdown is
+// intentional: every modern MCP client renders it readably in tool
+// output, and the structured field lets the AI consume it without
+// re-parsing free text.
+type MCPGetAmApiDocsResponse struct {
+	Markdown string `json:"markdown"`
+	Version  string `json:"version"`
+}
