@@ -651,9 +651,21 @@ func (s *Service) ExecuteHTTPRequestWithScriptsWithSource(
 	// Pre-scripts and post-scripts are INDEPENDENT:
 	// - If preScriptIDs is empty, inherit from parent levels
 	// - If postScriptIDs is empty, inherit from parent levels
-	merged, err := s.ProjectMgr.GetRequestScriptsWithPriority(requestPath)
-	if err != nil {
-		return nil, err
+	//
+	// mcp_execute_raw passes requestPath="" because the request has not
+	// been saved yet — there is no request-level script chain to look
+	// up, so we skip the project-layer query and use an empty merged
+	// set instead. (Previously, GetRequestScriptsWithPriority("") would
+	// return os.ErrInvalid → "-32603 invalid argument" on every raw call.)
+	merged := &project.MergedScripts{}
+	if requestPath != "" {
+		m, err := s.ProjectMgr.GetRequestScriptsWithPriority(requestPath)
+		if err != nil {
+			return nil, err
+		}
+		if m != nil {
+			merged = m
+		}
 	}
 
 	// Determine which pre-scripts to use
@@ -809,9 +821,18 @@ func (s *Service) ExecuteHTTPRequestWithScriptsWithSourceAndCancel(
 	var preScriptContents, postScriptContents []string
 	var preScriptNames, postScriptNames []string
 
-	merged, err := s.ProjectMgr.GetRequestScriptsWithPriority(requestPath)
-	if err != nil {
-		return nil, err
+	// See the matching comment in ExecuteHTTPRequestWithScriptsWithSource
+	// for why requestPath="" is allowed (mcp_execute_raw has no
+	// saved request, so there is no script chain to look up).
+	merged := &project.MergedScripts{}
+	if requestPath != "" {
+		m, err := s.ProjectMgr.GetRequestScriptsWithPriority(requestPath)
+		if err != nil {
+			return nil, err
+		}
+		if m != nil {
+			merged = m
+		}
 	}
 
 	scriptsToUse := preScriptIDs

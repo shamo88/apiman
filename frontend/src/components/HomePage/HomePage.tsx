@@ -366,11 +366,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
               导入 Postman
             </Button>
           </Upload>
-          <Upload accept=".json,.yaml,.yml" showUploadList={false} beforeUpload={handleOpenAPIFile}>
+          {/* <Upload accept=".json,.yaml,.yml" showUploadList={false} beforeUpload={handleOpenAPIFile}>
             <Button icon={<ImportOutlined />} loading={importing} style={{ marginLeft: 8 }}>
               导入 OpenAPI
             </Button>
-          </Upload>
+          </Upload> */}
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -420,27 +420,27 @@ export const HomePage: React.FC<HomePageProps> = ({ onProjectOpen }) => {
         ) : (
           <>
             {projectGroups.map((groupName) => (
-            <ProjectGroup
-              key={groupName}
-              groupName={groupName}
-              isCollapsed={collapsedProjectGroups.has(groupName)}
-              projectsInGroup={groupedProjects(groupName)}
-              isDragOver={dragOverGroup === groupName}
-              onToggleCollapse={() => toggleProjectGroupCollapse(groupName)}
-              onOpenRenameModal={() => openRenameGroupModal(groupName)}
-              onDeleteGroup={() => handleDeleteGroup(groupName)}
-              onDragOver={(e) => handleDragOver(e, groupName)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, groupName)}
-              onProjectOpen={handleOpenProject}
-              setRenameProject={setRenameProject}
-              setRenameModal={setRenameModal}
-              handleDeleteProject={handleDeleteProject}
-              handleDragStart={handleDragStart}
-              handleAssignGroup={handleAssignGroup}
-              handleRemoveFromGroup={handleRemoveFromGroup}
-            />
-          ))}
+              <ProjectGroup
+                key={groupName}
+                groupName={groupName}
+                isCollapsed={collapsedProjectGroups.has(groupName)}
+                projectsInGroup={groupedProjects(groupName)}
+                isDragOver={dragOverGroup === groupName}
+                onToggleCollapse={() => toggleProjectGroupCollapse(groupName)}
+                onOpenRenameModal={() => openRenameGroupModal(groupName)}
+                onDeleteGroup={() => handleDeleteGroup(groupName)}
+                onDragOver={(e) => handleDragOver(e, groupName)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, groupName)}
+                onProjectOpen={handleOpenProject}
+                setRenameProject={setRenameProject}
+                setRenameModal={setRenameModal}
+                handleDeleteProject={handleDeleteProject}
+                handleDragStart={handleDragStart}
+                handleAssignGroup={handleAssignGroup}
+                handleRemoveFromGroup={handleRemoveFromGroup}
+              />
+            ))}
             {ungroupedProjects.length > 0 && (
               <div className={`project-group ${uiDraggingProjectId ? 'has-dragging-item' : ''}`}>
                 <div
