@@ -16,9 +16,59 @@ const (
 type Environment struct {
 	ID        string            `json:"id"`
 	Name      string            `json:"name"`
+	Mark      EnvironmentMark   `json:"mark,omitempty"`
 	Variables map[string]string `json:"variables"`
 	CreatedAt time.Time         `json:"created_at"`
 	UpdatedAt time.Time         `json:"updated_at"`
+}
+
+// EnvironmentMark classifies an environment's lifecycle stage so MCP
+// tools can be gated against non-development environments.
+//
+// Empty value ("") means the user has not classified this environment;
+// such environments are treated as NOT accessible from MCP — even
+// though the GUI remains fully usable.
+//
+// EnvironmentMarkUnspecified is a sentinel used by update operations
+// to signal "do not touch the mark field". It is never persisted.
+type EnvironmentMark string
+
+const (
+	EnvironmentMarkUnspecified EnvironmentMark = "__unspecified__"
+	EnvironmentMarkUnmarked    EnvironmentMark = ""
+	EnvironmentMarkDev         EnvironmentMark = "dev"
+	EnvironmentMarkTest        EnvironmentMark = "test"
+	EnvironmentMarkPre         EnvironmentMark = "pre"
+	EnvironmentMarkProd        EnvironmentMark = "prod"
+)
+
+// AllEnvironmentMarks lists every selectable mark, in display order.
+// Used by the GUI to render the mark selector. The Unspecified sentinel
+// is intentionally excluded — it is not a user-selectable value.
+var AllEnvironmentMarks = []EnvironmentMark{
+	EnvironmentMarkUnmarked,
+	EnvironmentMarkDev,
+	EnvironmentMarkTest,
+	EnvironmentMarkPre,
+	EnvironmentMarkProd,
+}
+
+// IsValid reports whether m is one of the recognized user-selectable marks.
+func (m EnvironmentMark) IsValid() bool {
+	for _, v := range AllEnvironmentMarks {
+		if v == m {
+			return true
+		}
+	}
+	return false
+}
+
+// IsMCPAccessible reports whether m denotes an environment that MCP
+// tools may see / switch to. As of this implementation only dev and
+// test environments are exposed to MCP; pre/prod/unmarked are kept
+// out of the AI client's reach to avoid accidental production access.
+func (m EnvironmentMark) IsMCPAccessible() bool {
+	return m == EnvironmentMarkDev || m == EnvironmentMarkTest
 }
 
 type Project struct {
@@ -189,12 +239,14 @@ type TestResult struct {
 
 // MCPAPIInfo represents an API item in the project tree (for MCP).
 type MCPAPIInfo struct {
-	ID       string        `json:"id"`
-	Name     string        `json:"name"`
-	Method   string        `json:"method,omitempty"`
-	URL      string        `json:"url,omitempty"`
-	Path     string        `json:"path,omitempty"`
-	Children []*MCPAPIInfo `json:"children,omitempty"`
+	ID          string        `json:"id"`
+	Name        string        `json:"name"`
+	Method      string        `json:"method,omitempty"`
+	URL         string        `json:"url,omitempty"`
+	Path        string        `json:"path,omitempty"`
+	PreScripts  []string      `json:"pre_scripts,omitempty"`
+	PostScripts []string      `json:"post_scripts,omitempty"`
+	Children    []*MCPAPIInfo `json:"children,omitempty"`
 }
 
 // MCPScriptInfo represents a script's metadata (for MCP list_scripts).

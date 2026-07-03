@@ -158,6 +158,35 @@ export namespace config {
 
 }
 
+export namespace main {
+	
+	export class MCPRuntimeState {
+	    running: boolean;
+	    boundProjectId: string;
+	    boundProjectName: string;
+	    environmentId: string;
+	    environmentName: string;
+	    activeClients: number;
+	    port: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPRuntimeState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.running = source["running"];
+	        this.boundProjectId = source["boundProjectId"];
+	        this.boundProjectName = source["boundProjectName"];
+	        this.environmentId = source["environmentId"];
+	        this.environmentName = source["environmentName"];
+	        this.activeClients = source["activeClients"];
+	        this.port = source["port"];
+	    }
+	}
+
+}
+
 export namespace models {
 	
 	export class HttpRequestSpec {
@@ -433,6 +462,7 @@ export namespace models {
 	export class Environment {
 	    id: string;
 	    name: string;
+	    mark?: string;
 	    variables: Record<string, string>;
 	    // Go type: time
 	    created_at: any;
@@ -447,6 +477,7 @@ export namespace models {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.name = source["name"];
+	        this.mark = source["mark"];
 	        this.variables = source["variables"];
 	        this.created_at = this.convertValues(source["created_at"], null);
 	        this.updated_at = this.convertValues(source["updated_at"], null);

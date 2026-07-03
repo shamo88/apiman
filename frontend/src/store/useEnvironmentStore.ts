@@ -4,10 +4,30 @@ import { devtools } from 'zustand/middleware';
 export interface Environment {
   id: string;
   name: string;
+  // `mark` is intentionally typed as `string | undefined` so the value
+  // coming back from the wails-generated `models.Environment` (also
+  // `string | undefined`) is directly assignable. The known set is
+  // enumerated below; callers that care about a specific value should
+  // use the EnvironmentMarkValue union.
+  mark?: string;
   variables: Record<string, string>;
   created_at?: string;
   updated_at?: string;
 }
+
+// The known set of selectable marks, mirroring the backend's
+// models.AllEnvironmentMarks. Order is significant — this drives the
+// order of the mark selector dropdown.
+export const ALL_ENVIRONMENT_MARKS = ['', 'dev', 'test', 'pre', 'prod'] as const;
+export type EnvironmentMarkValue = (typeof ALL_ENVIRONMENT_MARKS)[number];
+
+export const ENVIRONMENT_MARK_LABELS: Record<string, string> = {
+  '': '未标记',
+  dev: '开发',
+  test: '测试',
+  pre: '预发布',
+  prod: '正式',
+};
 
 export interface EnvironmentVariableRow {
   id: string;
@@ -21,6 +41,7 @@ interface EnvironmentStore {
   environmentsInitiallyLoaded: boolean;
   editingEnvironmentId: string;
   environmentFormName: string;
+  environmentFormMark: EnvironmentMarkValue;
   environmentFormVariables: EnvironmentVariableRow[];
   loading: boolean;
   saving: boolean;
@@ -31,6 +52,7 @@ interface EnvironmentStore {
   setEnvironmentsInitiallyLoaded: (loaded: boolean) => void;
   setEditingEnvironmentId: (id: string) => void;
   setEnvironmentFormName: (name: string) => void;
+  setEnvironmentFormMark: (mark: EnvironmentMarkValue) => void;
   setEnvironmentFormVariables: (variables: EnvironmentVariableRow[]) => void;
   setLoading: (loading: boolean) => void;
   setSaving: (saving: boolean) => void;
@@ -55,6 +77,7 @@ export const useEnvironmentStore = create<EnvironmentStore>()(
       environmentsInitiallyLoaded: false,
       editingEnvironmentId: '',
       environmentFormName: '',
+      environmentFormMark: '',
       environmentFormVariables: [createEnvironmentVariableRow()],
       loading: false,
       saving: false,
@@ -64,6 +87,7 @@ export const useEnvironmentStore = create<EnvironmentStore>()(
       setEnvironmentsInitiallyLoaded: (loaded) => set({ environmentsInitiallyLoaded: loaded }),
       setEditingEnvironmentId: (id) => set({ editingEnvironmentId: id }),
       setEnvironmentFormName: (name) => set({ environmentFormName: name }),
+      setEnvironmentFormMark: (mark) => set({ environmentFormMark: mark }),
       setEnvironmentFormVariables: (variables) => set({ environmentFormVariables: variables }),
       setLoading: (loading) => set({ loading }),
       setSaving: (saving) => set({ saving }),
@@ -71,18 +95,24 @@ export const useEnvironmentStore = create<EnvironmentStore>()(
       openEnvironmentEditor: (env) => set({
         editingEnvironmentId: env.id,
         environmentFormName: env.name,
+        // env.mark is a free-form string from the wails-generated type;
+        // the form state is a narrower union, so we validate here rather
+        // than at the boundary to keep the form field type-safe.
+        environmentFormMark: isKnownMark(env.mark) ? env.mark : '',
         environmentFormVariables: environmentToRows(env.variables),
       }),
 
       openCreateEnvironmentEditor: (projectEnvCount) => set({
         editingEnvironmentId: '',
         environmentFormName: `环境${projectEnvCount + 1}`,
+        environmentFormMark: '',
         environmentFormVariables: [createEnvironmentVariableRow()],
       }),
 
       resetEnvironmentEditor: () => set({
         editingEnvironmentId: '',
         environmentFormName: '',
+        environmentFormMark: '',
         environmentFormVariables: [createEnvironmentVariableRow()],
       }),
 
@@ -108,4 +138,11 @@ export const useEnvironmentStore = create<EnvironmentStore>()(
 function environmentToRows(variables: Record<string, string>): EnvironmentVariableRow[] {
   const rows = Object.entries(variables || {}).map(([key, value]) => createEnvironmentVariableRow(key, value));
   return rows.length > 0 ? rows : [createEnvironmentVariableRow()];
+}
+
+// isKnownMark narrows an arbitrary string (e.g. from the wails-generated
+// Environment type) to the strict union used by the form / dropdown.
+// Unrecognized values collapse to '' so they display as "未标记".
+export function isKnownMark(s: string | undefined): s is EnvironmentMarkValue {
+  return typeof s === 'string' && (ALL_ENVIRONMENT_MARKS as readonly string[]).includes(s);
 }

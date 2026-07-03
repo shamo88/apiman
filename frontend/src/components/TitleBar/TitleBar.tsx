@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { AppstoreOutlined, CloseOutlined, MinusOutlined, SearchOutlined, SettingOutlined, KeyOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, CloseOutlined, MinusOutlined, SearchOutlined, SettingOutlined, KeyOutlined, GlobalOutlined } from '@ant-design/icons';
 import { Select, Tabs } from 'antd';
 import { Quit, WindowMinimise, WindowToggleMaximise } from '../../../wailsjs/runtime/runtime';
 import { SettingsModal } from './SettingsModal';
+import { MCPRuntimeStatus } from '../MCPRuntimeStatus';
 import { useEnvironmentStore, useProjectStore, useUIStore, useWorkspaceStore } from '../../store';
 
 interface TitleBarProps {
@@ -133,6 +134,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({ onOpenShortcutsHelp }) => {
               style={{ width: 120, marginRight: 8 }}
             />
           )}
+          <MCPRuntimeStatus />
           <button
             className="title-bar-button settings"
             onClick={handleOpenSettings}
@@ -140,6 +142,14 @@ export const TitleBar: React.FC<TitleBarProps> = ({ onOpenShortcutsHelp }) => {
             style={{ '--wails-draggable': 'no-drag' } as React.CSSProperties}
           >
             <SettingOutlined />
+          </button>
+          <button
+            className="title-bar-button settings"
+            onClick={() => uiStore.openGlobalVariablesModal()}
+            title="全局变量"
+            style={{ '--wails-draggable': 'no-drag' } as React.CSSProperties}
+          >
+            <GlobalOutlined />
           </button>
           <button
             className="title-bar-button settings"

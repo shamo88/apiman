@@ -9,6 +9,7 @@ import { AppFooter } from './components/AppFooter';
 import { KeyboardShortcutsHelp, ShortcutToast } from './components/KeyboardShortcutsHelp';
 import { CookieModal, HistoryModal, CreateRequestModal, CreateFolderModal, RenameModal, AddCaseModal, CaseRenameModal } from './components/modals';
 import { GlobalSearchModal } from './components/modals/GlobalSearchModal';
+import { GlobalVariablesModal } from './components/GlobalVariablesModal';
 
 import {
   useProjectStore,
@@ -107,6 +108,8 @@ const App: React.FC = () => {
       <CaseRenameModal />
 
       <GlobalSearchModal />
+
+      <GlobalVariablesModal />
     </div>
   );
 };

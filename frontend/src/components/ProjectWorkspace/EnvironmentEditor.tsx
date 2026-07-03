@@ -1,8 +1,13 @@
 import React from 'react';
-import { Button, Empty, Input, Space } from 'antd';
+import { Button, Empty, Input, Select, Space } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { ContextMenu, useContextMenu } from '../ContextMenu';
-import { EnvironmentVariableRow, useEnvironmentStore } from '../../store';
+import {
+  ALL_ENVIRONMENT_MARKS,
+  ENVIRONMENT_MARK_LABELS,
+  EnvironmentVariableRow,
+  useEnvironmentStore,
+} from '../../store';
 import './EnvironmentEditor.css';
 
 interface EnvironmentEditorProps {
@@ -16,8 +21,10 @@ export const EnvironmentEditor: React.FC<EnvironmentEditorProps> = ({
 }) => {
   const {
     environmentFormName,
+    environmentFormMark,
     environmentFormVariables,
     setEnvironmentFormName,
+    setEnvironmentFormMark,
     setEnvironmentFormVariables,
     editingEnvironmentId,
     resetEnvironmentEditor,
@@ -86,6 +93,21 @@ export const EnvironmentEditor: React.FC<EnvironmentEditorProps> = ({
               onChange={(e) => setEnvironmentFormName(e.target.value)}
               style={{ marginBottom: 10 }}
             />
+            <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ color: 'var(--text-secondary, #888)', fontSize: 12, whiteSpace: 'nowrap' }}>
+                标记
+              </span>
+              <Select
+                value={environmentFormMark}
+                onChange={(value) => setEnvironmentFormMark(value)}
+                style={{ flex: 1 }}
+                placeholder="选择环境标记"
+                options={ALL_ENVIRONMENT_MARKS.map((m: string) => ({
+                  value: m,
+                  label: ENVIRONMENT_MARK_LABELS[m] ?? m,
+                }))}
+              />
+            </div>
             <div className="environment-vars-header">
               <span>变量</span>
               <Button

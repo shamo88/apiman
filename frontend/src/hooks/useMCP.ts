@@ -6,6 +6,9 @@ import {
   StartMCP,
   StopMCP,
   GetMCPStatus,
+  GetMCPRuntimeState,
+  BindMCPProject,
+  SetMCPEnvironment,
 } from '../../wailsjs/go/main/App';
 import { useUIStore } from '../store';
 
@@ -17,6 +20,29 @@ interface MCPConfig {
   api_key: string;
 }
 
+// Live snapshot of the running MCP server. Populated from the backend's
+// GetMCPRuntimeState; project_id / environment_id reflect the *current*
+// runtime binding, which may differ from the boot defaults in mcpConfig.
+export interface MCPRuntimeState {
+  running: boolean;
+  boundProjectId: string;
+  boundProjectName: string;
+  environmentId: string;
+  environmentName: string;
+  activeClients: number;
+  port: number;
+}
+
+const EMPTY_RUNTIME: MCPRuntimeState = {
+  running: false,
+  boundProjectId: '',
+  boundProjectName: '',
+  environmentId: '',
+  environmentName: '',
+  activeClients: 0,
+  port: 0,
+};
+
 export function useMCP() {
   const [mcpConfig, setMCPConfig] = useState<MCPConfig>({
     enabled: false,
@@ -25,6 +51,8 @@ export function useMCP() {
     environment_id: '',
     api_key: '',
   });
+  const [runtimeState, setRuntimeState] = useState<MCPRuntimeState>(EMPTY_RUNTIME);
+
   // 使用 UIStore 共享状态
   const mcpStatus = useUIStore((state) => state.mcpStatus);
   const setMcpStatus = useUIStore((state) => state.setMcpStatus);
@@ -54,7 +82,6 @@ export function useMCP() {
         setMcpStatus('stopped');
       }
 
-      message.success('MCP 配置已保存');
     } catch (error: any) {
       message.error(`保存失败: ${error?.message || error}`);
       throw error;
@@ -93,13 +120,65 @@ export function useMCP() {
     }
   }, [setMcpStatus]);
 
+  const loadRuntimeState = useCallback(async (): Promise<MCPRuntimeState | null> => {
+    try {
+      const state = await GetMCPRuntimeState();
+      if (state) {
+        const normalized: MCPRuntimeState = {
+          running: state.running ?? false,
+          boundProjectId: state.boundProjectId ?? '',
+          boundProjectName: state.boundProjectName ?? '',
+          environmentId: state.environmentId ?? '',
+          environmentName: state.environmentName ?? '',
+          activeClients: state.activeClients ?? 0,
+          port: state.port ?? 0,
+        };
+        setRuntimeState(normalized);
+        return normalized;
+      }
+    } catch (error) {
+      console.error('Failed to load MCP runtime state:', error);
+    }
+    return null;
+  }, []);
+
+  // Runtime project switching. Empty id unbinds.
+  const bindProject = useCallback(async (projectId: string): Promise<boolean> => {
+    try {
+      await BindMCPProject(projectId);
+      await loadRuntimeState();
+      message.success('项目已切换');
+      return true;
+    } catch (error: any) {
+      message.error(`切换项目失败: ${error?.message || error}`);
+      return false;
+    }
+  }, [loadRuntimeState]);
+
+  // Runtime environment switching. Empty id deactivates.
+  const setEnvironment = useCallback(async (envId: string): Promise<boolean> => {
+    try {
+      await SetMCPEnvironment(envId);
+      await loadRuntimeState();
+      message.success(envId ? '环境已切换' : '已取消环境');
+      return true;
+    } catch (error: any) {
+      message.error(`切换环境失败: ${error?.message || error}`);
+      return false;
+    }
+  }, [loadRuntimeState]);
+
   return {
     mcpConfig,
     mcpStatus,
+    runtimeState,
     loadMCPConfig,
     saveMCPConfig,
     startMCP,
     stopMCP,
     loadMCPStatus,
+    loadRuntimeState,
+    bindProject,
+    setEnvironment,
   };
 }

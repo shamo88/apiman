@@ -14,7 +14,7 @@ import { ResizeHandle } from './ResizeHandle';
 import { ResizeSplitter } from './ResizeSplitter';
 import { CurlResponse } from '../../types';
 import { GetProjectScriptsResult } from '../../../wailsjs/go/main/App';
-import { Environment, ProjectScript, useEnvironmentStore, useScriptStore, EnvironmentVariableRow, ProjectTree } from '../../store';
+import { Environment, ProjectScript, useEnvironmentStore, useScriptStore, EnvironmentVariableRow, ProjectTree, isKnownMark } from '../../store';
 import { useWorkspace, useWorkspaceHandlers, useEnvironments, useScripts } from '../../hooks';
 import { useUIStore, useWorkspaceStore, useProjectStore } from '../../store';
 import './ProjectWorkspace.css';
@@ -74,6 +74,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
   // Environment store state
   const {
     environmentFormName,
+    environmentFormMark,
     environmentFormVariables,
     setEnvironmentFormName,
     setEnvironmentFormVariables,
@@ -203,18 +204,18 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
     const variables = rowsToEnvironmentVariables(environmentFormVariables);
     try {
       if (editingEnvironmentId) {
-        await updateEnvironment(projectId, editingEnvironmentId, name, variables);
+        await updateEnvironment(projectId, editingEnvironmentId, name, variables, environmentFormMark);
         setEditingEnvironmentId('');
         await loadEnvironments(projectId);
       } else {
-        await createEnvironment(projectId, name, variables);
+        await createEnvironment(projectId, name, variables, environmentFormMark);
         setEditingEnvironmentId('');
         await loadEnvironments(projectId);
       }
     } catch (error) {
       console.error('Failed to save environment:', error);
     }
-  }, [projectId, editingEnvironmentId, environmentFormName, environmentFormVariables, createEnvironment, updateEnvironment, rowsToEnvironmentVariables, setEditingEnvironmentId, loadEnvironments]);
+  }, [projectId, editingEnvironmentId, environmentFormName, environmentFormVariables, environmentFormMark, createEnvironment, updateEnvironment, rowsToEnvironmentVariables, setEditingEnvironmentId, loadEnvironments]);
 
   const handleDeleteEnvironment = useCallback(async () => {
     if (!editingEnvironmentId) return;
@@ -237,7 +238,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
 
   const handleDuplicateEnvironment = useCallback(async (env: Environment) => {
     try {
-      await createEnvironment(projectId, `${env.name} (副本)`, env.variables);
+      await createEnvironment(projectId, `${env.name} (副本)`, env.variables, isKnownMark(env.mark) ? env.mark : '');
       await loadEnvironments(projectId);
     } catch (error) {
       console.error('Failed to duplicate environment:', error);

@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useEnvironments } from './useEnvironments';
+import { useEnvironments, EnvironmentMarkValue } from './useEnvironments';
 import { useProjectStore } from '../store/useProjectStore';
 
 export const useEnvironmentHandlers = () => {
@@ -14,19 +14,19 @@ export const useEnvironmentHandlers = () => {
     t => t.id === projectStore.activeTab
   )?.project;
 
-  const handleCreateEnvironment = useCallback(async (name: string, variables: Record<string, string>) => {
+  const handleCreateEnvironment = useCallback(async (name: string, variables: Record<string, string>, mark: EnvironmentMarkValue) => {
     if (!currentProject) return;
     try {
-      await createEnvironment(currentProject.id, name, variables);
+      await createEnvironment(currentProject.id, name, variables, mark);
     } catch (error) {
       // Error handled in hook
     }
   }, [currentProject, createEnvironment]);
 
-  const handleUpdateEnvironment = useCallback(async (envId: string, name: string, variables: Record<string, string>) => {
+  const handleUpdateEnvironment = useCallback(async (envId: string, name: string, variables: Record<string, string>, mark: EnvironmentMarkValue) => {
     if (!currentProject) return;
     try {
-      await updateEnvironment(currentProject.id, envId, name, variables);
+      await updateEnvironment(currentProject.id, envId, name, variables, mark);
     } catch (error) {
       // Error handled in hook
     }

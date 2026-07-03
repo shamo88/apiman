@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Empty, Input, Space, Tooltip } from 'antd';
+import { Button, Empty, Input, Popconfirm, Space, Tooltip } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import { javascript } from '@codemirror/lang-javascript';
 import CodeMirror from '@uiw/react-codemirror';
@@ -58,7 +58,16 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({ onClose }) => {
               <Tooltip title="脚本开发指南">
                 <Button icon={<QuestionCircleOutlined />} onClick={() => setScriptHelpVisible(true)} />
               </Tooltip>
-              <Button danger onClick={handleDelete}>删除</Button>
+              <Popconfirm
+                title="删除脚本"
+                description={`确定要删除脚本「${scriptFormName || '未命名'}」吗？此操作不可恢复。`}
+                okText="删除"
+                okButtonProps={{ danger: true }}
+                cancelText="取消"
+                onConfirm={handleDelete}
+              >
+                <Button danger>删除</Button>
+              </Popconfirm>
               <Button type="primary" onClick={handleSave}>保存脚本</Button>
             </Space>
           </div>

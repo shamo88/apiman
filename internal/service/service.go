@@ -84,24 +84,24 @@ func (s *Service) LoadEnvironments(projectID string) ([]models.Environment, erro
 	return s.ConfigManager.LoadProjectEnvironments(path)
 }
 
-func (s *Service) CreateEnvironment(projectID string, name string, variables map[string]string) (*models.Environment, error) {
+func (s *Service) CreateEnvironment(projectID string, name string, variables map[string]string, mark models.EnvironmentMark) (*models.Environment, error) {
 	path, err := s.ProjectMgr.ProjectPathByID(projectID)
 	if err != nil {
 		return nil, err
 	}
-	env, err := s.ConfigManager.CreateProjectEnvironment(path, name, variables)
+	env, err := s.ConfigManager.CreateProjectEnvironment(path, name, variables, mark)
 	if err == nil && s.shouldAutoSync() {
 		go s.SyncProjectToGit(projectID)
 	}
 	return env, err
 }
 
-func (s *Service) UpdateEnvironment(projectID string, id string, name string, variables map[string]string) error {
+func (s *Service) UpdateEnvironment(projectID string, id string, name string, variables map[string]string, mark models.EnvironmentMark) error {
 	path, err := s.ProjectMgr.ProjectPathByID(projectID)
 	if err != nil {
 		return err
 	}
-	err = s.ConfigManager.UpdateProjectEnvironment(path, id, name, variables)
+	err = s.ConfigManager.UpdateProjectEnvironment(path, id, name, variables, mark)
 	if err == nil && s.shouldAutoSync() {
 		go s.SyncProjectToGit(projectID)
 	}

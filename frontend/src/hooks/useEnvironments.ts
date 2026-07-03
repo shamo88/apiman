@@ -8,6 +8,8 @@ import {
   DeleteEnvironment,
 } from '../../wailsjs/go/main/App';
 
+export type EnvironmentMarkValue = '' | 'dev' | 'test' | 'pre' | 'prod';
+
 export function useEnvironments() {
   const {
     environments,
@@ -29,9 +31,9 @@ export function useEnvironments() {
     }
   }, [setEnvironments, setLoading]);
 
-  const createEnvironment = useCallback(async (projectId: string, name: string, variables: Record<string, string>) => {
+  const createEnvironment = useCallback(async (projectId: string, name: string, variables: Record<string, string>, mark: EnvironmentMarkValue) => {
     try {
-      const created = await CreateEnvironment(projectId, name, variables);
+      const created = await CreateEnvironment(projectId, name, variables, mark);
       await loadEnvironments(projectId);
       message.success('环境已创建');
       return created;
@@ -41,9 +43,9 @@ export function useEnvironments() {
     }
   }, [loadEnvironments]);
 
-  const updateEnvironment = useCallback(async (projectId: string, envId: string, name: string, variables: Record<string, string>) => {
+  const updateEnvironment = useCallback(async (projectId: string, envId: string, name: string, variables: Record<string, string>, mark: EnvironmentMarkValue) => {
     try {
-      await UpdateEnvironment(projectId, envId, name, variables);
+      await UpdateEnvironment(projectId, envId, name, variables, mark);
       message.success('环境已保存');
     } catch (error: any) {
       message.error(`保存失败: ${error?.message || error}`);

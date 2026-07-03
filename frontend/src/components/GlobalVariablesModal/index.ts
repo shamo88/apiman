@@ -1,0 +1,1 @@
+export { GlobalVariablesModal } from './GlobalVariablesModal';

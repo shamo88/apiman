@@ -9,6 +9,7 @@ import (
 	"apiman/internal/service"
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 )
 
@@ -46,12 +47,16 @@ func (a *App) LoadEnvironments(projectID string) ([]models.Environment, error) {
 	return a.service.LoadEnvironments(projectID)
 }
 
-func (a *App) CreateEnvironment(projectID string, name string, variables map[string]string) (*models.Environment, error) {
-	return a.service.CreateEnvironment(projectID, name, variables)
+func (a *App) CreateEnvironment(projectID string, name string, variables map[string]string, mark string) (*models.Environment, error) {
+	return a.service.CreateEnvironment(projectID, name, variables, models.EnvironmentMark(mark))
 }
 
-func (a *App) UpdateEnvironment(projectID string, id string, name string, variables map[string]string) error {
-	return a.service.UpdateEnvironment(projectID, id, name, variables)
+func (a *App) UpdateEnvironment(projectID string, id string, name string, variables map[string]string, mark string) error {
+	// The frontend always sends the current mark value (selected from the
+	// dropdown, including "" for unmarked). The internal sentinel
+	// EnvironmentMarkUnspecified is reserved for callers that want to
+	// preserve the existing mark — the GUI never uses it.
+	return a.service.UpdateEnvironment(projectID, id, name, variables, models.EnvironmentMark(mark))
 }
 
 func (a *App) DeleteEnvironment(projectID string, id string) error {
@@ -375,22 +380,24 @@ func (a *App) DeleteGlobalCookie(id string) error {
 // MCP Server instance (set from main.go)
 var mcpServer *mcp.Server
 
-// LoadMCPConfig loads the MCP configuration.
+// LoadMCPConfig loads the MCP configuration with the api_key field
+// transparently decrypted for in-memory use.
 func (a *App) LoadMCPConfig() (*config.MCPConfig, error) {
 	cfg, err := a.service.LoadAppConfig()
 	if err != nil {
 		return nil, err
 	}
-	return &cfg.MCP, nil
+	return mcp.DecryptMCPConfig(&cfg.MCP), nil
 }
 
-// SaveMCPConfig saves the MCP configuration.
+// SaveMCPConfig saves the MCP configuration. The api_key field is encrypted
+// on disk; legacy plaintext keys are migrated on first save.
 func (a *App) SaveMCPConfig(cfg *config.MCPConfig) error {
 	appCfg, err := a.service.LoadAppConfig()
 	if err != nil {
 		appCfg = &config.AppConfig{}
 	}
-	appCfg.MCP = *cfg
+	appCfg.MCP = *mcp.EncryptMCPConfig(cfg)
 	return a.service.SaveAppConfig(appCfg)
 }
 
@@ -401,17 +408,11 @@ func (a *App) StartMCP() error {
 		return err
 	}
 
-	// Ensure project exists
-	if cfg.ProjectID == "" {
-		project, err := a.service.CreateProject("MCP Default Project")
-		if err != nil {
-			return err
-		}
-		cfg.ProjectID = project.ID
-		if err := a.SaveMCPConfig(cfg); err != nil {
-			return err
-		}
-	}
+	// MCP can start without a bound project — it just runs unbound until
+	// the user picks a project via the runtime switcher. We deliberately
+	// do NOT auto-create a "MCP Default Project": the user must configure
+	// the bound project explicitly. MCPRuntimeState will surface the
+	// unbound state with a "未绑定项目" placeholder.
 
 	// Stop existing server if running
 	if mcpServer != nil && mcpServer.IsRunning() {
@@ -444,6 +445,138 @@ func (a *App) GetMCPStatus() string {
 // ListProjectsForMCP lists all projects for MCP configuration.
 func (a *App) ListProjectsForMCP() ([]models.Project, error) {
 	return a.service.ListProjects()
+}
+
+// MCPRuntimeState is the frontend-facing snapshot of the MCP server's
+// current binding. It augments mcp.RuntimeState with human-readable names
+// resolved against the user's project list.
+type MCPRuntimeState struct {
+	Running          bool   `json:"running"`
+	BoundProjectID   string `json:"boundProjectId"`
+	BoundProjectName string `json:"boundProjectName"`
+	EnvironmentID    string `json:"environmentId"`
+	EnvironmentName  string `json:"environmentName"`
+	ActiveClients    int    `json:"activeClients"`
+	Port             int    `json:"port"`
+}
+
+// GetMCPRuntimeState returns a snapshot of the running MCP server's
+// current project / environment binding. When the server is not running
+// it returns Running=false with empty ID fields; this is a normal state,
+// not an error.
+func (a *App) GetMCPRuntimeState() (*MCPRuntimeState, error) {
+	if mcpServer == nil {
+		return &MCPRuntimeState{Running: false, BoundProjectName: "未绑定项目"}, nil
+	}
+
+	snap := mcpServer.GetRuntimeState()
+	out := &MCPRuntimeState{
+		Running:        snap.Running,
+		BoundProjectID: snap.BoundProjectID,
+		EnvironmentID:  snap.EnvironmentID,
+		ActiveClients:  snap.ActiveClients,
+		Port:           snap.Port,
+	}
+
+	// No bound project — surface a Chinese "未绑定项目" placeholder so the
+	// UI doesn't fall back to showing the (empty) UUID, which users mistake
+	// for an unresolved bug. This also covers the case where mcpServer
+	// exists but has no project set yet.
+	if snap.BoundProjectID == "" {
+		out.BoundProjectName = "未绑定项目"
+	} else {
+		if name, err := a.service.GetProjectName(snap.BoundProjectID); err == nil {
+			out.BoundProjectName = name
+		}
+		if snap.EnvironmentID != "" {
+			envs, err := a.service.LoadEnvironments(snap.BoundProjectID)
+			if err == nil {
+				for _, env := range envs {
+					if env.ID == snap.EnvironmentID {
+						out.EnvironmentName = env.Name
+						break
+					}
+				}
+			}
+		}
+	}
+
+	return out, nil
+}
+
+// BindMCPProject switches the MCP server's bound project at runtime.
+// When the server is running, the change is applied live (no restart);
+// in either case the new project ID is persisted to MCPConfig so it
+// becomes the boot default. Empty projectID is allowed and unbinds.
+// Validates the project exists before applying.
+func (a *App) BindMCPProject(projectID string) error {
+	if projectID != "" {
+		projects, err := a.service.ListProjects()
+		if err != nil {
+			return fmt.Errorf("failed to list projects: %w", err)
+		}
+		found := false
+		for _, p := range projects {
+			if p.ID == projectID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("project not found: %s", projectID)
+		}
+	}
+
+	if mcpServer != nil && mcpServer.IsRunning() {
+		mcpServer.Handler().SetProjectID(projectID)
+		// Clearing the active environment when project changes avoids
+		// dangling references to environments that belong to the old project.
+		mcpServer.Handler().SetEnvironmentID("")
+	}
+
+	cfg, err := a.LoadMCPConfig()
+	if err != nil {
+		return err
+	}
+	cfg.ProjectID = projectID
+	cfg.EnvironmentID = "" // reset on project switch
+	return a.SaveMCPConfig(cfg)
+}
+
+// SetMCPEnvironment switches the MCP server's active environment at
+// runtime. Empty envID is allowed and deactivates. When non-empty, the
+// environment must belong to the currently bound project.
+func (a *App) SetMCPEnvironment(envID string) error {
+	if mcpServer != nil && mcpServer.IsRunning() {
+		projectID := mcpServer.Handler().GetProjectID()
+		if projectID == "" {
+			return fmt.Errorf("no project bound; cannot set environment")
+		}
+		if envID != "" {
+			envs, err := a.service.LoadEnvironments(projectID)
+			if err != nil {
+				return fmt.Errorf("failed to load environments: %w", err)
+			}
+			found := false
+			for _, env := range envs {
+				if env.ID == envID {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return fmt.Errorf("environment %s not found in bound project", envID)
+			}
+		}
+		mcpServer.Handler().SetEnvironmentID(envID)
+	}
+
+	cfg, err := a.LoadMCPConfig()
+	if err != nil {
+		return err
+	}
+	cfg.EnvironmentID = envID
+	return a.SaveMCPConfig(cfg)
 }
 
 // ListHistory returns recent request history entries.

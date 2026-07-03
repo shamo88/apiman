@@ -329,5 +329,430 @@ func GetToolDefinitions() []MCPTool {
 				"required": []string{"keyword"},
 			},
 		},
+
+		// ---- P1-1: Runtime project switching ----
+
+		{
+			Name:        "mcp_list_projects",
+			Description: "List all projects available to the MCP server, plus the currently bound project ID (if any). Returns {\"projects\":[...],\"bound_id\":\"...\",\"environment_id\":\"...\"}.",
+			InputSchema: map[string]interface{}{
+				"type":       "object",
+				"properties": map[string]interface{}{},
+			},
+		},
+		{
+			Name:        "mcp_bind_project",
+			Description: "Switch the bound project and (optionally) the active environment at runtime. Does not restart the MCP server. Pass an empty project_id to unbind. Returns {\"project_id\":\"...\",\"environment_id\":\"...\",\"previous_id\":\"...\"}.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"project_id": map[string]interface{}{
+						"type":        "string",
+						"description": "ID of the project to bind. Empty string unbinds.",
+					},
+					"environment_id": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional environment ID to make active. Empty string means no active environment.",
+					},
+				},
+				"required": []string{"project_id"},
+			},
+		},
+
+		// ---- P1-2: History reading tools ----
+
+		{
+			Name:        "mcp_list_history",
+			Description: "List recent request-history entries with optional filters: limit (default 50), project_name, method, status_code, keyword. Returns {\"entries\":[...],\"limit\":N,\"count\":N}.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"limit": map[string]interface{}{
+						"type":        "integer",
+						"description": "Maximum number of entries to return. Defaults to 50.",
+					},
+					"project_name": map[string]interface{}{
+						"type":        "string",
+						"description": "Fuzzy match on project name.",
+					},
+					"method": map[string]interface{}{
+						"type":        "string",
+						"description": "Exact-match HTTP method (GET, POST, ...).",
+					},
+					"status_code": map[string]interface{}{
+						"type":        "integer",
+						"description": "Exact-match HTTP status code (e.g. 200, 404, 500).",
+					},
+					"keyword": map[string]interface{}{
+						"type":        "string",
+						"description": "Comprehensive keyword applied across URL and request name.",
+					},
+				},
+			},
+		},
+		{
+			Name:        "mcp_get_history_entry",
+			Description: "Fetch a single history entry (including its detail-file payload) by ID. Returns {\"entry\":{...}} or empty entry if not found.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"id": map[string]interface{}{
+						"type":        "string",
+						"description": "History entry ID.",
+					},
+				},
+				"required": []string{"id"},
+			},
+		},
+		{
+			Name:        "mcp_clear_history",
+			Description: "Delete ALL request-history entries. Requires confirm=true to prevent accidental clearing. Returns {\"success\":true,\"message\":\"...\"}.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"confirm": map[string]interface{}{
+						"type":        "boolean",
+						"description": "Must be true to actually clear history. Pass false to be a no-op.",
+					},
+				},
+				"required": []string{"confirm"},
+			},
+		},
+
+		// ---- P1-3: Environment CRUD ----
+
+		{
+			Name:        "mcp_create_environment",
+			Description: "Create a new environment in the bound project. mark must be one of 'dev' or 'test'; pre/prod/empty are rejected (production-grade environments are deliberately kept out of MCP reach). Returns {\"environment\":{\"id\":\"...\",\"name\":\"...\",\"mark\":\"...\",\"variables\":{...}}}.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"name": map[string]interface{}{
+						"type":        "string",
+						"description": "Display name for the new environment.",
+					},
+					"mark": map[string]interface{}{
+						"type":        "string",
+						"enum":        []string{"dev", "test"},
+						"description": "Lifecycle stage. Only 'dev' and 'test' are accepted from MCP; other values return an error.",
+					},
+					"variables": map[string]interface{}{
+						"type":                 "object",
+						"description":          "Map of key->value string variables.",
+						"additionalProperties": map[string]interface{}{"type": "string"},
+					},
+				},
+				"required": []string{"name", "mark"},
+			},
+		},
+		{
+			Name:        "mcp_update_environment",
+			Description: "Update an existing environment. name, variables, and mark are all optional; omitted fields keep their previous value. mark, when provided, must be 'dev' or 'test' — pre/prod/empty are rejected. Requires a bound project.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"id": map[string]interface{}{
+						"type":        "string",
+						"description": "Environment ID to update.",
+					},
+					"name": map[string]interface{}{
+						"type":        "string",
+						"description": "New display name.",
+					},
+					"mark": map[string]interface{}{
+						"type":        "string",
+						"enum":        []string{"dev", "test"},
+						"description": "New lifecycle mark. Omit (or pass empty) to keep current value; pass 'dev' or 'test' to update. Other values are rejected.",
+					},
+					"variables": map[string]interface{}{
+						"type":                 "object",
+						"description":          "Replacement variables map (string keys and values).",
+						"additionalProperties": map[string]interface{}{"type": "string"},
+					},
+				},
+				"required": []string{"id"},
+			},
+		},
+		{
+			Name:        "mcp_delete_environment",
+			Description: "Delete an environment from the bound project. Returns {\"deleted\":true,\"id\":\"...\"}.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"id": map[string]interface{}{
+						"type":        "string",
+						"description": "Environment ID to delete.",
+					},
+				},
+				"required": []string{"id"},
+			},
+		},
+		{
+			Name:        "mcp_set_active_environment",
+			Description: "Switch the active environment at runtime (no server restart). Pass empty id to deactivate. SSE subscribers receive a message event. Returns {\"environment_id\":\"...\",\"previous_id\":\"...\"}.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"id": map[string]interface{}{
+						"type":        "string",
+						"description": "Environment ID to activate. Empty string clears the active environment.",
+					},
+				},
+			},
+		},
+
+		// ---- Global variables: chainable scenarios ----
+
+		{
+			Name:        "mcp_list_globals",
+			Description: "List ALL global variables (saved at ~/.apiman/variables.json). These are made available to the goja script runtime as am.globals.* and to {{name}} substitution. Returns {\"variables\":{...},\"count\":N}.",
+			InputSchema: map[string]interface{}{
+				"type":       "object",
+				"properties": map[string]interface{}{},
+			},
+		},
+		{
+			Name:        "mcp_get_globals",
+			Description: "Read a filtered subset of global variables. Provide either 'keys' (array of exact names) or 'prefix' (string prefix). With neither filter this returns everything, equivalent to mcp_list_globals. Returns {\"variables\":{...},\"count\":N}.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"keys": map[string]interface{}{
+						"type":        "array",
+						"items":       map[string]interface{}{"type": "string"},
+						"description": "Optional list of exact key names to read.",
+					},
+					"prefix": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional string prefix; only keys starting with this prefix are returned.",
+					},
+				},
+			},
+		},
+		{
+			Name:        "mcp_set_global",
+			Description: "Set (upsert) a single global variable. Persists immediately to ~/.apiman/variables.json so subsequent requests / scripts can read it via {{name}} or am.globals.get('name'). SSE subscribers receive a 'message' event with kind=globals_changed. Returns {\"key\":\"...\",\"value\":\"...\"}.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"key": map[string]interface{}{
+						"type":        "string",
+						"description": "Variable name.",
+					},
+					"value": map[string]interface{}{
+						"type":        "string",
+						"description": "Value to store. Empty string is allowed.",
+					},
+				},
+				"required": []string{"key", "value"},
+			},
+		},
+		{
+			Name:        "mcp_unset_global",
+			Description: "Delete a single global variable. Idempotent: returns existed=false if the key was not present (no error). SSE subscribers receive a 'message' event when an actual removal happens. Returns {\"key\":\"...\",\"existed\":bool}.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"key": map[string]interface{}{
+						"type":        "string",
+						"description": "Variable name to remove.",
+					},
+				},
+				"required": []string{"key"},
+			},
+		},
+
+		// ---- P0/P1 write tools: request update/rename/move, folder rename/move,
+		//      script create/update/delete ----
+
+		{
+			Name:        "mcp_update_request",
+			Description: "Partially update a saved request. spec fields (method, http_url, body, body_type, headers, params, form_data, url_encoded) are merged: fields present in the spec arg overwrite the current value, fields absent are preserved. cases (array of {id, name, spec}) is full-replacement when provided (omit to keep existing). active_case_id updates only when explicitly passed. Returns {\"id\":\"...\",\"name\":\"...\",\"path\":\"...\"}.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "Request path in format 'request|project-id|request-id'",
+					},
+					"spec": map[string]interface{}{
+						"type":        "object",
+						"description": "Partial spec. Each field is optional; omit to keep current value.",
+						"properties": map[string]interface{}{
+							"method":    map[string]interface{}{"type": "string"},
+							"http_url":  map[string]interface{}{"type": "string"},
+							"headers":   map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "object"}},
+							"params":    map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "object"}},
+							"body":      map[string]interface{}{"type": "string"},
+							"body_type": map[string]interface{}{"type": "string"},
+							"form_data": map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "object"}},
+							"url_encoded": map[string]interface{}{
+								"type":  "array",
+								"items": map[string]interface{}{"type": "object"},
+							},
+						},
+					},
+					"cases": map[string]interface{}{
+						"type":        "array",
+						"description": "Replacement list of test cases. Omit to keep existing cases.",
+						"items": map[string]interface{}{
+							"type": "object",
+							"properties": map[string]interface{}{
+								"id":   map[string]interface{}{"type": "string"},
+								"name": map[string]interface{}{"type": "string"},
+								"spec": map[string]interface{}{"type": "object"},
+							},
+						},
+					},
+					"active_case_id": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional id of the case to mark active. Omit to keep current active case.",
+					},
+				},
+				"required": []string{"path"},
+			},
+		},
+		{
+			Name:        "mcp_rename_request",
+			Description: "Rename a saved request. Path does not change (paths are flat). Returns {\"id\":\"...\",\"name\":\"...\",\"path\":\"...\"}.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "Request path in format 'request|project-id|request-id'",
+					},
+					"name": map[string]interface{}{
+						"type":        "string",
+						"description": "New display name (must be non-empty and unique within the same folder).",
+					},
+				},
+				"required": []string{"path", "name"},
+			},
+		},
+		{
+			Name:        "mcp_move_request",
+			Description: "Move a request to a different folder (or project root). target_parent_path is the full folder path 'folder|project-id|folder-id'; empty string means project root. before_id optionally inserts before a specific sibling; empty means append. Returns {\"id\":\"...\",\"path\":\"...\"}.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "Request path in format 'request|project-id|request-id'",
+					},
+					"target_parent_path": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional full folder path 'folder|project-id|folder-id'. Empty or omitted means project root.",
+					},
+					"before_id": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional id of the sibling under target_parent_path to insert before. Empty means append.",
+					},
+				},
+				"required": []string{"path"},
+			},
+		},
+		{
+			Name:        "mcp_rename_folder",
+			Description: "Rename a folder. Path does not change (paths are flat). Returns {\"id\":\"...\",\"name\":\"...\",\"path\":\"...\"}.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "Folder path in format 'folder|project-id|folder-id'",
+					},
+					"name": map[string]interface{}{
+						"type":        "string",
+						"description": "New folder name (must be non-empty and unique within the same parent).",
+					},
+				},
+				"required": []string{"path", "name"},
+			},
+		},
+		{
+			Name:        "mcp_move_folder",
+			Description: "Move a folder to a different parent (or project root). target_parent_path is the full folder path of the destination parent; empty string means project root. before_id optionally inserts before a specific sibling; empty means append. Returns {\"id\":\"...\",\"path\":\"...\"}.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "Folder path in format 'folder|project-id|folder-id'",
+					},
+					"target_parent_path": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional full folder path 'folder|project-id|folder-id'. Empty or omitted means project root.",
+					},
+					"before_id": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional id of the sibling under target_parent_path to insert before. Empty means append.",
+					},
+				},
+				"required": []string{"path"},
+			},
+		},
+		{
+			Name:        "mcp_create_script",
+			Description: "Create a new project-level script. Requires a bound project. Returns {\"id\":\"...\",\"name\":\"...\",\"description\":\"...\"}.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"name": map[string]interface{}{
+						"type":        "string",
+						"description": "Display name (must be non-empty).",
+					},
+					"description": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional human-readable description.",
+					},
+					"content": map[string]interface{}{
+						"type":        "string",
+						"description": "JavaScript source. Empty string is allowed.",
+					},
+				},
+				"required": []string{"name", "content"},
+			},
+		},
+		{
+			Name:        "mcp_update_script",
+			Description: "Partially update a project-level script. name, description, and content are all optional; omitted fields keep their previous value. Returns {\"id\":\"...\",\"name\":\"...\",\"description\":\"...\"}.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"id": map[string]interface{}{
+						"type":        "string",
+						"description": "Script ID to update.",
+					},
+					"name": map[string]interface{}{
+						"type":        "string",
+						"description": "New display name. Omit to keep current value.",
+					},
+					"description": map[string]interface{}{
+						"type":        "string",
+						"description": "New description. Omit to keep current value.",
+					},
+					"content": map[string]interface{}{
+						"type":        "string",
+						"description": "New JavaScript source. Omit to keep current content.",
+					},
+				},
+				"required": []string{"id"},
+			},
+		},
+		{
+			Name:        "mcp_delete_script",
+			Description: "Delete a project-level script by id. Idempotent: returns deleted=false when the script does not exist (no error). Returns {\"deleted\":bool,\"id\":\"...\"}.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"id": map[string]interface{}{
+						"type":        "string",
+						"description": "Script ID to delete.",
+					},
+				},
+				"required": []string{"id"},
+			},
+		},
 	}
 }

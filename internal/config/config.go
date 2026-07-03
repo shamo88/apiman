@@ -17,6 +17,18 @@ import (
 	"golang.org/x/crypto/nacl/secretbox"
 )
 
+// EncryptSecret encrypts a string using NaCl secretbox. Public wrapper around
+// the package-private encrypt for cross-package use (e.g. MCP API keys).
+func EncryptSecret(plaintext string) string {
+	return encrypt(plaintext)
+}
+
+// DecryptSecret decrypts a NaCl secretbox ciphertext. Returns plaintext on
+// failure, which is safe for legacy data that predates encryption.
+func DecryptSecret(ciphertext string) string {
+	return decrypt(ciphertext)
+}
+
 // encrypt uses NaCl secretbox for secure encryption
 func encrypt(plaintext string) string {
 	if plaintext == "" {
@@ -188,13 +200,14 @@ func (c *ConfigManager) saveProjectEnvironmentsLocked(projectPath string, envs [
 }
 
 // CreateProjectEnvironment appends an environment to the project's environments.json.
-func (c *ConfigManager) CreateProjectEnvironment(projectPath string, name string, variables map[string]string) (*models.Environment, error) {
+func (c *ConfigManager) CreateProjectEnvironment(projectPath string, name string, variables map[string]string, mark models.EnvironmentMark) (*models.Environment, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	env := &models.Environment{
 		ID:        uuid.New().String(),
 		Name:      name,
+		Mark:      mark,
 		Variables: variables,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
@@ -222,7 +235,8 @@ func (c *ConfigManager) CreateProjectEnvironment(projectPath string, name string
 }
 
 // UpdateProjectEnvironment updates one environment in the project's file.
-func (c *ConfigManager) UpdateProjectEnvironment(projectPath string, id string, name string, variables map[string]string) error {
+// Passing an empty mark preserves the previous value (mirrors name/variables).
+func (c *ConfigManager) UpdateProjectEnvironment(projectPath string, id string, name string, variables map[string]string, mark models.EnvironmentMark) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -240,6 +254,11 @@ func (c *ConfigManager) UpdateProjectEnvironment(projectPath string, id string, 
 		if env.ID == id {
 			envs[i].Name = name
 			envs[i].Variables = variables
+			// mark == Unspecified → caller does not want to touch mark.
+			// mark == "" or any other value → caller wants to set it.
+			if mark != models.EnvironmentMarkUnspecified {
+				envs[i].Mark = mark
+			}
 			envs[i].UpdatedAt = time.Now()
 			break
 		}

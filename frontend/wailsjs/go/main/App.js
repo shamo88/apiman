@@ -14,6 +14,10 @@ export function BatchExecuteHTTPRequests(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['BatchExecuteHTTPRequests'](arg1, arg2, arg3, arg4);
 }
 
+export function BindMCPProject(arg1) {
+  return window['go']['main']['App']['BindMCPProject'](arg1);
+}
+
 export function CancelCurrentRequest() {
   return window['go']['main']['App']['CancelCurrentRequest']();
 }
@@ -26,8 +30,8 @@ export function CopyRequest(arg1) {
   return window['go']['main']['App']['CopyRequest'](arg1);
 }
 
-export function CreateEnvironment(arg1, arg2, arg3) {
-  return window['go']['main']['App']['CreateEnvironment'](arg1, arg2, arg3);
+export function CreateEnvironment(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['CreateEnvironment'](arg1, arg2, arg3, arg4);
 }
 
 export function CreateFolder(arg1, arg2, arg3) {
@@ -136,6 +140,10 @@ export function GetGlobalVariables() {
 
 export function GetHistoryEntry(arg1) {
   return window['go']['main']['App']['GetHistoryEntry'](arg1);
+}
+
+export function GetMCPRuntimeState() {
+  return window['go']['main']['App']['GetMCPRuntimeState']();
 }
 
 export function GetMCPStatus() {
@@ -278,6 +286,10 @@ export function SearchHistory(arg1, arg2) {
   return window['go']['main']['App']['SearchHistory'](arg1, arg2);
 }
 
+export function SetMCPEnvironment(arg1) {
+  return window['go']['main']['App']['SetMCPEnvironment'](arg1);
+}
+
 export function StartMCP() {
   return window['go']['main']['App']['StartMCP']();
 }
@@ -298,8 +310,8 @@ export function SyncProjectToGit(arg1) {
   return window['go']['main']['App']['SyncProjectToGit'](arg1);
 }
 
-export function UpdateEnvironment(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['UpdateEnvironment'](arg1, arg2, arg3, arg4);
+export function UpdateEnvironment(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['UpdateEnvironment'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function UpdateFolderScripts(arg1, arg2, arg3) {

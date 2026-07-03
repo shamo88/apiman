@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Form, Input, Select, Switch, Button, Space, message } from 'antd';
+import { Modal, Form, Input, Switch, Button, Space, message } from 'antd';
 import { ApiOutlined, CopyOutlined } from '@ant-design/icons';
-import { useProjectStore, useUIStore } from '../../store';
-import { useMCP, useEnvironments } from '../../hooks';
+import { useUIStore } from '../../store';
+import { useMCP } from '../../hooks';
 
 export interface MCPConfig {
     enabled: boolean;
@@ -23,24 +23,20 @@ export interface Environment {
 }
 
 export const MCPSettingsModal: React.FC = () => {
-    const projectStore = useProjectStore();
     const uiStore = useUIStore();
     const { mcpConfig, mcpStatus, saveMCPConfig, loadMCPConfig } = useMCP();
-    const { environments, loadEnvironments } = useEnvironments();
 
     const visible = uiStore.mcpModalVisible;
 
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
 
-    const projects = projectStore.projects;
-
     // 弹窗打开时加载 MCP 配置
     useEffect(() => {
         if (visible) {
             loadMCPConfig();
         }
-    }, [visible]);
+    }, [visible, loadMCPConfig]);
 
     const generateRandomKey = () => {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -60,24 +56,16 @@ export const MCPSettingsModal: React.FC = () => {
         try {
             const values = await form.validateFields();
 
-            if (values.enabled) {
-                if (!values.project_id) {
-                    message.error('启用 MCP 服务时，请选择项目');
-                    return;
-                }
-                if (!values.environment_id) {
-                    message.error('启用 MCP 服务时，请选择环境');
-                    return;
-                }
-            }
-
             setLoading(true);
 
+            // project_id / environment_id are no longer required here.
+            // They are the *initial* binding only; runtime switching is done
+            // by MCP tools / the runtime status component.
             const config: MCPConfig = {
                 enabled: values.enabled,
                 port: values.port,
-                project_id: values.project_id,
-                environment_id: values.environment_id,
+                project_id: values.project_id || '',
+                environment_id: '',
                 api_key: values.api_key,
             };
 
@@ -115,20 +103,10 @@ export const MCPSettingsModal: React.FC = () => {
             form.setFieldsValue({
                 enabled: mcpConfig.enabled ?? false,
                 port: mcpConfig.port ?? 3847,
-                project_id: mcpConfig.project_id || (projects.length > 0 ? projects[0].id : ''),
-                environment_id: mcpConfig.environment_id || '',
                 api_key: mcpConfig.api_key || '',
             });
-            if (mcpConfig.project_id) {
-                loadEnvironments(mcpConfig.project_id);
-            }
         }
-    }, [visible, mcpConfig, projects]);
-
-    const handleProjectChange = (projectId: string) => {
-        form.setFieldValue('environment_id', '');
-        loadEnvironments(projectId);
-    };
+    }, [visible, mcpConfig, form]);
 
     const handleClose = () => {
         uiStore.setMcpModalVisible(false);
@@ -178,34 +156,6 @@ export const MCPSettingsModal: React.FC = () => {
                             </Button>
                         }
                     />
-                </Form.Item>
-
-                <Form.Item
-                    name="project_id"
-                    label="绑定项目"
-                    extra="MCP 将绑定到该项目，提供 API 和脚本管理"
-                >
-                    <Select style={{ width: '100%' }} placeholder="选择项目" onChange={handleProjectChange}>
-                        {projects.map((p) => (
-                            <Select.Option key={p.id} value={p.id}>
-                                {p.name}
-                            </Select.Option>
-                        ))}
-                    </Select>
-                </Form.Item>
-
-                <Form.Item
-                    name="environment_id"
-                    label="环境"
-                    extra="选择要使用的环境变量集合"
-                >
-                    <Select style={{ width: '100%' }} placeholder="选择环境" allowClear>
-                        {environments.map((env) => (
-                            <Select.Option key={env.id} value={env.id}>
-                                {env.name}
-                            </Select.Option>
-                        ))}
-                    </Select>
                 </Form.Item>
 
                 <Form.Item

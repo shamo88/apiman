@@ -132,3 +132,152 @@ type MCPSearchAPIsResponse struct {
 	Folders  []*models.MCPAPIInfo `json:"folders"`
 	Requests []*models.MCPAPIInfo `json:"requests"`
 }
+
+// List Projects Response (P1-1)
+
+type MCPListProjectsResponse struct {
+	Projects    []models.Project `json:"projects"`
+	BoundID     string           `json:"bound_id,omitempty"`
+	Environment string           `json:"environment_id,omitempty"`
+}
+
+// Bind Project Response (P1-1)
+
+type MCPBindProjectResponse struct {
+	ProjectID     string `json:"project_id"`
+	EnvironmentID string `json:"environment_id,omitempty"`
+	PreviousID    string `json:"previous_id,omitempty"`
+}
+
+// List History Response (P1-2)
+
+type MCPListHistoryResponse struct {
+	Entries []models.HistoryEntry `json:"entries"`
+	Limit   int                   `json:"limit"`
+	Count   int                   `json:"count"`
+}
+
+// History Entry Response (P1-2)
+
+type MCPHistoryEntryResponse struct {
+	Entry *models.RequestHistory `json:"entry,omitempty"`
+}
+
+// Clear History Response (P1-2)
+
+type MCPClearHistoryResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message,omitempty"`
+}
+
+// Create Environment Response (P1-3)
+
+type MCPCreateEnvironmentResponse struct {
+	Environment *models.Environment `json:"environment"`
+}
+
+// Update Environment Response (P1-3)
+
+type MCPUpdateEnvironmentResponse struct {
+	ID        string            `json:"id"`
+	Name      string            `json:"name"`
+	Variables map[string]string `json:"variables"`
+	Updated   bool              `json:"updated"`
+}
+
+// Delete Environment Response (P1-3)
+
+type MCPDeleteEnvironmentResponse struct {
+	Deleted bool   `json:"deleted"`
+	ID      string `json:"id"`
+}
+
+// Set Active Environment Response (P1-3)
+
+type MCPSetActiveEnvironmentResponse struct {
+	EnvironmentID string `json:"environment_id,omitempty"`
+	Previous      string `json:"previous_id,omitempty"`
+}
+
+// ---- Global variables ----
+//
+// Global variables are persisted at ~/.apiman/variables.json and made
+// available to the goja script runtime as `am.globals.*`. The MCP tools
+// let an AI client read/write them so chainable scenarios work end-to-end
+// (e.g. login → extract token → am.globals.set("token", ...) →
+// subsequent mcp_execute_request uses {{token}}).
+
+// MCPListGlobalsResponse returns the full key/value map.
+type MCPListGlobalsResponse struct {
+	Variables map[string]string `json:"variables"`
+	Count     int               `json:"count"`
+}
+
+// MCPGetGlobalsResponse returns a filtered view of globals.
+type MCPGetGlobalsResponse struct {
+	Variables map[string]string `json:"variables"`
+	Count     int               `json:"count"`
+}
+
+// MCPSetGlobalResponse reports the value that was stored.
+type MCPSetGlobalResponse struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+// MCPUnsetGlobalResponse indicates whether a key was present and removed.
+type MCPUnsetGlobalResponse struct {
+	Key     string `json:"key"`
+	Existed bool   `json:"existed"`
+}
+
+// ---- Request / folder / script write operations ----
+//
+// These response shapes cover the 8 P0/P1 write tools: request
+// update/rename/move, folder rename/move, and script create/update/delete.
+// Each is intentionally narrow: callers that need full state should re-fetch
+// via the existing read tools (mcp_get_request, mcp_list_apis, mcp_list_scripts).
+
+// MCPUpdateRequestResponse is returned by mcp_update_request. The full merged
+// state is not echoed back; callers re-read via mcp_get_request when needed.
+type MCPUpdateRequestResponse struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Path string `json:"path"`
+}
+
+// MCPRenameResponse is returned by mcp_rename_request and mcp_rename_folder.
+type MCPRenameResponse struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Path string `json:"path"`
+}
+
+// MCPMoveResponse is returned by mcp_move_request and mcp_move_folder. The
+// path format stays request|<projectID>|<requestID> (or folder|...) regardless
+// of parent, so we echo back the same path the caller used.
+type MCPMoveResponse struct {
+	ID   string `json:"id"`
+	Path string `json:"path"`
+}
+
+// MCPCreateScriptResponse is returned by mcp_create_script.
+type MCPCreateScriptResponse struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// MCPUpdateScriptResponse is returned by mcp_update_script.
+type MCPUpdateScriptResponse struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// MCPDeleteScriptResponse is returned by mcp_delete_script. deleted=false
+// indicates the script did not exist; the call is idempotent.
+type MCPDeleteScriptResponse struct {
+	Deleted bool   `json:"deleted"`
+	ID      string `json:"id"`
+}

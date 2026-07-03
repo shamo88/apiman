@@ -35,6 +35,7 @@ interface UIStore {
   renameGroupModal: boolean;
   renameGroupValue: string;
   globalSearchVisible: boolean;
+  globalVariablesModalVisible: boolean;
 
   // 批量执行
   batchExecuteModalVisible: boolean;
@@ -91,6 +92,9 @@ interface UIStore {
   setRenameGroupValue: (value: string) => void;
   openGlobalSearch: () => void;
   closeGlobalSearch: () => void;
+  setGlobalVariablesModalVisible: (visible: boolean) => void;
+  openGlobalVariablesModal: () => void;
+  closeGlobalVariablesModal: () => void;
   openBatchExecuteModal: (items: ProjectTree[]) => void;
   closeBatchExecuteModal: () => void;
 
@@ -144,6 +148,7 @@ export const useUIStore = create<UIStore>()(
       renameGroupModal: false,
       renameGroupValue: '',
       globalSearchVisible: false,
+      globalVariablesModalVisible: false,
 
       // 批量执行初始状态
       batchExecuteModalVisible: false,
@@ -200,6 +205,9 @@ export const useUIStore = create<UIStore>()(
       setRenameGroupValue: (value) => set({ renameGroupValue: value }),
       openGlobalSearch: () => set({ globalSearchVisible: true }),
       closeGlobalSearch: () => set({ globalSearchVisible: false }),
+      setGlobalVariablesModalVisible: (visible) => set({ globalVariablesModalVisible: visible }),
+      openGlobalVariablesModal: () => set({ globalVariablesModalVisible: true }),
+      closeGlobalVariablesModal: () => set({ globalVariablesModalVisible: false }),
       openBatchExecuteModal: (items) => set({ batchExecuteModalVisible: true, batchExecuteSelectedItems: items }),
       closeBatchExecuteModal: () => set({ batchExecuteModalVisible: false, batchExecuteSelectedItems: [] }),
 
