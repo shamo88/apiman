@@ -3,6 +3,7 @@ package mcp
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -761,9 +762,7 @@ func parseSpecFromMap(data map[string]any) models.HttpRequestSpec {
 				if k, ok := hm["key"].(string); ok {
 					kv.Key = k
 				}
-				if v, ok := hm["value"].(string); ok {
-					kv.Value = v
-				}
+				kv.Value = coerceToString(hm["value"])
 				if e, ok := hm["enabled"].(bool); ok {
 					kv.Enabled = e
 				} else {
@@ -782,9 +781,7 @@ func parseSpecFromMap(data map[string]any) models.HttpRequestSpec {
 				if k, ok := pm["key"].(string); ok {
 					kv.Key = k
 				}
-				if v, ok := pm["value"].(string); ok {
-					kv.Value = v
-				}
+				kv.Value = coerceToString(pm["value"])
 				if e, ok := pm["enabled"].(bool); ok {
 					kv.Enabled = e
 				} else {
@@ -2125,9 +2122,10 @@ func parseRequestKeyValArray(v interface{}) []models.RequestKeyVal {
 		if s, ok := m["key"].(string); ok {
 			kv.Key = s
 		}
-		if s, ok := m["value"].(string); ok {
-			kv.Value = s
-		}
+		// Accept any JSON-decoded type for value: JSON-RPC clients may
+		// send numbers/bools (e.g. `value: 2` for page size) which
+		// the previous strict string assertion silently dropped.
+		kv.Value = coerceToString(m["value"])
 		// Default enabled=true when the field is missing; honour an
 		// explicit false so callers can disable rows.
 		if b, ok := m["enabled"].(bool); ok {
@@ -2157,9 +2155,10 @@ func parseRequestPairArray(v interface{}) []models.RequestPair {
 		if s, ok := m["key"].(string); ok {
 			p.Key = s
 		}
-		if s, ok := m["value"].(string); ok {
-			p.Value = s
+		if s, ok := m["key"].(string); ok {
+			p.Key = s
 		}
+		p.Value = coerceToString(m["value"])
 		if b, ok := m["enabled"].(bool); ok {
 			p.Enabled = b
 		} else {
@@ -2168,6 +2167,65 @@ func parseRequestPairArray(v interface{}) []models.RequestPair {
 		out = append(out, p)
 	}
 	return out
+}
+
+// coerceToString accepts any JSON-decoded value and returns a string
+// representation. The previous code asserted `.(string)` for value
+// fields, which silently dropped numbers (e.g. page=2), booleans,
+// and null. JSON-RPC clients sometimes send these as their native
+// JSON type instead of as a quoted string; the test report's
+// `params[].value` loss was traced to this strict assertion.
+//
+// Conversion rules:
+//   - string   -> as-is
+//   - number   -> canonical Go formatting (integers stay integer-shaped)
+//   - bool     -> "true" / "false"
+//   - nil      -> ""
+//   - []any / map[string]any -> JSON encoded
+//   - anything else -> fmt.Sprintf("%v", v)
+func coerceToString(v interface{}) string {
+	switch x := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return x
+	case bool:
+		if x {
+			return "true"
+		}
+		return "false"
+	case int:
+		return strconv.Itoa(x)
+	case int8:
+		return strconv.FormatInt(int64(x), 10)
+	case int16:
+		return strconv.FormatInt(int64(x), 10)
+	case int32:
+		return strconv.FormatInt(int64(x), 10)
+	case int64:
+		return strconv.FormatInt(x, 10)
+	case uint:
+		return strconv.FormatUint(uint64(x), 10)
+	case uint8:
+		return strconv.FormatUint(uint64(x), 10)
+	case uint16:
+		return strconv.FormatUint(uint64(x), 10)
+	case uint32:
+		return strconv.FormatUint(uint64(x), 10)
+	case uint64:
+		return strconv.FormatUint(x, 10)
+	case float32:
+		return strconv.FormatFloat(float64(x), 'f', -1, 32)
+	case float64:
+		return strconv.FormatFloat(x, 'f', -1, 64)
+	case json.Number:
+		return x.String()
+	default:
+		if b, err := json.Marshal(v); err == nil {
+			return string(b)
+		}
+		return fmt.Sprintf("%v", v)
+	}
 }
 
 // parseCases decodes an array of {id, name, spec} case objects. The id
