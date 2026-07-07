@@ -7,11 +7,8 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
-	"syscall"
 	"time"
 
 	"apiman/internal/crypto"
@@ -22,16 +19,7 @@ import (
 	"golang.org/x/crypto/nacl/secretbox"
 )
 
-// hideWindowCmd creates an exec.Cmd that hides the window on Windows
-func hideWindowCmd(name string, args ...string) *exec.Cmd {
-	cmd := exec.Command(name, args...)
-	if runtime.GOOS == "windows" {
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			HideWindow: true,
-		}
-	}
-	return cmd
-}
+// hideWindowCmd is implemented per-platform in git_windows.go and git_unix.go.
 
 // encrypt uses NaCl secretbox for secure encryption
 func encrypt(plaintext string) string {
