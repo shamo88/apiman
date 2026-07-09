@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { AppstoreOutlined, CloseOutlined, MinusOutlined, SearchOutlined, SettingOutlined, KeyOutlined, GlobalOutlined } from '@ant-design/icons';
-import { Select, Tabs } from 'antd';
+import { Select, Tabs, message } from 'antd';
 import { Quit, WindowMinimise, WindowToggleMaximise } from '../../../wailsjs/runtime/runtime';
 import { SettingsModal } from './SettingsModal';
 import { MCPRuntimeStatus } from '../MCPRuntimeStatus';
 import { useEnvironmentStore, useProjectStore, useUIStore, useWorkspaceStore } from '../../store';
+import { confirmDirtyCloseAll } from '../../hooks/useWorkspaceHandlers';
+import { UpdateRequest, UpdateRequestScripts } from '../../../wailsjs/go/main/App';
+import { toWailsHttpSpec } from '../../utils/curlUtils';
 
 interface TitleBarProps {
   onOpenShortcutsHelp?: () => void;
@@ -41,12 +44,117 @@ export const TitleBar: React.FC<TitleBarProps> = ({ onOpenShortcutsHelp }) => {
     }
   };
 
-  const handleClose = async () => {
+  // —— 脏数据保护工具 ——
+
+  /** 获取指定项目下所有 dirty tabId 列表 */
+  const getProjectDirtyTabIds = (projectId: string): string[] => {
+    const ws = workspaceStore.workspaceStates[projectId];
+    if (!ws) return [];
+    return Array.from(ws.dirtyTabs);
+  };
+
+  /** 获取所有项目中 dirty tab 的总数（用于退出 app 时的全局检查） */
+  const getTotalDirtyCount = (): number => {
+    let count = 0;
+    for (const projectId of Object.keys(workspaceStore.workspaceStates)) {
+      count += workspaceStore.workspaceStates[projectId].dirtyTabs.size;
+    }
+    return count;
+  };
+
+  /** 丢弃指定项目下所有 dirty tab 的草稿 */
+  const discardProjectDirtyTabs = (projectId: string) => {
+    const ws = workspaceStore.workspaceStates[projectId];
+    if (!ws) return;
+    const dirtyIds: string[] = [];
+    ws.dirtyTabs.forEach((id) => dirtyIds.push(id));
+    dirtyIds.forEach((tabId) => workspaceStore.clearTabContent(projectId, tabId));
+  };
+
+  /**
+   * 保存指定项目下所有 dirty tabs
+   * 返回是否全部成功（任一失败立刻停止并返回 false）
+   */
+  const saveProjectDirtyTabs = async (projectId: string): Promise<boolean> => {
+    const ws = workspaceStore.workspaceStates[projectId];
+    if (!ws) return true;
+    const dirtyIds: string[] = [];
+    ws.dirtyTabs.forEach((id) => dirtyIds.push(id));
+    if (dirtyIds.length === 0) return true;
+
+    for (const tabId of dirtyIds) {
+      const tab = ws.requestTabs.find((t) => t.id === tabId);
+      const draft = ws.tabDrafts[tabId];
+      if (!tab || !draft) continue;
+      try {
+        // 直接调 Wails API（不依赖 useProjects hook，因为这里是 TitleBar 上下文）
+        await UpdateRequest(
+          tab.path,
+          toWailsHttpSpec({ ...draft, name: '' }),
+          [],
+          '',
+        );
+        await UpdateRequestScripts(tab.path, draft.preScripts, draft.postScripts);
+        workspaceStore.markTabSaved(projectId, tabId);
+      } catch (e: any) {
+        message.error(`保存失败：${e?.message || String(e)}`);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  /** 关闭项目 tab（带 dirty 拦截） */
+  const handleCloseProject = async (projectId: string) => {
+    const dirtyIds = getProjectDirtyTabIds(projectId);
+    const projectName = projectStore.projectTabs.find((t) => t.id === projectId)?.title || '项目';
+
+    if (dirtyIds.length > 0) {
+      const choice = await confirmDirtyCloseAll(`关闭项目 "${projectName}"`, dirtyIds.length);
+      if (choice === 'cancel') return;
+      if (choice === 'save-all') {
+        const ok = await saveProjectDirtyTabs(projectId);
+        if (!ok) return; // 保存失败保留 dirty tabs，不关闭
+      } else {
+        discardProjectDirtyTabs(projectId);
+      }
+    }
+
+    projectStore.closeProjectTab(projectId);
+    workspaceStore.resetWorkspaceState(projectId);
+  };
+
+  /** 退出 app（带全局 dirty 拦截） */
+  const handleQuit = async () => {
+    const totalDirty = getTotalDirtyCount();
+    if (totalDirty > 0) {
+      const choice = await confirmDirtyCloseAll('退出 Apiman', totalDirty);
+      if (choice === 'cancel') return;
+      if (choice === 'save-all') {
+        const projectIds = Object.keys(workspaceStore.workspaceStates)
+          .filter((pid) => workspaceStore.workspaceStates[pid].dirtyTabs.size > 0);
+        for (const pid of projectIds) {
+          const ok = await saveProjectDirtyTabs(pid);
+          if (!ok) {
+            message.error('部分保存失败，已中止退出');
+            return;
+          }
+        }
+      } else {
+        for (const pid of Object.keys(workspaceStore.workspaceStates)) {
+          discardProjectDirtyTabs(pid);
+        }
+      }
+    }
     try {
       await Quit();
     } catch (error) {
       console.error('Failed to close window:', error);
     }
+  };
+
+  const handleClose = async () => {
+    await handleQuit();
   };
 
   const handleOpenSettings = () => {
@@ -64,9 +172,8 @@ export const TitleBar: React.FC<TitleBarProps> = ({ onOpenShortcutsHelp }) => {
   const handleTabEdit = (targetKey: React.MouseEvent | React.KeyboardEvent | string, action: 'add' | 'remove') => {
     if (action === 'remove' && targetKey !== 'home') {
       const closingProjectId = targetKey as string;
-      projectStore.closeProjectTab(closingProjectId);
-      // 关闭项目 tab 时清理该项目的 workspace 状态，释放内存
-      workspaceStore.resetWorkspaceState(closingProjectId);
+      // 关闭项目 tab 前检查 dirty tabs，弹 Modal 让用户选择保存/放弃/取消
+      handleCloseProject(closingProjectId);
     }
   };
 
