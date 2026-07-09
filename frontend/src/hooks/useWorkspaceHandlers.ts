@@ -1,14 +1,16 @@
 import { useCallback, useEffect } from 'react';
-import { message } from 'antd';
+import React from 'react';
+import { message, Modal, Button, Space } from 'antd';
 import { useProjects } from './useProjects';
 import { useRequest } from './useRequest';
-import { GetRequest, GetProjectTree } from '../../wailsjs/go/main/App';
+import { GetRequest, GetProjectTree, UpdateRequest, UpdateRequestScripts } from '../../wailsjs/go/main/App';
 import { useWorkspaceStore, createEmptyWorkspaceState } from '../store/useWorkspaceStore';
 import { useProjectStore } from '../store/useProjectStore';
 import { useUIStore } from '../store/useUIStore';
 import type { CurlRequest } from '../constants/defaults';
 import type { ProjectTree } from '../store';
 import { apiConfigFromRequest, apiConfigFromHttpSpec, hydrateRequestEditor } from '../utils';
+import { toWailsHttpSpec } from '../utils/curlUtils';
 import { models } from '../../wailsjs/go/models';
 
 export const useWorkspace = (projectId: string) => {
@@ -31,7 +33,6 @@ export const useWorkspace = (projectId: string) => {
 
 export const useWorkspaceHandlers = (projectId: string) => {
   const {
-    saveRequest,
     addCase,
     duplicateCase,
     deleteCase,
@@ -101,6 +102,9 @@ export const useWorkspaceHandlers = (projectId: string) => {
           request.interface_spec || models.HttpRequestSpec.createFrom({}),
           request.name || ''
         );
+        // 多 tab 隔离：按 tabId 存 cases
+        workspaceStore.initTabCases(projectId, tab.id, reqRows, '', ifaceCfg);
+        // 同步给旧字段（保持兼容）
         workspaceStore.setWorkspaceState(projectId, {
           requestCases: reqRows,
           activeCaseId: '',
@@ -108,6 +112,8 @@ export const useWorkspaceHandlers = (projectId: string) => {
           requestEditorSurface: 'interface',
         });
       } else {
+        // 多 tab 隔离：按 tabId 存空 cases
+        workspaceStore.initTabCases(projectId, tab.id, [], '', { ...cfg });
         workspaceStore.setWorkspaceState(projectId, {
           requestCases: [],
           activeCaseId: '',
@@ -115,7 +121,7 @@ export const useWorkspaceHandlers = (projectId: string) => {
           requestEditorSurface: 'interface',
         });
       }
-      workspaceStore.setApiConfig(projectId, {
+      workspaceStore.initTabContent(projectId, tab.id, {
         ...cfg,
         preScripts: request.pre_scripts || [],
         postScripts: request.post_scripts || [],
@@ -183,12 +189,15 @@ export const useWorkspaceHandlers = (projectId: string) => {
               request.interface_spec || models.HttpRequestSpec.createFrom({}),
               request.name || ''
             );
+            // 多 tab 隔离：按 reqPath 存 cases
+            workspaceStore.initTabCases(projectId, reqPath, rows, caseId, ifaceCfg);
+            // 同步给旧字段
             workspaceStore.setWorkspaceState(projectId, {
               requestCases: rows,
               activeCaseId: caseId,
               interfaceApiConfig: ifaceCfg,
             });
-            workspaceStore.setApiConfig(projectId, { ...caseConfig, name: request.name || '' });
+            workspaceStore.initTabContent(projectId, reqPath, { ...caseConfig, name: request.name || '' });
           }
         } else {
           // First time loading cases for this request - load from server and preserve interface
@@ -201,6 +210,8 @@ export const useWorkspaceHandlers = (projectId: string) => {
             request.interface_spec || models.HttpRequestSpec.createFrom({}),
             request.name || ''
           );
+          // 多 tab 隔离：按 reqPath 存 cases
+          workspaceStore.initTabCases(projectId, reqPath, rows, caseId, ifaceCfg);
           workspaceStore.setWorkspaceState(projectId, {
             requestCases: rows,
             activeCaseId: caseId,
@@ -208,7 +219,7 @@ export const useWorkspaceHandlers = (projectId: string) => {
           });
           const activeCase = rows.find(r => r.id === caseId);
           if (activeCase) {
-            workspaceStore.setApiConfig(projectId, { ...activeCase.config, name: request.name || '' });
+            workspaceStore.initTabContent(projectId, reqPath, { ...activeCase.config, name: request.name || '' });
           }
         }
         workspaceStore.setRequestEditorSurface(projectId, 'case');
@@ -223,64 +234,114 @@ export const useWorkspaceHandlers = (projectId: string) => {
     if (!project) return;
     const envId = workspace.selectedEnvironmentId;
     try {
+      // 多 tab 隔离：使用当前激活 tab 的草稿（避免用错其他 tab 的配置）
+      const latestWs = workspaceStore.workspaceStates[projectId];
+      const currentConfig = latestWs?.tabDrafts[latestWs.activeRequestTab] || latestWs?.apiConfig;
       await executeRequest(
         project.id,
         envId,
-        workspace.apiConfig,
-        workspace.apiConfig.preScripts,
-        workspace.apiConfig.postScripts,
-        workspace.currentRequest?.name || '',
-        workspace.currentRequest?.path || ''
+        currentConfig!,
+        currentConfig!.preScripts,
+        currentConfig!.postScripts,
+        latestWs?.currentRequest?.name || '',
+        latestWs?.currentRequest?.path || ''
       );
     } catch (error) {
       // Error handled in hook
     }
-  }, [project, workspace, executeRequest]);
+  }, [project, executeRequest, workspaceStore, projectId]);
 
   const handleSaveRequest = useCallback(async () => {
-    if (!project || !workspace.currentRequest?.path) {
+    // 关键：从 store 同步拿最新 workspace，避免 useCallback 闭包 stale 导致保存错 tab
+    const latestWs = workspaceStore.workspaceStates[projectId];
+    const activeTabId = latestWs?.activeRequestTab;
+    // 优先用 requestTabs 里的 path（按 active tab 取），不依赖 currentRequest（可能滞后）
+    const activeTab = latestWs?.requestTabs.find(t => t.id === activeTabId);
+    const requestPath = activeTab?.path || latestWs?.currentRequest?.path;
+    if (!project || !requestPath || !activeTabId) {
       message.error('请先在左侧选择一个请求，或创建新请求');
-      return;
+      return false;
     }
     try {
-      // Preserve existing cases by passing current requestCases
-      await saveRequest(
-        project.id,
-        workspace.currentRequest.path,
-        workspace.apiConfig,
-        workspace.requestCases.map(c => ({ id: c.id, name: c.name, config: c.config })),
-        workspace.activeCaseId
+      const currentConfig = latestWs!.tabDrafts[activeTabId] || latestWs!.apiConfig;
+      // 多 tab 隔离：按 activeTabId 拿 cases
+      const { cases, activeCaseId } = workspaceStore.getTabCases(projectId, activeTabId);
+      // 关键修复：直接调 UpdateRequest + UpdateRequestScripts，不走 useProjects.saveRequest
+      // 原因：saveRequest 不区分 case 模式 / 普通模式，会无条件用 draft 作为接口 spec，
+      // 并且会用 interfaceConfig（preScripts=[]）调 UpdateRequestScripts 清空接口的 pre/post scripts
+      const wailsSpec = models.HttpRequestSpec.createFrom(
+        toWailsHttpSpec({ ...currentConfig, name: '' }),
       );
+      const wailsCases = cases.map((c) =>
+        models.HttpRequestCase.createFrom({
+          id: c.id,
+          name: (c.name || '').trim() || '未命名',
+          spec: models.HttpRequestSpec.createFrom(toWailsHttpSpec({ ...c.config, name: '' })),
+        })
+      );
+      await UpdateRequest(requestPath, wailsSpec, wailsCases, activeCaseId);
+      // pre/post scripts 是接口级，case 模式下不应被覆盖
+      if (cases.length === 0) {
+        await UpdateRequestScripts(requestPath, currentConfig.preScripts, currentConfig.postScripts);
+      }
+      // 保存成功：把当前 tab 的 draft 提升为 baseline，清除 dirty
+      workspaceStore.markTabSaved(projectId, activeTabId);
+      return true;
     } catch (error) {
       // Error handled in hook
+      return false;
     }
-  }, [project, workspace, saveRequest]);
+  }, [project, workspaceStore, projectId]);
 
   // Save only the active case, preserving interface and other cases
   const handleSaveCase = useCallback(async () => {
-    if (!project || !workspace.currentRequest?.path || !workspace.activeCaseId) {
+    // 关键：从 store 同步拿最新 workspace，避免闭包 stale 问题
+    const latestWs = workspaceStore.workspaceStates[projectId];
+    const activeTabId = latestWs?.activeRequestTab;
+    const activeTab = latestWs?.requestTabs.find(t => t.id === activeTabId);
+    const requestPath = activeTab?.path || latestWs?.currentRequest?.path;
+    if (!project || !requestPath || !activeTabId) {
       message.error('请先选择一个请求和用例');
-      return;
+      return false;
+    }
+    // 多 tab 隔离：按 activeTabId 拿 cases
+    const { cases, activeCaseId, interfaceConfig } = workspaceStore.getTabCases(projectId, activeTabId);
+    if (!activeCaseId) {
+      message.error('请先选择一个用例');
+      return false;
     }
     try {
-      // Replace only the active case in the cases array
-      const updatedCases = workspace.requestCases.map(c =>
-        c.id === workspace.activeCaseId
-          ? { id: c.id, name: c.name, config: workspace.apiConfig }
+      const currentConfig = latestWs.tabDrafts[activeTabId] || latestWs.apiConfig;
+      // 关键修复：直接调 UpdateRequest，不走 useProjects.saveRequest
+      // 原因：saveRequest 内部会调 UpdateRequestScripts(path, apiConfig.preScripts, ...)，
+      // apiConfig 用的是 interfaceConfig（接口定义），preScripts 是 []，
+      // 这会清空接口本身的 pre/post scripts（pre-existing bug）
+      // spec 用 interfaceConfig（保持接口定义不变），cases 中 active case 替换为 currentConfig
+      const updatedCases = cases.map(c =>
+        c.id === activeCaseId
+          ? { id: c.id, name: c.name, config: currentConfig }
           : c
       );
-      // Use interfaceApiConfig for the interface spec to preserve original interface
-      await saveRequest(
-        project.id,
-        workspace.currentRequest.path,
-        workspace.interfaceApiConfig,
-        updatedCases.map(c => ({ id: c.id, name: c.name, config: c.config })),
-        workspace.activeCaseId
+      const wailsSpec = models.HttpRequestSpec.createFrom(
+        toWailsHttpSpec({ ...interfaceConfig, name: '' }),
       );
+      const wailsCases = updatedCases.map((c) =>
+        models.HttpRequestCase.createFrom({
+          id: c.id,
+          name: (c.name || '').trim() || '未命名',
+          spec: models.HttpRequestSpec.createFrom(toWailsHttpSpec({ ...c.config, name: '' })),
+        })
+      );
+      await UpdateRequest(requestPath, wailsSpec, wailsCases, activeCaseId);
+      // case 模式下不调 UpdateRequestScripts（pre/post 是接口级，不是 case 级）
+      // 保存成功：把当前 tab 的 draft 提升为 baseline，清除 dirty
+      workspaceStore.markTabSaved(projectId, activeTabId);
+      return true;
     } catch (error) {
       // Error handled in hook
+      return false;
     }
-  }, [project, workspace, saveRequest]);
+  }, [project, workspaceStore, projectId]);
 
   const handleDeleteRequest = useCallback(async (path: string) => {
     try {
@@ -381,7 +442,7 @@ export const useWorkspaceHandlers = (projectId: string) => {
 
       // Update apiConfig when switching tabs (matching handleTreeItemClick behavior)
       const cfg = apiConfigFromRequest(request as CurlRequest, request.name || '');
-      workspaceStore.setApiConfig(projectId, {
+      workspaceStore.initTabContent(projectId, path, {
         ...cfg,
         preScripts: request.pre_scripts || [],
         postScripts: request.post_scripts || [],
@@ -399,12 +460,16 @@ export const useWorkspaceHandlers = (projectId: string) => {
           request.interface_spec || models.HttpRequestSpec.createFrom({}),
           request.name || ''
         );
+        // 多 tab 隔离：按 path 存 cases
+        workspaceStore.initTabCases(projectId, path, rows, '', ifaceCfg);
         workspaceStore.setWorkspaceState(projectId, {
           requestCases: rows,
           activeCaseId: '',
           interfaceApiConfig: ifaceCfg,
         });
       } else {
+        // 多 tab 隔离：按 path 存空 cases
+        workspaceStore.initTabCases(projectId, path, [], '', cfg);
         workspaceStore.setWorkspaceState(projectId, {
           requestCases: [],
           activeCaseId: '',
@@ -419,38 +484,134 @@ export const useWorkspaceHandlers = (projectId: string) => {
   }, [projectId, workspaceStore]);
 
   const handleRequestTabChange = useCallback((tabId: string) => {
+    // 切换 tab 时不再重新加载：草稿数据已在 store 中（多 tab 隔离设计），
+    // 否则会覆盖用户在未保存状态下对其他 tab 的修改。
     workspaceStore.setActiveRequestTab(projectId, tabId);
-    const tab = workspace.requestTabs.find(t => t.id === tabId);
-    if (tab) {
-      loadRequestContent(tab.path);
-    }
-  }, [projectId, workspace, workspaceStore, loadRequestContent]);
+    // 恢复目标 tab 的 case 快照到全局字段（cases/activeCaseId/interfaceApiConfig/surface）
+    workspaceStore.restoreTabCasesToActive(projectId, tabId);
+  }, [projectId, workspaceStore]);
 
-  const handleCloseRequestTab = useCallback((tabId: string) => {
+  const handleCloseRequestTab = useCallback(async (tabId: string) => {
+    // 关键修复：保存逻辑不再依赖 activeRequestTab，避免切换 tab 时的副作用与 stale 闭包
+    // 直接从 store 按 tabId 取出 draft + path，调 Wails API 保存
+    const saveTabById = async (targetTabId: string): Promise<boolean> => {
+      const latestWs = workspaceStore.workspaceStates[projectId];
+      const tab = latestWs?.requestTabs.find((t) => t.id === targetTabId);
+      const draft = latestWs?.tabDrafts[targetTabId];
+      if (!project || !tab || !draft) return false;
+      try {
+        // 多 tab 隔离：按目标 tabId 拿 cases（处理 case 模式编辑后关 tab 不丢数据）
+        // getTabCases 会按 tabId 找；找不到时回退到 workspace 共享字段（兼容旧数据）
+        let cases = workspaceStore.getTabCases(projectId, targetTabId).cases;
+        const { activeCaseId: tabActiveCaseId, interfaceConfig: tabInterfaceConfig } =
+          workspaceStore.getTabCases(projectId, targetTabId);
+        // 如果目标 tab 没有任何 tabCases 记录（从未进入 case 模式或兼容旧数据），
+        // 从后端拉最新数据防止误覆盖
+        const hasTabCases = latestWs?.tabCases && latestWs.tabCases[targetTabId] !== undefined;
+        if (!hasTabCases && (!cases || cases.length === 0)) {
+          try {
+            const freshReq = await GetRequest(tab.path);
+            const freshCases = freshReq?.cases as models.HttpRequestCase[] | undefined;
+            cases = (freshCases || []).map((c) => ({
+              id: c.id,
+              name: c.name,
+              config: apiConfigFromHttpSpec(c.spec, c.name),
+            }));
+          } catch {
+            cases = [];
+          }
+        }
+
+        // 关键：判断 tab 是不是 case 模式
+        // - case 模式（cases.length > 0）：spec 必须用 interfaceConfig（保持接口定义不变），
+        //   cases 数组中 active case 的 config 替换为 draft
+        // - 普通接口模式（cases.length === 0）：spec = draft，cases 保持
+        const isCaseMode = cases.length > 0;
+
+        let wailsSpec: models.HttpRequestSpec;
+        let wailsCases: models.HttpRequestCase[] = [];
+        let finalActiveCaseId = '';
+
+        if (isCaseMode) {
+          // case 模式：spec 用接口定义（tabInterfaceConfig）；保持接口 spec 不变
+          wailsSpec = models.HttpRequestSpec.createFrom(toWailsHttpSpec({ ...tabInterfaceConfig, name: '' }));
+          // 把 cases 数组中 active case 的 config 替换为 draft（用户编辑的 case 内容）
+          const updatedCases = cases.map(c =>
+            c.id === tabActiveCaseId
+              ? { id: c.id, name: c.name, config: draft }
+              : c
+          );
+          wailsCases = updatedCases.map((c) =>
+            models.HttpRequestCase.createFrom({
+              id: c.id,
+              name: (c.name || '').trim() || '未命名',
+              spec: models.HttpRequestSpec.createFrom(toWailsHttpSpec({ ...c.config, name: '' })),
+            })
+          );
+          finalActiveCaseId = tabActiveCaseId;
+        } else {
+          // 普通接口模式：spec 用 draft（用户编辑的接口内容）
+          wailsSpec = models.HttpRequestSpec.createFrom(toWailsHttpSpec({ ...draft, name: '' }));
+          // cases 为空（普通接口无 case）
+        }
+
+        await UpdateRequest(
+          tab.path,
+          wailsSpec,
+          wailsCases,
+          finalActiveCaseId,
+        );
+        // UpdateRequestScripts 是接口级的，case 模式下不调（避免清空接口的 pre/post scripts）
+        // 普通模式下才更新 pre/post scripts
+        if (!isCaseMode) {
+          await UpdateRequestScripts(tab.path, draft.preScripts, draft.postScripts);
+        }
+        workspaceStore.markTabSaved(projectId, targetTabId);
+        return true;
+      } catch (e: any) {
+        console.error('[handleCloseRequestTab] save failed:', e);
+        return false;
+      }
+    };
+
     const workspace = workspaceStore.workspaceStates[projectId];
     if (!workspace) return;
 
     const wasActiveTab = workspace.activeRequestTab === tabId;
     const tabs = workspace.requestTabs;
     const closedIndex = tabs.findIndex((t) => t.id === tabId);
+    const isDirty = workspaceStore.isTabDirty(projectId, tabId);
+
+    // 如果 tab 有未保存改动，弹 Modal 让用户选择
+    if (isDirty) {
+      const tab = tabs.find(t => t.id === tabId);
+      const tabTitle = tab?.title || '该请求';
+      const choice = await confirmDirtyClose(tabTitle);
+      if (choice === 'cancel') return;
+
+      if (choice === 'save') {
+        // 直接按 tabId 保存，不切换 activeRequestTab（避免一切副作用）
+        const ok = await saveTabById(tabId);
+        if (!ok) {
+          message.error('保存失败，请重试');
+          return; // 不关闭 tab，保留 dirty 状态
+        }
+      } else {
+        // choice === 'discard': 清除草稿
+        workspaceStore.clearTabContent(projectId, tabId);
+      }
+    }
 
     workspaceStore.closeRequestTab(projectId, tabId);
 
-    // 如果关闭的是当前激活的 tab，关闭后需要加载新 tab 的内容
+    // 关闭激活 tab 后，切换到相邻 tab（不再 reload，草稿已在 store）
     if (wasActiveTab && tabs.length > 1) {
-      // 计算关闭后哪个 tab 会成为新的激活 tab
       const newActiveTab = tabs[closedIndex - 1] || tabs[0];
       if (newActiveTab && newActiveTab.id !== tabId) {
-        // 手动触发内容加载
-        const newWorkspace = workspaceStore.workspaceStates[projectId];
-        const newTab = newWorkspace.requestTabs.find((t) => t.id === newActiveTab.id);
-        if (newTab?.path) {
-          workspaceStore.setActiveRequestTab(projectId, newTab.id);
-          loadRequestContent(newTab.path);
-        }
+        workspaceStore.setActiveRequestTab(projectId, newActiveTab.id);
       }
     }
-  }, [projectId, workspaceStore, loadRequestContent]);
+  }, [projectId, project, workspaceStore]);
 
   const handleCreateFolder = useCallback(async (name: string, parentPath: string) => {
     if (!project) return;
@@ -512,4 +673,82 @@ export const useWorkspaceHandlers = (projectId: string) => {
     cancelRequest,
     handleRenameRequest,
   };
+};
+
+/**
+ * 弹出三按钮确认框：保存 / 放弃 / 取消
+ * 因为 useWorkspaceHandlers.ts 是 .ts 文件，用 React.createElement 替代 JSX。
+ * 返回 Promise<'save' | 'discard' | 'cancel'>
+ */
+export const confirmDirtyClose = (tabTitle: string): Promise<'save' | 'discard' | 'cancel'> => {
+  return new Promise((resolve) => {
+    let resolved = false;
+    const finish = (choice: 'save' | 'discard' | 'cancel') => {
+      if (resolved) return;
+      resolved = true;
+      Modal.destroyAll();
+      resolve(choice);
+    };
+    const footer = React.createElement(
+      Space,
+      null,
+      React.createElement(Button, { onClick: () => finish('cancel') }, '取消'),
+      React.createElement(Button, { danger: true, onClick: () => finish('discard') }, '放弃修改'),
+      React.createElement(Button, { type: 'primary', onClick: () => finish('save') }, '保存并关闭'),
+    );
+    Modal.confirm({
+      title: `"${tabTitle}" 有未保存的修改`,
+      content: '请选择如何处理当前 tab 的修改：',
+      icon: null,
+      footer,
+      // 用户点 X 或 ESC 等价于"取消"
+      onCancel: () => finish('cancel'),
+    });
+  });
+};
+
+/**
+ * 批量未保存确认框（关项目 / 退出 app 时使用）
+ * - title: 资源名（项目名或 "退出 Apiman"）
+ * - count: 涉及的 dirty tab 数
+ * 返回 Promise<'save-all' | 'discard-all' | 'cancel'>
+ */
+export const confirmDirtyCloseAll = (
+  title: string,
+  count: number,
+): Promise<'save-all' | 'discard-all' | 'cancel'> => {
+  return new Promise((resolve) => {
+    let resolved = false;
+    const finish = (choice: 'save-all' | 'discard-all' | 'cancel') => {
+      if (resolved) return;
+      resolved = true;
+      Modal.destroyAll();
+      resolve(choice);
+    };
+    const footer = React.createElement(
+      Space,
+      null,
+      React.createElement(Button, { onClick: () => finish('cancel') }, '取消'),
+      React.createElement(
+        Button,
+        { danger: true, onClick: () => finish('discard-all') },
+        count > 0 ? '放弃全部修改' : '确认',
+      ),
+      React.createElement(
+        Button,
+        { type: 'primary', onClick: () => finish('save-all') },
+        count > 0 ? '保存全部并继续' : '确定',
+      ),
+    );
+    const contentText = count > 0
+      ? `共有 ${count} 个 tab 有未保存的修改。\n请选择如何处理：\n• 保存全部：将所有改动落盘后再继续\n• 放弃全部：丢弃所有改动\n• 取消：留在当前页面`
+      : '确定要继续吗？';
+    Modal.confirm({
+      title,
+      content: React.createElement('div', { style: { whiteSpace: 'pre-line' } }, contentText),
+      icon: null,
+      footer,
+onCancel: () => finish('cancel'),
+    });
+  });
 };

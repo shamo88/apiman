@@ -469,12 +469,13 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
   const environmentVariables = useMemo(() => selectedEnvironment?.variables || {}, [selectedEnvironment]);
   const scriptLogs = useMemo(() => workspace.response?.script_logs || [], [workspace.response]);
   const testResults = useMemo(() => workspace.response?.tests || [], [workspace.response]);
-  // 当前用例名
+  // 当前用例名（按 activeTabId 从多 tab 隔离的 tabCases 取，缺失时回退到 workspace 共享字段）
   const activeCaseName = useMemo(() => {
-    if (workspace.requestEditorSurface !== 'case' || !workspace.activeCaseId) return '';
-    const caseItem = workspace.requestCases.find(c => c.id === workspace.activeCaseId);
+    const tabCasesInfo = workspaceStore.getTabCases(projectId, activeTab?.id || '');
+    if (workspace.requestEditorSurface !== 'case' || !tabCasesInfo.activeCaseId) return '';
+    const caseItem = tabCasesInfo.cases.find(c => c.id === tabCasesInfo.activeCaseId);
     return caseItem?.name || '';
-  }, [workspace.requestEditorSurface, workspace.activeCaseId, workspace.requestCases]);
+  }, [workspaceStore, projectId, activeTab, workspace.requestEditorSurface]);
 
   // 展开/折叠模块 - 展开时同时激活模块以加载数据
   const toggleModule = (module: 'apis' | 'environments' | 'scripts' | 'project-settings') => {
@@ -723,10 +724,17 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
                     handleCloseRequestTab(targetKey as string);
                   }
                 }}
-                items={requestTabs.map(tab => ({
-                  key: tab.id,
-                  label: tab.title,
-                }))}
+                items={requestTabs.map(tab => {
+                  const isDirty = workspace.dirtyTabs?.has(tab.id);
+                  return {
+                    key: tab.id,
+                    label: (
+                      <span style={isDirty ? { fontStyle: 'italic' } : undefined}>
+                        {tab.title}{isDirty ? ' *' : ''}
+                      </span>
+                    ),
+                  };
+                })}
                 size="small"
                 style={{ marginBottom: 0 }}
               />
@@ -752,8 +760,8 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({ projectId })
             <>
               <div className="workspace-request">
                 <RequestPanel
-                  apiConfig={workspace.apiConfig}
-                  onApiConfigChange={(config) => handleUpdateWorkspace({ apiConfig: config })}
+                  apiConfig={workspaceStore.getCurrentApiConfig(projectId)}
+                  onApiConfigChange={(config) => workspaceStore.setTabDraft(projectId, activeRequestTab, config)}
                   executing={executing}
                   onExecute={handleExecuteRequest}
                   onCancel={cancelRequest}

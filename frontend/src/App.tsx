@@ -13,6 +13,7 @@ import { GlobalVariablesModal } from './components/GlobalVariablesModal';
 
 import {
   useProjectStore,
+  useWorkspaceStore,
 } from './store';
 import {
   useProjectHandlers,
@@ -24,6 +25,7 @@ const App: React.FC = () => {
   const [shortcutsHelpVisible, setShortcutsHelpVisible] = useState(false);
 
   const projectStore = useProjectStore();
+  const workspaceStore = useWorkspaceStore();
 
   const { handleOpenProject } = useProjectHandlers();
 
@@ -46,6 +48,29 @@ const App: React.FC = () => {
   useEffect(() => {
     projectStore.setLoading(false);
   }, []);
+
+  // 退出/卸载前的脏数据拦截
+  // - beforeunload: 浏览器原生拦截（覆盖刷新、Ctrl+W、点 X 等触发的前端事件）
+  // - Wails 桌面端点 X 也会先派发 beforeunload，e.returnValue 非空时浏览器/Wails 会弹原生确认
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      let hasDirty = false;
+      for (const pid of Object.keys(workspaceStore.workspaceStates)) {
+        if (workspaceStore.workspaceStates[pid].dirtyTabs.size > 0) {
+          hasDirty = true;
+          break;
+        }
+      }
+      if (hasDirty) {
+        e.preventDefault();
+        // Chrome 需要设 returnValue 才能触发原生确认弹窗
+        e.returnValue = '有未保存的修改，确定要离开吗？';
+        return e.returnValue;
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [workspaceStore]);
 
   const getShortcutMessage = () => {
     switch (activeShortcut) {
